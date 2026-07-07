@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from backend.core.config import settings
@@ -18,3 +18,14 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _migrate_student_last_seen()
+
+
+def _migrate_student_last_seen():
+    insp = inspect(engine)
+    if "student" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("student")}
+        if "last_seen_at" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE student ADD COLUMN last_seen_at DATETIME"))
+                conn.commit()

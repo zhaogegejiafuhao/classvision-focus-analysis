@@ -61,6 +61,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import { marked } from 'marked'
 
 const route = useRoute()
 const classroomId = route.params.id
@@ -75,16 +76,12 @@ const timelineEl = ref(null)
 const studentCols = [
   { title: '姓名', dataIndex: 'name', key: 'name' },
   { title: '平均注意力', dataIndex: 'avg_attention', key: 'avg_attention' },
-  { title: '低头次数', dataIndex: 'head_down_count', key: 'head_down_count' },
+  { title: '低头人次', dataIndex: 'head_down_count', key: 'head_down_count' },
   { title: '眨眼次数', dataIndex: 'blink_count', key: 'blink_count' },
 ]
 
 function renderMarkdown(text) {
-  return text.replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>')
+  return marked.parse(text, { breaks: true })
 }
 
 async function genReport() {

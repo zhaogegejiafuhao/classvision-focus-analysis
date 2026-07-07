@@ -1,6 +1,7 @@
 import asyncio
 import json
 import base64
+from datetime import datetime, timedelta
 
 import cv2
 import numpy as np
@@ -27,17 +28,30 @@ def _process_frame(frame):
 def _save_records(classroom_id: int, faces: list):
     db: Session = SessionLocal()
     try:
+        now = datetime.now()
         for face in faces:
             track_id = face["track_id"]
             student = db.query(Student).filter(
                 Student.classroom_id == classroom_id,
                 Student.track_id == track_id,
             ).first()
+
             if not student:
-                student = Student(classroom_id=classroom_id, track_id=track_id)
-                db.add(student)
-                db.commit()
-                db.refresh(student)
+                stale = db.query(Student).filter(
+                    Student.classroom_id == classroom_id,
+                    Student.last_seen_at < now - timedelta(seconds=5),
+                ).order_by(Student.last_seen_at.desc()).first()
+
+                if stale:
+                    stale.track_id = track_id
+                    student = stale
+                else:
+                    student = Student(classroom_id=classroom_id, track_id=track_id)
+                    db.add(student)
+                    db.commit()
+                    db.refresh(student)
+
+            student.last_seen_at = now
 
             pose = face.get("pose", {})
             fatigue = face.get("fatigue", {})

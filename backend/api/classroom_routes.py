@@ -31,10 +31,21 @@ def get_classroom(classroom_id: int, db: Session = Depends(get_db)):
     if not classroom:
         raise HTTPException(404, "课堂不存在")
 
-    records = db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).all()
-    head_down_count = sum(1 for r in records if abs(r.pitch) > 15)
-    head_turn_count = sum(1 for r in records if abs(r.yaw) > 20)
-    fatigue_count = sum(1 for r in records if r.is_blinking)
+    student_ids = db.query(func.distinct(AttentionRecord.student_id)).filter(
+        AttentionRecord.classroom_id == classroom_id
+    ).all()
+
+    head_down_count = 0
+    head_turn_count = 0
+    fatigue_count = 0
+    for (sid,) in student_ids:
+        student_records = [r for r in records if r.student_id == sid]
+        if any(abs(r.pitch) > 15 for r in student_records):
+            head_down_count += 1
+        if any(abs(r.yaw) > 20 for r in student_records):
+            head_turn_count += 1
+        if any(r.is_blinking for r in student_records):
+            fatigue_count += 1
 
     high = sum(1 for r in records if r.attention_score >= 60)
     medium = sum(1 for r in records if 30 <= r.attention_score < 60)

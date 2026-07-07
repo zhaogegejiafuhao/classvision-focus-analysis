@@ -24,8 +24,6 @@ class FatigueDetector:
 
     def __init__(self, landmarker: FaceLandmarker = None):
         self._landmarker = landmarker
-        self.blink_counter = 0
-        self.total_blinks = 0
 
     @property
     def landmarker(self) -> FaceLandmarker:
@@ -50,12 +48,16 @@ class FatigueDetector:
             return 0.3
         return (v1 + v2) / (2.0 * h)
 
-    def detect(self, frame, bbox: list, landmarker_result: FaceLandmarkerResult = None):
+    def detect(self, frame, bbox: list, landmarker_result: FaceLandmarkerResult = None,
+               blink_state: dict = None):
+        if blink_state is None:
+            blink_state = {"counter": 0, "total": 0}
+
         if landmarker_result is None:
             landmarker_result = self._detect(frame, bbox)
 
         if landmarker_result is None or not landmarker_result.face_landmarks:
-            return {"ear": 0, "is_blinking": False, "blink_count": self.total_blinks}
+            return {"ear": 0, "is_blinking": False, "blink_count": blink_state["total"]}
 
         landmarks = landmarker_result.face_landmarks[0]
         x1, y1, x2, y2 = bbox
@@ -67,16 +69,16 @@ class FatigueDetector:
         ear = (self._calc_ear(left_eye) + self._calc_ear(right_eye)) / 2.0
 
         if ear < self.EAR_THRESHOLD:
-            self.blink_counter += 1
+            blink_state["counter"] += 1
         else:
-            if self.blink_counter >= self.EAR_CONSEC_FRAMES:
-                self.total_blinks += 1
-            self.blink_counter = 0
+            if blink_state["counter"] >= self.EAR_CONSEC_FRAMES:
+                blink_state["total"] += 1
+            blink_state["counter"] = 0
 
         return {
             "ear": round(ear, 3),
-            "is_blinking": self.blink_counter >= self.EAR_CONSEC_FRAMES,
-            "blink_count": self.total_blinks,
+            "is_blinking": blink_state["counter"] >= self.EAR_CONSEC_FRAMES,
+            "blink_count": blink_state["total"],
         }
 
     def _detect(self, frame, bbox: list):

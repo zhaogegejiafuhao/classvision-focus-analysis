@@ -27,6 +27,7 @@ class AttentionAnalyzer:
         self._landmarker: FaceLandmarker | None = None
         self.pose_estimator = PoseEstimator()
         self.fatigue_detector = FatigueDetector()
+        self._blink_states: dict[int, dict] = {}
 
     @property
     def landmarker(self) -> FaceLandmarker | None:
@@ -79,14 +80,21 @@ class AttentionAnalyzer:
 
     def analyze(self, frame, tracked_faces: list) -> dict:
         results = []
+        active_ids = set()
         for face in tracked_faces:
             bbox = face["bbox"]
             track_id = face["track_id"]
+            active_ids.add(track_id)
+
+            blink_state = self._blink_states.get(track_id, {"counter": 0, "total": 0})
 
             landmarker_result = self._detect_landmarks(frame, bbox)
 
             pose = self.pose_estimator.estimate(frame, bbox, landmarker_result)
-            fatigue = self.fatigue_detector.detect(frame, bbox, landmarker_result)
+            fatigue = self.fatigue_detector.detect(
+                frame, bbox, landmarker_result, blink_state=blink_state
+            )
+            self._blink_states[track_id] = blink_state
 
             gaze_score = self._score_gaze(pose)
             pose_score = self._score_pose(pose)
@@ -108,5 +116,9 @@ class AttentionAnalyzer:
                 "pose_score": round(pose_score, 1),
                 "fatigue_score": round(fatigue_score, 1),
             })
+
+        stale_ids = [tid for tid in self._blink_states if tid not in active_ids]
+        for tid in stale_ids:
+            del self._blink_states[tid]
 
         return {"faces": results, "count": len(results)}

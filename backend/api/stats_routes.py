@@ -47,7 +47,7 @@ def get_students(classroom_id: int, db: Session = Depends(get_db)):
     for s in students:
         records = db.query(AttentionRecord).filter(AttentionRecord.student_id == s.id).all()
         avg_att = sum(r.attention_score for r in records) / len(records) if records else 0
-        head_down = sum(1 for r in records if abs(r.pitch) > 15)
+        head_down = 1 if any(abs(r.pitch) > 15 for r in records) else 0
         blinks = records[-1].blink_count if records else 0
         result.append(StudentOut(
             id=s.id, track_id=s.track_id, name=s.name or f"学生{s.track_id}",
@@ -67,12 +67,27 @@ def create_report(classroom_id: int, db: Session = Depends(get_db)):
         return existing
 
     records = db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).all()
+
+    student_ids = set(r.student_id for r in records)
+    head_down_count = sum(
+        1 for sid in student_ids
+        if any(abs(r.pitch) > 15 for r in records if r.student_id == sid)
+    )
+    head_turn_count = sum(
+        1 for sid in student_ids
+        if any(abs(r.yaw) > 20 for r in records if r.student_id == sid)
+    )
+    fatigue_count = sum(
+        1 for sid in student_ids
+        if any(r.is_blinking for r in records if r.student_id == sid)
+    )
+
     stats = {
         "total_students": classroom.total_students,
         "avg_attention": classroom.avg_attention,
-        "head_down_count": sum(1 for r in records if abs(r.pitch) > 15),
-        "head_turn_count": sum(1 for r in records if abs(r.yaw) > 20),
-        "fatigue_count": sum(1 for r in records if r.is_blinking),
+        "head_down_count": head_down_count,
+        "head_turn_count": head_turn_count,
+        "fatigue_count": fatigue_count,
         "duration": classroom.duration,
     }
 

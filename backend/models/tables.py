@@ -30,6 +30,7 @@ class Student(Base):
     classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
     track_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     classroom: Mapped["Classroom"] = relationship(back_populates="students")
     records: Mapped[list["AttentionRecord"]] = relationship(back_populates="student")

@@ -18,9 +18,15 @@ frontend/dist/
 # 环境配置
 .env
 
-# YOLO 模型权重
+# YOLO 模型权重（首次运行会自动下载）
 *.pt
 *.onnx
+
+# MediaPipe 模型文件（首次运行会自动下载）
+cv_engine/models/*.task
+
+# SQLite 数据库
+*.db
 
 # 参考仓库（已在 references/ 中，按需忽略）
 # references/
@@ -31,3 +37,17 @@ Thumbs.db
 
 # 日志
 *.log
+
+# 未来模块：违规截图
+screenshots/
+captures/
+
+# 未来模块：试卷上传图片
+paper_scanner/uploads/
+paper_scanner/results/
+
+# 未来模块：PaddleOCR 缓存
+.paddleocr/
+
+# Ollama 模型缓存（系统级，不在项目目录）
+# ~/.ollama/
