@@ -1,0 +1,29 @@
+# ============================================
+# ClassVision 课堂注意力智能分析系统
+# Python 3.11+ 依赖清单
+# 安装方式: pip install -r requirements.txt
+# ============================================
+
+# --- Web 框架 ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+websockets==14.1
+
+# --- CV 视觉算法 ---
+ultralytics>=8.3.0           # YOLOv8 人脸检测 + 内置 ByteTrack 多目标跟踪
+mediapipe>=0.10.9            # Google MediaPipe FaceMesh 468 关键点
+opencv-python>=4.8.0         # 图像处理
+numpy>=1.24.0                # 数值计算（版本由 pip 自动解决兼容性）
+
+# --- 大模型 ---
+ollama==0.4.7                # Ollama Python SDK，调用本地 qwen2.5:7b
+
+# --- 数据库 ---
+sqlalchemy==2.0.36           # ORM
+
+# --- 配置与工具 ---
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+python-jose[cryptography]==3.3.0  # JWT 鉴权（可选）
