@@ -17,7 +17,7 @@ opencv-python>=4.8.0         # 图像处理
 numpy>=1.24.0                # 数值计算（版本由 pip 自动解决兼容性）
 
 # --- 大模型 ---
-ollama==0.4.7                # Ollama Python SDK，调用本地 qwen2.5:7b
+ollama==0.4.7                # Ollama Python SDK，调用本地大模型
 
 # --- 数据库 ---
 sqlalchemy==2.0.36           # ORM
