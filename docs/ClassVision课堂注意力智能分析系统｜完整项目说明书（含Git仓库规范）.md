@@ -84,7 +84,7 @@
 
 - 运行服务：Uvicorn
 
-- 数据库：PostgreSQL（适配时序数据统计）
+- 数据库：SQLite（轻量零配置，适配时序数据统计）
 
 - ORM：SQLAlchemy
 
@@ -158,7 +158,7 @@
 
 - WebSocket视频帧转发、帧缓冲、降帧优化
 
-- PostgreSQL数据表设计、时序行为数据存储
+- SQLite数据表设计、时序行为数据存储
 
 - 用户、课堂、历史记录全套业务接口
 

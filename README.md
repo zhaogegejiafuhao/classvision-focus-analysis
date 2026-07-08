@@ -6,8 +6,8 @@
 1. WebRTC浏览器无插件采集实时摄像头/本地视频文件
 2. YOLOv8+ByteTrack多人人脸跟踪，MediaPipe提取468关键点
 3. 融合视线偏移、俯仰角度、眨眼频率计算0-100注意力指数
-4. FastAPI WebSocket实时传输视频帧与识别结果，PostgreSQL存储时序行为数据
-5. Ollama本地部署Qwen2.5-7B离线大模型，自动生成结构化课堂教学改进报告
+4. FastAPI WebSocket实时传输视频帧与识别结果，SQLite存储时序行为数据
+5. Ollama本地部署qwen3:4b离线大模型，自动生成结构化课堂教学改进报告
 
 ## ✨ 核心功能
 - 双视频源：实时摄像头、本地MP4视频上传回放
@@ -21,11 +21,11 @@
 ### 前端（Vue3）
 Vue3 + Vite + Ant Design Vue | WebRTC | Canvas | ECharts | WebSocket
 ### 后端（Python）
-FastAPI | Uvicorn | PostgreSQL | SQLAlchemy | ollama-python
+FastAPI | Uvicorn | SQLite | SQLAlchemy | ollama-python
 ### 计算机视觉算法
 OpenCV | NumPy | YOLOv8-face | ByteTrack | MediaPipe FaceMesh
 ### 本地大模型
-Qwen2.5:7b-q4_K_M
+qwen3:4b
 
 ## ⚙️ 环境部署要求
 1. Python >= 3.10

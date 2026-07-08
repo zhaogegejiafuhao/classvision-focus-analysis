@@ -19,6 +19,7 @@ def get_db():
 def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_student_last_seen()
+    _migrate_classroom_exam_mode()
 
 
 def _migrate_student_last_seen():
@@ -28,4 +29,14 @@ def _migrate_student_last_seen():
         if "last_seen_at" not in columns:
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE student ADD COLUMN last_seen_at DATETIME"))
+                conn.commit()
+
+
+def _migrate_classroom_exam_mode():
+    insp = inspect(engine)
+    if "classroom" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("classroom")}
+        if "exam_mode" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE classroom ADD COLUMN exam_mode BOOLEAN DEFAULT 0"))
                 conn.commit()

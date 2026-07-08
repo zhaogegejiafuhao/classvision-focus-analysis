@@ -1,6 +1,7 @@
 import asyncio
 import json
 import base64
+import logging
 from datetime import datetime, timedelta
 
 import cv2
@@ -10,25 +11,119 @@ from sqlalchemy.orm import Session
 
 from cv_engine.trackers.face_tracker import FaceTracker
 from cv_engine.analyzers.attention_analyzer import AttentionAnalyzer
+from cv_engine.face_recognizer import recognizer, json_to_embedding
 from backend.core.database import SessionLocal
-from backend.models.tables import Student, AttentionRecord
+from backend.models.tables import Student, AttentionRecord, ExamRiskRecord, Classroom, RegisteredPerson
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 tracker = FaceTracker()
-analyzer = AttentionAnalyzer()
+_analyzers: dict[int, AttentionAnalyzer] = {}
+_models_ready = False
 
 
-def _process_frame(frame):
-    tracked = tracker.track(frame)
-    results = analyzer.analyze(frame, tracked)
-    return tracked, results
+def _warmup_models():
+    """启动时预热模型，避免首次推理超时"""
+    global _models_ready
+    try:
+        logger.info("正在预热 YOLO 模型...")
+        dummy = np.zeros((480, 640, 3), dtype=np.uint8)
+        tracker.model  # 触发 YOLO 模型加载
+        tracker.track(dummy)  # 触发首次推理
+        logger.info("YOLO 模型预热完成")
+
+        logger.info("正在预热 FaceLandmarker...")
+        analyzer = AttentionAnalyzer()
+        analyzer.landmarker  # 触发 FaceLandmarker 模型加载
+        logger.info("FaceLandmarker 预热完成")
+
+        _models_ready = True
+    except Exception as e:
+        logger.warning(f"模型预热异常（不影响运行）: {e}")
+        _models_ready = True
 
 
-def _save_records(classroom_id: int, faces: list):
+def _get_analyzer(classroom_id: int, exam_mode: bool) -> AttentionAnalyzer:
+    if classroom_id not in _analyzers:
+        _analyzers[classroom_id] = AttentionAnalyzer(exam_mode=exam_mode)
+    return _analyzers[classroom_id]
+
+
+# 已注册人脸库缓存（每60秒刷新一次）
+_registered_persons_cache: list[tuple[int, str, np.ndarray]] = []
+_cache_last_refresh: datetime = datetime.min
+
+
+def _refresh_registered_persons_cache(db: Session):
+    """刷新已注册人脸库缓存"""
+    global _registered_persons_cache, _cache_last_refresh
+    now = datetime.now()
+    if now - _cache_last_refresh < timedelta(seconds=60):
+        return  # 缓存未过期，无需刷新
+
+    try:
+        persons = db.query(RegisteredPerson).filter(RegisteredPerson.role == "student").all()
+        _registered_persons_cache = [
+            (p.id, p.name, json_to_embedding(p.face_embedding))
+            for p in persons
+        ]
+        _cache_last_refresh = now
+        logger.info(f"已注册人脸库缓存刷新，共 {len(_registered_persons_cache)} 人")
+    except Exception as e:
+        logger.error(f"刷新人脸库缓存失败: {e}")
+
+
+def _match_face_identity(frame: np.ndarray, bbox: list[int]) -> tuple[int, str] | None:
+    """在人脸库中匹配身份"""
+    if len(_registered_persons_cache) == 0:
+        return None
+
+    try:
+        embedding = recognizer.extract_embedding_from_bbox(frame, bbox)
+        if embedding is None:
+            return None
+
+        return recognizer.match_face(embedding, _registered_persons_cache, threshold=0.5)
+    except Exception as e:
+        logger.error(f"人脸匹配失败: {e}")
+        return None
+
+
+def _process_frame(frame, classroom_id: int, exam_mode: bool):
+    try:
+        persons, objects = tracker.track(frame)
+        analyzer = _get_analyzer(classroom_id, exam_mode)
+        if exam_mode:
+            results = analyzer.analyze(frame, persons, objects=objects)
+        else:
+            results = analyzer.analyze(frame, persons)
+        results["objects"] = objects
+        results["exam_mode"] = exam_mode
+
+        # 尝试人脸身份匹配（仅对新学生）
+        if len(_registered_persons_cache) > 0:
+            for face in results.get("faces", []):
+                bbox = face.get("bbox")
+                if bbox:
+                    match = _match_face_identity(frame, bbox)
+                    if match:
+                        face["matched_person_id"] = match[0]
+                        face["matched_person_name"] = match[1]
+    except Exception as e:
+        logger.error(f"帧处理异常: {e}")
+        results = {"faces": [], "count": 0, "objects": [], "exam_mode": exam_mode}
+    return results
+
+
+def _save_records(classroom_id: int, faces: list, exam_mode: bool):
     db: Session = SessionLocal()
     try:
         now = datetime.now()
+        # 刷新人脸库缓存
+        _refresh_registered_persons_cache(db)
+
         for face in faces:
             track_id = face["track_id"]
             student = db.query(Student).filter(
@@ -46,7 +141,15 @@ def _save_records(classroom_id: int, faces: list):
                     stale.track_id = track_id
                     student = stale
                 else:
-                    student = Student(classroom_id=classroom_id, track_id=track_id)
+                    # 创建新学生时，尝试绑定已注册身份
+                    matched_person_id = face.get("matched_person_id")
+                    matched_person_name = face.get("matched_person_name")
+                    student = Student(
+                        classroom_id=classroom_id,
+                        track_id=track_id,
+                        person_id=matched_person_id,
+                        name=matched_person_name,  # 如果匹配到，设置姓名
+                    )
                     db.add(student)
                     db.commit()
                     db.refresh(student)
@@ -70,7 +173,23 @@ def _save_records(classroom_id: int, faces: list):
                 fatigue_score=face.get("fatigue_score", 0),
             )
             db.add(record)
+
+            if exam_mode and "exam_risk" in face:
+                risk = face["exam_risk"]
+                risk_record = ExamRiskRecord(
+                    student_id=student.id,
+                    classroom_id=classroom_id,
+                    risk_level=risk["risk_level"],
+                    gaze_deviation_duration=risk["gaze_deviation_duration"],
+                    head_down_duration=risk["head_down_duration"],
+                    head_turn_events=risk["head_turn_events"],
+                    cheating_object_nearby=risk["cheating_object_nearby"],
+                    attention_score=face["attention_score"],
+                )
+                db.add(risk_record)
         db.commit()
+    except Exception as e:
+        logger.error(f"保存记录异常: {e}")
     finally:
         db.close()
 
@@ -83,6 +202,12 @@ async def video_stream(
     await ws.accept()
     frame_seq = 0
     loop = asyncio.get_event_loop()
+
+    db = SessionLocal()
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    exam_mode = classroom.exam_mode if classroom else False
+    db.close()
+
     try:
         while True:
             data = await ws.receive_text()
@@ -94,8 +219,8 @@ async def video_stream(
             if frame is None:
                 continue
 
-            tracked, results = await loop.run_in_executor(
-                None, _process_frame, frame
+            results = await loop.run_in_executor(
+                None, _process_frame, frame, classroom_id, exam_mode
             )
             results["classroom_id"] = classroom_id
             results["frame_seq"] = frame_seq
@@ -105,7 +230,10 @@ async def video_stream(
 
             if frame_seq % 30 == 0 and results["faces"]:
                 await loop.run_in_executor(
-                    None, _save_records, classroom_id, results["faces"]
+                    None, _save_records, classroom_id, results["faces"], exam_mode
                 )
     except WebSocketDisconnect:
-        pass
+        _analyzers.pop(classroom_id, None)
+    except Exception as e:
+        logger.error(f"WebSocket 异常: {e}")
+        _analyzers.pop(classroom_id, None)

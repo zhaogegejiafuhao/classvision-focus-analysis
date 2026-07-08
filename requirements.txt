@@ -15,6 +15,8 @@ ultralytics>=8.3.0           # YOLOv8 人脸检测 + 内置 ByteTrack 多目标�
 mediapipe>=0.10.9            # Google MediaPipe FaceMesh 468 关键点
 opencv-python>=4.8.0         # 图像处理
 numpy>=1.24.0                # 数值计算（版本由 pip 自动解决兼容性）
+insightface>=0.7.3           # 人脸识别特征提取（ArcFace ONNX）
+onnxruntime>=1.16.0          # ONNX 推理引擎（轻量，无需 TensorFlow）
 
 # --- 大模型 ---
 ollama==0.4.7                # Ollama Python SDK，调用本地大模型
@@ -27,3 +29,11 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 python-jose[cryptography]==3.3.0  # JWT 鉴权（可选）
+
+# --- RAG 模块 ---
+sentence-transformers>=2.2.0   # 文本嵌入模型
+faiss-cpu>=1.7.4               # 向量检索索引（Windows用cpu版）
+pdfplumber>=0.7.0              # PDF解析
+pymupdf>=1.23.0                # PDF解析（实际使用，比pdfplumber快）
+python-docx>=1.1.0             # Word文档解析
+python-pptx>=0.6.23            # PPT课件解析

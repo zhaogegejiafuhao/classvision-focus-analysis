@@ -28,6 +28,12 @@ cv_engine/models/*.task
 # SQLite 数据库
 *.db
 
+# RAG 索引和上传的文档（二进制大文件，可重建）
+data/
+
+# Trae IDE 文件
+.trae/
+
 # 参考仓库（已在 references/ 中，按需忽略）
 # references/
 

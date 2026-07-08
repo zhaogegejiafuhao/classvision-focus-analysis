@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.models.tables import Classroom, Student, AttentionRecord
+from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord
 from backend.models.schemas import ClassroomCreate, ClassroomOut, ClassroomDetail, ClassroomEndOut
 
 router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
@@ -13,7 +13,12 @@ router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
 
 @router.post("", response_model=ClassroomOut)
 def create_classroom(data: ClassroomCreate, db: Session = Depends(get_db)):
-    classroom = Classroom(name=data.name, teacher=data.teacher)
+    classroom = Classroom(
+        name=data.name,
+        teacher=data.teacher,
+        exam_mode=data.exam_mode,
+        teacher_person_id=data.teacher_person_id,
+    )
     db.add(classroom)
     db.commit()
     db.refresh(classroom)
@@ -30,6 +35,10 @@ def get_classroom(classroom_id: int, db: Session = Depends(get_db)):
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+
+    records = db.query(AttentionRecord).filter(
+        AttentionRecord.classroom_id == classroom_id
+    ).all()
 
     student_ids = db.query(func.distinct(AttentionRecord.student_id)).filter(
         AttentionRecord.classroom_id == classroom_id
@@ -51,12 +60,23 @@ def get_classroom(classroom_id: int, db: Session = Depends(get_db)):
     medium = sum(1 for r in records if 30 <= r.attention_score < 60)
     low = sum(1 for r in records if r.attention_score < 30)
 
-    classroom.stats = {
+    stats = {
         "head_down_count": head_down_count,
         "head_turn_count": head_turn_count,
         "fatigue_count": fatigue_count,
         "attention_distribution": {"high": high, "medium": medium, "low": low},
     }
+
+    if classroom.exam_mode:
+        risk_counts = (
+            db.query(ExamRiskRecord.risk_level, func.count())
+            .filter(ExamRiskRecord.classroom_id == classroom_id)
+            .group_by(ExamRiskRecord.risk_level)
+            .all()
+        )
+        stats["risk_distribution"] = {level: count for level, count in risk_counts}
+
+    classroom.stats = stats
     return classroom
 
 
