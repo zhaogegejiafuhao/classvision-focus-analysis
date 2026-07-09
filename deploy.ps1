@@ -1,4 +1,4 @@
-# ============================================
+﻿# ============================================
 # ClassVision 一键部署脚本 (Windows PowerShell)
 # 使用方式: 右键 -> 使用 PowerShell 运行
 # 或在 PowerShell 中执行: .\deploy.ps1
@@ -33,7 +33,7 @@ $PythonPaths = @(
 foreach ($path in $PythonPaths) {
     try {
         $version = & $path --version 2>$null
-        if ($version -match "Python 3\.(10|11|12)") {
+        if ($version -match 'Python 3\.(1[1-9]|[2-9]\d)') {
             $PythonCmd = $path
             Write-Host "找到 Python: $path ($version)" -ForegroundColor Green
             break
@@ -89,7 +89,7 @@ Write-Host "`n[3/6] 检查 Node.js 环境..." -ForegroundColor Yellow
 
 try {
     $NodeVersion = & node --version 2>$null
-    if ($NodeVersion -match "v(18|20|22)") {
+    if ($NodeVersion -match 'v(1[8-9]|[2-9]\d)') {
         Write-Host "Node.js 已安装: $NodeVersion" -ForegroundColor Green
     } else {
         throw "Node.js 版本过低"
@@ -206,7 +206,7 @@ Start-Process -FilePath $VenvPython -ArgumentList "-m", "uvicorn", "backend.main
 
 # 启动前端
 Write-Host "启动前端服务 (http://localhost:5173)..." -ForegroundColor Yellow
-Start-Process -FilePath "npm" -ArgumentList "run", "dev" -WorkingDirectory "$ProjectRoot\frontend"
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WorkingDirectory "$ProjectRoot\frontend"
 
 Start-Sleep -Seconds 3
 

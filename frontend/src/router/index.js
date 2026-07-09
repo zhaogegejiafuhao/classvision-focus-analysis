@@ -7,6 +7,7 @@ const routes = [
   { path: '/classrooms/:id', name: 'classroom-detail', component: () => import('../views/ClassroomDetail.vue') },
   { path: '/persons', name: 'persons', component: () => import('../views/PersonsPage.vue') },
   { path: '/rag', name: 'rag', component: () => import('../views/RagPage.vue') },
+  { path: '/papers', name: 'papers', component: () => import('../views/PaperGradingPage.vue') },
 ]
 
 const router = createRouter({

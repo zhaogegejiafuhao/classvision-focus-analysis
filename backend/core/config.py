@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     RAG_CHUNK_OVERLAP: int = 50  # 文本块重叠
     RAG_TOP_K: int = 5  # 检索返回top-k结果
 
+    # 试卷扫描配置
+    PAPER_UPLOAD_DIR: str = "D:/ClassVision/data/papers"  # 试卷图片存储目录
+    PAPER_IMAGE_WIDTH: int = 1000  # 透视矫正后的标准宽度（像素）
+
     class Config:
         env_file = ".env"
 

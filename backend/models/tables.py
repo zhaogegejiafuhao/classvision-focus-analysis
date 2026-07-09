@@ -147,3 +147,58 @@ class KnowledgeChunk(Base):
     embedding_stored: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已存储到FAISS
 
     document: Mapped["KnowledgeDocument"] = relationship(back_populates="chunks")
+
+
+class PaperTemplate(Base):
+    """试卷模板：定义答题卡布局 + 标准答案"""
+    __tablename__ = "paper_template"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100))
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    question_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_score: Mapped[float] = mapped_column(Float, default=100)
+    regions_config: Mapped[str] = mapped_column(Text)  # JSON: list of QuestionRegion dicts
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    papers: Mapped[list["Paper"]] = relationship(back_populates="template")
+
+
+class Paper(Base):
+    """扫描的试卷：一次扫描记录"""
+    __tablename__ = "paper"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("paper_template.id"))
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    student_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    corrected_image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    total_auto_score: Mapped[float] = mapped_column(Float, default=0)
+    final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/graded/corrected
+    scanned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    template: Mapped["PaperTemplate"] = relationship(back_populates="papers")
+    answers: Mapped[list["PaperAnswer"]] = relationship(back_populates="paper", cascade="all, delete-orphan")
+
+
+class PaperAnswer(Base):
+    """单题作答与评分"""
+    __tablename__ = "paper_answer"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    paper_id: Mapped[int] = mapped_column(Integer, ForeignKey("paper.id"))
+    question_index: Mapped[int] = mapped_column(Integer)
+    question_type: Mapped[str] = mapped_column(String(20))  # objective/subjective
+    ocr_text: Mapped[str] = mapped_column(Text, default="")
+    standard_answer: Mapped[str] = mapped_column(Text, default="")
+    max_score: Mapped[float] = mapped_column(Float, default=0)
+    auto_score: Mapped[float] = mapped_column(Float, default=0)
+    final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    paper: Mapped["Paper"] = relationship(back_populates="answers")
