@@ -18,6 +18,10 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'action'">
             <a-button type="link" @click="$router.push(`/classrooms/${record.id}`)">查看详情</a-button>
+            <a-popconfirm title="确认删除此课堂及其所有数据？" ok-text="删除" cancel-text="取消"
+                          @confirm="deleteClassroom(record.id)">
+              <a-button type="link" danger>删除</a-button>
+            </a-popconfirm>
           </template>
           <template v-if="column.key === 'avg_attention'">
             <a-tag :color="record.avg_attention >= 60 ? 'green' : record.avg_attention >= 30 ? 'orange' : 'red'">
@@ -36,6 +40,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { message } from 'ant-design-vue'
 import { waitForBackend } from '../utils/api'
 
 const classrooms = ref([])
@@ -69,6 +74,16 @@ async function loadClassrooms() {
     backendError.value = true
   } finally {
     loading.value = false
+  }
+}
+
+async function deleteClassroom(id) {
+  try {
+    await axios.delete(`/api/classrooms/${id}`)
+    message.success('课堂已删除')
+    classrooms.value = classrooms.value.filter(c => c.id !== id)
+  } catch (e) {
+    message.error('删除失败: ' + (e.response?.data?.detail || e.message))
   }
 }
 

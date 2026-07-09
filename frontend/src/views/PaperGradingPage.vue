@@ -25,6 +25,10 @@
           <a-select v-model:value="selectedTemplateId" placeholder="选择模板"
                     :options="templateOptions" style="width: 200px" />
           <a-button type="primary" @click="showTemplateModal = true">创建新模板</a-button>
+          <a-popconfirm v-if="selectedTemplateId" title="确认删除此模板？" ok-text="删除" cancel-text="取消"
+                        @confirm="deleteTemplate">
+            <a-button danger>删除模板</a-button>
+          </a-popconfirm>
           <a-button :disabled="!selectedTemplateId" @click="currentStep = 2">下一步：扫描</a-button>
         </a-space>
 
@@ -758,6 +762,18 @@ async function loadTemplates() {
     })
     templates.value = res.data || []
   } catch { templates.value = [] }
+}
+
+async function deleteTemplate() {
+  if (!selectedTemplateId.value) return
+  try {
+    await axios.delete(`/api/papers/templates/${selectedTemplateId.value}`)
+    message.success('模板已删除')
+    selectedTemplateId.value = null
+    await loadTemplates()
+  } catch (e) {
+    message.error('删除失败: ' + (e.response?.data?.detail || e.message))
+  }
 }
 
 async function loadStudents() {
