@@ -8,6 +8,12 @@
     </a-layout-header>
     <a-layout-content style="padding: 24px">
       <a-typography-title :level="3">历史课堂</a-typography-title>
+      <a-alert v-if="backendError" message="后端服务未就绪，请确认后端已启动" type="error" show-icon
+               style="margin-bottom: 16px">
+        <template #action>
+          <a-button size="small" @click="loadClassrooms">重试</a-button>
+        </template>
+      </a-alert>
       <a-table :columns="columns" :data-source="classrooms" :loading="loading" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'action'">
@@ -30,9 +36,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { waitForBackend } from '../utils/api'
 
 const classrooms = ref([])
 const loading = ref(true)
+const backendError = ref(false)
 
 const columns = [
   { title: '课程', dataIndex: 'name', key: 'name' },
@@ -45,12 +53,26 @@ const columns = [
   { title: '操作', key: 'action' },
 ]
 
-onMounted(async () => {
+async function loadClassrooms() {
+  loading.value = true
+  backendError.value = false
+  const ready = await waitForBackend()
+  if (!ready) {
+    backendError.value = true
+    loading.value = false
+    return
+  }
   try {
     const res = await axios.get('/api/classrooms')
     classrooms.value = res.data
+  } catch {
+    backendError.value = true
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadClassrooms()
 })
 </script>

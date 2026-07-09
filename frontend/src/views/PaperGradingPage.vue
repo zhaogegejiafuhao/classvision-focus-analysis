@@ -230,6 +230,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import { message, Modal } from 'ant-design-vue'
+import { waitForBackend } from '../utils/api'
 
 const currentStep = ref(1)
 
@@ -767,6 +768,7 @@ async function loadStudents() {
 }
 
 onMounted(async () => {
+  await waitForBackend()
   await Promise.all([loadClassrooms(), loadTemplates(), loadStudents()])
 })
 

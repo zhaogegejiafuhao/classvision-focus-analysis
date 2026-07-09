@@ -125,6 +125,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { CameraOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { waitForBackend } from '../utils/api'
 
 const form = ref({
   name: '',
@@ -242,6 +243,7 @@ async function deletePerson(personId) {
 }
 
 onMounted(async () => {
+  await waitForBackend()
   await loadPersons()
 })
 

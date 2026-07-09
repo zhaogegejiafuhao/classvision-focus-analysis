@@ -51,6 +51,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { waitForBackend } from '../utils/api'
 
 const router = useRouter()
 const form = ref({ name: '', teacher: '', exam_mode: false, teacher_person_id: null })
@@ -81,6 +82,7 @@ async function startClass() {
 }
 
 onMounted(async () => {
+  await waitForBackend()
   await loadTeachers()
 })
 </script>

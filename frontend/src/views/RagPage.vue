@@ -183,6 +183,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { marked } from 'marked'
 import { message } from 'ant-design-vue'
+import { waitForBackend } from '../utils/api'
 
 const ragStatus = ref({})
 const documents = ref([])
@@ -371,6 +372,7 @@ async function previewDoc(docId) {
 }
 
 onMounted(async () => {
+  await waitForBackend()
   await loadStatus()
   await loadDocuments()
 })
