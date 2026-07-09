@@ -1,4 +1,4 @@
-# ClassVision 快速启动脚本
+﻿# ClassVision 快速启动脚本
 # 使用方式: 右键 -> 使用 PowerShell 运行
 
 $ProjectRoot = $PSScriptRoot
