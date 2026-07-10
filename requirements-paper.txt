@@ -5,7 +5,7 @@
 # PaddleOCR 较重，仅在使用试卷扫描功能时安装
 # ============================================
 
-paddlepaddle==2.6.1              # PaddlePaddle 深度学习框架（CPU版）
+paddlepaddle==2.6.2              # PaddlePaddle 深度学习框架（CPU版）
 paddleocr>=2.7.0                 # PaddleOCR 文字识别引擎
 shapely>=2.0.0                   # PaddleOCR 依赖（几何形状处理）
 pyclipper>=1.3.0                 # PaddleOCR 依赖（多边形裁剪）
