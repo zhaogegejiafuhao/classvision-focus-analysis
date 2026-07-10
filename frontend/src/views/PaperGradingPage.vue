@@ -33,7 +33,7 @@
         </a-space>
 
         <!-- 模板创建弹窗 -->
-        <a-modal v-model:open="showTemplateModal" title="创建试卷模板" width="1000px" @ok="createTemplate"
+        <a-modal v-model:open="showTemplateModal" title="创建试卷模板" width="1200px" @ok="createTemplate"
                  :ok-button-props="{ loading: templateCreating }" @cancel="resetTemplateModal">
           <a-form layout="vertical">
             <a-form-item label="模板名称">
@@ -63,11 +63,11 @@
                   <a-typography-text type="secondary">
                     {{ drawingQuestionIndex !== null
                       ? `正在框选第${drawingQuestionIndex}题区域，请在图片上拖动鼠标`
-                      : '点击右侧题目的"框选"按钮，然后在图片上拖动鼠标选择答题区域' }}
+                      : '点击右侧题目的"框选"按钮，或直接点击已有框选区域进行微调' }}
                   </a-typography-text>
                 </div>
-                <canvas ref="templateCanvas" width="600" height="450"
-                        style="border: 1px solid #d9d9d9; border-radius: 4px; cursor: crosshair; max-width: 100%"
+                <canvas ref="templateCanvas" width="800" height="600"
+                        style="border: 1px solid #d9d9d9; border-radius: 4px; cursor: crosshair; max-width: 100%; max-height: 65vh"
                         @mousedown="onCanvasMouseDown"
                         @mousemove="onCanvasMouseMove"
                         @mouseup="onCanvasMouseUp"
@@ -368,7 +368,7 @@ function drawCanvasImage() {
   const img = templateImageObj.value
 
   // 计算缩放比例，适配画布
-  const maxW = 600, maxH = 450
+  const maxW = 1000, maxH = 700
   const scale = Math.min(maxW / img.width, maxH / img.height)
   canvas.width = img.width * scale
   canvas.height = img.height * scale
@@ -430,7 +430,23 @@ function getCanvasPos(e) {
 
 function onCanvasMouseDown(e) {
   if (drawingQuestionIndex.value === null) {
-    message.warning('请先点击右侧题目的"框选"按钮')
+    // 检查是否点击了已有框选区域，如果是则选中该题用于重新框选
+    const pos = getCanvasPos(e)
+    const clicked = newTemplate.value.questions.find(q => {
+      if (q.w <= 0 || q.h <= 0) return false
+      const canvas = templateCanvas.value
+      const x = q.x * canvas.width
+      const y = q.y * canvas.height
+      const w = q.w * canvas.width
+      const h = q.h * canvas.height
+      return pos.x >= x && pos.x <= x + w && pos.y >= y && pos.y <= y + h
+    })
+    if (clicked) {
+      drawingQuestionIndex.value = clicked.question_index
+      message.info(`已选中第${clicked.question_index}题，可拖动鼠标重新框选区域`)
+    } else {
+      message.warning('请先点击右侧题目的"框选"按钮，或点击已有框选区域进行微调')
+    }
     return
   }
   isDrawing.value = true
@@ -476,10 +492,10 @@ function onCanvasMouseUp(e) {
   // 更新对应题目的区域
   const q = newTemplate.value.questions.find(q => q.question_index === drawingQuestionIndex.value)
   if (q) {
-    q.x = Math.round(x, 4)
-    q.y = Math.round(y, 4)
-    q.w = Math.round(w, 4)
-    q.h = Math.round(h, 4)
+    q.x = parseFloat(x.toFixed(4))
+    q.y = parseFloat(y.toFixed(4))
+    q.w = parseFloat(w.toFixed(4))
+    q.h = parseFloat(h.toFixed(4))
   }
 
   drawingQuestionIndex.value = null
