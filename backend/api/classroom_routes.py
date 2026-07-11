@@ -120,6 +120,13 @@ def get_classroom(
         stats["risk_distribution"] = {level: count for level, count in risk_counts}
 
     classroom.stats = stats
+    # 获取教师姓名
+    teacher_name = classroom.teacher
+    if classroom.teacher_person_id:
+        person = db.query(RegisteredPerson).filter(RegisteredPerson.id == classroom.teacher_person_id).first()
+        if person:
+            teacher_name = person.name
+    classroom.teacher_person_name = teacher_name
     return classroom
 
 

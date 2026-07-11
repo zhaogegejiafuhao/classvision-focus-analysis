@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
 from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson
-from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut, StudentPersonalReport, StudentClassroomAttention
+from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut, StudentPersonalReport, StudentClassroomAttention, ExamRiskOut
 from backend.services.ollama_service import generate_report
 
 router = APIRouter(prefix="/api", tags=["stats"])
@@ -377,6 +377,46 @@ def delete_report(
     db.delete(report)
     db.commit()
     return {"message": "报告已删除"}
+
+
+# ===== 考试风险记录 =====
+
+@router.get("/classrooms/{classroom_id}/exam-risks", response_model=list[ExamRiskOut])
+def get_exam_risks(
+    classroom_id: int,
+    risk_level: str | None = Query(None),
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取课堂的考试作弊风险记录（按风险等级可选过滤）"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+
+    q = db.query(ExamRiskRecord).filter(ExamRiskRecord.classroom_id == classroom_id)
+    if risk_level:
+        q = q.filter(ExamRiskRecord.risk_level == risk_level)
+    records = q.order_by(ExamRiskRecord.timestamp.desc()).all()
+
+    student_cache = {}
+    result = []
+    for r in records:
+        if r.student_id not in student_cache:
+            s = db.query(Student).filter(Student.id == r.student_id).first()
+            student_cache[r.student_id] = s.name or f"学生{s.track_id}" if s else "未知"
+        result.append(ExamRiskOut(
+            id=r.id,
+            student_id=r.student_id,
+            student_name=student_cache[r.student_id],
+            risk_level=r.risk_level,
+            gaze_deviation_duration=r.gaze_deviation_duration,
+            head_down_duration=r.head_down_duration,
+            head_turn_events=r.head_turn_events,
+            cheating_object_nearby=r.cheating_object_nearby,
+            attention_score=r.attention_score,
+            timestamp=r.timestamp,
+        ))
+    return result
 
 
 # ===== 学生管理 CRUD =====

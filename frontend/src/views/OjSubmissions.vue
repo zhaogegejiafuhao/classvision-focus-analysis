@@ -2,10 +2,19 @@
   <div class="oj-subs-page">
     <div class="subs-header">
       <a-typography-title :level="3" style="margin: 0">提交记录</a-typography-title>
-      <a-button type="text" @click="$router.push('/oj')">
-        <template #icon><ArrowLeftOutlined /></template>
-        返回题目列表
-      </a-button>
+      <a-space>
+        <a-select v-model:value="filterStatus" style="width: 120px" placeholder="状态筛选" allow-clear @change="onFilterChange">
+          <a-select-option value="AC">AC</a-select-option>
+          <a-select-option value="WA">WA</a-select-option>
+          <a-select-option value="CE">CE</a-select-option>
+          <a-select-option value="TLE">TLE</a-select-option>
+          <a-select-option value="RE">RE</a-select-option>
+        </a-select>
+        <a-button type="text" @click="$router.push('/oj')">
+          <template #icon><ArrowLeftOutlined /></template>
+          返回题目列表
+        </a-button>
+      </a-space>
     </div>
 
     <a-card style="margin-top: 16px">
@@ -16,11 +25,15 @@
         :data-source="submissions"
         :loading="loading"
         row-key="id"
-        :pagination="{ pageSize: 20, hideOnSinglePage: true }"
+        :pagination="pagination"
+        @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'problem_title'">
             <a href="javascript:void(0)" @click.prevent="$router.push(`/oj/${record.problem_id}`)">{{ record.problem_title }}</a>
+          </template>
+          <template v-if="column.key === 'user_name'">
+            <span>{{ record.user_name || '-' }}</span>
           </template>
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
@@ -56,23 +69,47 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import api from '@/api'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const submissions = ref([])
 const loading = ref(true)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const filterStatus = ref(undefined)
 
-const columns = [
-  { title: '#', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '题目', key: 'problem_title' },
-  { title: '语言', key: 'language', width: 100 },
-  { title: '结果', key: 'status', width: 100 },
-  { title: '耗时', key: 'cpu_time', width: 100 },
-  { title: '内存', key: 'memory', width: 100 },
-  { title: '提交时间', key: 'submitted_at', width: 180 },
-]
+const pagination = computed(() => ({
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  total: total.value,
+  showSizeChanger: true,
+  showTotal: (t) => `共 ${t} 条`,
+}))
+
+const isTeacherOrAdmin = computed(() => ['teacher', 'admin'].includes(userStore.role))
+
+const columns = computed(() => {
+  const cols = [
+    { title: '#', dataIndex: 'id', key: 'id', width: 60 },
+    { title: '题目', key: 'problem_title' },
+  ]
+  if (isTeacherOrAdmin.value) {
+    cols.push({ title: '提交者', key: 'user_name', width: 100 })
+  }
+  cols.push(
+    { title: '语言', key: 'language', width: 100 },
+    { title: '结果', key: 'status', width: 100 },
+    { title: '耗时', key: 'cpu_time', width: 100 },
+    { title: '内存', key: 'memory', width: 100 },
+    { title: '提交时间', key: 'submitted_at', width: 180 },
+  )
+  return cols
+})
 
 function statusColor(s) {
   if (s === 'AC') return 'success'
@@ -99,11 +136,25 @@ function formatTime(timeStr) {
   return new Date(timeStr).toLocaleString('zh-CN')
 }
 
+function onTableChange(pag) {
+  currentPage.value = pag.current
+  pageSize.value = pag.pageSize
+  loadSubmissions()
+}
+
+function onFilterChange() {
+  currentPage.value = 1
+  loadSubmissions()
+}
+
 async function loadSubmissions() {
   loading.value = true
   try {
-    const res = await api.get('/oj/submissions')
-    submissions.value = res.data || []
+    const params = { page: currentPage.value, page_size: pageSize.value }
+    if (filterStatus.value) params.status = filterStatus.value
+    const res = await api.get('/oj/submissions', { params })
+    submissions.value = res.data.items || []
+    total.value = res.data.total || 0
   } catch (e) {
     message.error('加载提交记录失败')
   } finally {

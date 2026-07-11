@@ -35,6 +35,7 @@ class ClassroomOut(BaseModel):
 
 class ClassroomDetail(ClassroomOut):
     stats: dict | None = None
+    teacher_person_name: str | None = None
 
 
 class ClassroomEndOut(ClassroomOut):
@@ -301,6 +302,22 @@ class OjSubmissionOut(BaseModel):
     error_message: str = ""
     source_code: str = ""
     submitted_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- 考试风险记录 ---
+class ExamRiskOut(BaseModel):
+    id: int
+    student_id: int
+    student_name: str = ""
+    risk_level: str
+    gaze_deviation_duration: float = 0
+    head_down_duration: float = 0
+    head_turn_events: int = 0
+    cheating_object_nearby: bool = False
+    attention_score: float = 0
+    timestamp: datetime
 
     model_config = {"from_attributes": True}
 

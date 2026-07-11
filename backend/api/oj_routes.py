@@ -410,36 +410,52 @@ async def submit_code(
 
 # ===== 提交记录 =====
 
-@router.get("/submissions", response_model=list[OjSubmissionOut])
+@router.get("/submissions")
 def list_submissions(
     problem_id: int | None = Query(None),
+    status: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = db.query(OjSubmission).filter(OjSubmission.user_id == current_user.id)
+    """分页查询提交记录。学生只看自己的，教师/管理员看全部"""
+    query = db.query(OjSubmission)
+    if current_user.role == "student":
+        query = query.filter(OjSubmission.user_id == current_user.id)
     if problem_id is not None:
         query = query.filter(OjSubmission.problem_id == problem_id)
-    submissions = query.order_by(OjSubmission.submitted_at.desc()).all()
+    if status is not None:
+        query = query.filter(OjSubmission.status == status)
+
+    total = query.count()
+    submissions = query.order_by(OjSubmission.submitted_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
     problem_cache = {}
-    result = []
+    user_cache = {}
+    items = []
     for s in submissions:
         if s.problem_id not in problem_cache:
             p = db.query(OjProblem).filter(OjProblem.id == s.problem_id).first()
             problem_cache[s.problem_id] = p.title if p else ""
-        result.append(OjSubmissionOut(
-            id=s.id,
-            problem_id=s.problem_id,
-            problem_title=problem_cache[s.problem_id],
-            language=s.language,
-            status=s.status,
-            cpu_time=s.cpu_time,
-            memory=s.memory,
-            error_message=s.error_message,
-            source_code=s.source_code,
-            submitted_at=s.submitted_at,
-        ))
-    return result
+        if s.user_id not in user_cache:
+            u = db.query(RegisteredPerson).filter(RegisteredPerson.id == s.user_id).first()
+            user_cache[s.user_id] = u.name if u else ""
+        items.append({
+            "id": s.id,
+            "problem_id": s.problem_id,
+            "problem_title": problem_cache[s.problem_id],
+            "user_id": s.user_id,
+            "user_name": user_cache[s.user_id],
+            "language": s.language,
+            "status": s.status,
+            "cpu_time": s.cpu_time,
+            "memory": s.memory,
+            "error_message": s.error_message,
+            "source_code": s.source_code,
+            "submitted_at": s.submitted_at,
+        })
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
 
 
 @router.get("/submissions/{sid}", response_model=OjSubmissionOut)

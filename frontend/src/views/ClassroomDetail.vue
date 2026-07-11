@@ -56,10 +56,76 @@
             </a-row>
           </a-card>
 
-          <!-- 考场模式：风险分布饼图 -->
+          <!-- 考场模式：风险分布饼图 + 时间线 + 风险记录 -->
           <template v-if="classroom.exam_mode">
-            <a-card title="风险等级分布" style="margin-bottom: 16px">
-              <div ref="riskChartEl" style="width: 100%; height: 300px" />
+            <a-row :gutter="16" style="margin-bottom: 16px">
+              <a-col :span="12">
+                <a-card title="风险等级分布">
+                  <div ref="riskChartEl" style="width: 100%; height: 300px" />
+                </a-card>
+              </a-col>
+              <a-col :span="12">
+                <a-card title="风险趋势时间线">
+                  <div ref="riskTimelineEl" style="width: 100%; height: 300px" />
+                </a-card>
+              </a-col>
+            </a-row>
+
+            <a-card title="作弊风险详情" style="margin-bottom: 16px">
+              <template #extra>
+                <a-select v-model:value="riskFilter" style="width: 120px" allow-clear placeholder="风险等级" @change="loadExamRisks">
+                  <a-select-option value="high">高风险</a-select-option>
+                  <a-select-option value="medium">中风险</a-select-option>
+                  <a-select-option value="low">低风险</a-select-option>
+                </a-select>
+              </template>
+              <a-table
+                :columns="riskColumns"
+                :data-source="examRisks"
+                :loading="riskLoading"
+                row-key="id"
+                size="small"
+                :pagination="{ pageSize: 10, showSizeChanger: true }"
+              >
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'risk_level'">
+                    <a-tag :color="record.risk_level === 'high' ? 'red' : record.risk_level === 'medium' ? 'orange' : 'green'">
+                      {{ { low: '低风险', medium: '中风险', high: '高风险' }[record.risk_level] || record.risk_level }}
+                    </a-tag>
+                  </template>
+                  <template v-if="column.key === 'cheating_object_nearby'">
+                    <a-tag :color="record.cheating_object_nearby ? 'red' : 'green'">
+                      {{ record.cheating_object_nearby ? '检测到' : '无' }}
+                    </a-tag>
+                  </template>
+                  <template v-if="column.key === 'gaze_deviation_duration'">
+                    {{ record.gaze_deviation_duration.toFixed(1) }}s
+                  </template>
+                  <template v-if="column.key === 'head_down_duration'">
+                    {{ record.head_down_duration.toFixed(1) }}s
+                  </template>
+                  <template v-if="column.key === 'timestamp'">
+                    {{ new Date(record.timestamp).toLocaleString('zh-CN') }}
+                  </template>
+                </template>
+              </a-table>
+            </a-card>
+
+            <!-- 高风险学生汇总 -->
+            <a-card title="高风险学生汇总" style="margin-bottom: 16px" v-if="highRiskSummary.length > 0">
+              <a-row :gutter="16">
+                <a-col :span="8" v-for="item in highRiskSummary" :key="item.student_id">
+                  <a-card size="small" style="margin-bottom: 8px" :style="{ borderLeft: item.risk_level === 'high' ? '3px solid #cf1322' : item.risk_level === 'medium' ? '3px solid #fa8c16' : '3px solid #52c41a' }">
+                    <a-statistic :title="item.student_name" :value="item.total_events" suffix="次风险事件" />
+                    <div style="margin-top: 8px">
+                      <a-tag v-if="item.has_cheating_object" color="red">疑似作弊物品</a-tag>
+                      <a-tag color="orange">视线偏移 {{ item.total_gaze.toFixed(1) }}s</a-tag>
+                      <a-tag color="purple">低头 {{ item.total_head_down.toFixed(1) }}s</a-tag>
+                      <a-tag color="blue">转头 {{ item.total_head_turn }}次</a-tag>
+                    </div>
+                  </a-card>
+                </a-col>
+              </a-row>
             </a-card>
           </template>
           <!-- 普通模式：注意力趋势 -->
@@ -320,7 +386,54 @@ const genLoading = ref(false)
 const endLoading = ref(false)
 const timelineEl = ref(null)
 const riskChartEl = ref(null)
+const riskTimelineEl = ref(null)
 const heatmapEl = ref(null)
+
+// 考试风险记录
+const examRisks = ref([])
+const riskLoading = ref(false)
+const riskFilter = ref(undefined)
+const riskColumns = [
+  { title: '学生', dataIndex: 'student_name', key: 'student_name', width: 100 },
+  { title: '风险等级', key: 'risk_level', width: 100 },
+  { title: '视线偏移时长', key: 'gaze_deviation_duration', width: 120 },
+  { title: '低头时长', key: 'head_down_duration', width: 100 },
+  { title: '转头次数', dataIndex: 'head_turn_events', key: 'head_turn_events', width: 100 },
+  { title: '作弊物品', key: 'cheating_object_nearby', width: 100 },
+  { title: '注意力', dataIndex: 'attention_score', key: 'attention_score', width: 80 },
+  { title: '时间', key: 'timestamp', width: 180 },
+]
+
+const highRiskSummary = computed(() => {
+  if (!examRisks.value.length) return []
+  const map = {}
+  for (const r of examRisks.value) {
+    if (!map[r.student_id]) {
+      map[r.student_id] = {
+        student_id: r.student_id,
+        student_name: r.student_name,
+        total_events: 0,
+        total_gaze: 0,
+        total_head_down: 0,
+        total_head_turn: 0,
+        has_cheating_object: false,
+        risk_level: 'low',
+      }
+    }
+    const item = map[r.student_id]
+    item.total_events += 1
+    item.total_gaze += r.gaze_deviation_duration || 0
+    item.total_head_down += r.head_down_duration || 0
+    item.total_head_turn += r.head_turn_events || 0
+    if (r.cheating_object_nearby) item.has_cheating_object = true
+    if (r.risk_level === 'high' || (r.risk_level === 'medium' && item.risk_level !== 'high')) {
+      item.risk_level = r.risk_level
+    }
+  }
+  return Object.values(map)
+    .filter(m => m.total_events > 0 && (m.risk_level === 'high' || m.risk_level === 'medium' || m.has_cheating_object))
+    .sort((a, b) => b.total_events - a.total_events)
+})
 
 // 出席情况
 const attendance = ref({
@@ -566,6 +679,21 @@ async function loadAttendance() {
   }
 }
 
+async function loadExamRisks() {
+  if (!classroom.value?.exam_mode) return
+  riskLoading.value = true
+  try {
+    const params = {}
+    if (riskFilter.value) params.risk_level = riskFilter.value
+    const res = await api.get(`/classrooms/${classroomId}/exam-risks`, { params })
+    examRisks.value = res.data || []
+  } catch {
+    examRisks.value = []
+  } finally {
+    riskLoading.value = false
+  }
+}
+
 async function loadHeatmap() {
   try {
     const res = await api.get(`/classrooms/${classroomId}/heatmap`)
@@ -735,6 +863,42 @@ onMounted(async () => {
           ],
         }],
       })
+
+      // 加载风险记录并绘制风险时间线
+      await loadExamRisks()
+      await nextTick()
+      if (riskTimelineEl.value && examRisks.value.length > 0) {
+        const riskTimelineChart = echarts.init(riskTimelineEl.value)
+        // 按时间排序的风险记录
+        const sortedRisks = [...examRisks.value].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        const timeLabels = sortedRisks.map(r => new Date(r.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
+        // 按学生分组
+        const studentNames = [...new Set(sortedRisks.map(r => r.student_name))]
+        const series = studentNames.map(name => ({
+          name,
+          type: 'line',
+          data: sortedRisks.map(r => r.student_name === name ? (r.risk_level === 'high' ? 3 : r.risk_level === 'medium' ? 2 : 1) : null),
+          connectNulls: false,
+          symbolSize: 6,
+        }))
+        riskTimelineChart.setOption({
+          tooltip: {
+            trigger: 'item',
+            formatter: (p) => `${p.seriesName}<br/>${p.axisValue}: ${['', '低风险', '中风险', '高风险'][p.value] || '未知'}`
+          },
+          legend: { bottom: 0, type: 'scroll' },
+          grid: { top: 20, bottom: 50, left: 50, right: 20 },
+          xAxis: { type: 'category', data: timeLabels },
+          yAxis: {
+            type: 'value',
+            min: 0,
+            max: 3,
+            interval: 1,
+            axisLabel: { formatter: v => ['', '低', '中', '高'][v] || '' }
+          },
+          series,
+        })
+      }
     } else {
       const chart = echarts.init(timelineEl.value)
       chart.setOption({
