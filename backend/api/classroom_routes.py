@@ -39,7 +39,21 @@ def list_classrooms(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return db.query(Classroom).order_by(Classroom.started_at.desc()).all()
+    """按角色过滤课堂列表：学生只看参与的，教师只看自己的，admin 看全部"""
+    q = db.query(Classroom)
+    if current_user.role == "student":
+        # 学生：只返回自己参与的课堂
+        my_classroom_ids = (
+            db.query(Student.classroom_id)
+            .filter(Student.person_id == current_user.id)
+            .subquery()
+        )
+        q = q.filter(Classroom.id.in_(my_classroom_ids))
+    elif current_user.role == "teacher":
+        # 教师：只返回自己创建的课堂
+        q = q.filter(Classroom.teacher_person_id == current_user.id)
+    # admin: 不加过滤
+    return q.order_by(Classroom.started_at.desc()).all()
 
 
 @router.get("/{classroom_id}", response_model=ClassroomDetail)
@@ -51,6 +65,19 @@ def get_classroom(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+
+    # 访问权限：学生只能访问自己参与的课堂
+    if current_user.role == "student":
+        enrolled = db.query(Student).filter(
+            Student.classroom_id == classroom_id,
+            Student.person_id == current_user.id,
+        ).first()
+        if not enrolled:
+            raise HTTPException(403, "你未参与该课堂")
+    # 教师只能访问自己的课堂
+    elif current_user.role == "teacher":
+        if classroom.teacher_person_id != current_user.id:
+            raise HTTPException(403, "你无权查看该课堂")
 
     records = db.query(AttentionRecord).filter(
         AttentionRecord.classroom_id == classroom_id

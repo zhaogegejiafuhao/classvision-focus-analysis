@@ -1,0 +1,6 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24.000000" height="24.000000" fill="none" customFrame="#000000">
+	<rect id="MagnifyingGlass" width="24.000000" height="24.000000" x="0.000000" y="0.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+	<path id="Vector" d="M24 0L0 0L0 24L24 24L24 0Z" fill-rule="evenodd" />
+	<path id="Vector" d="M10.875 18.75C6.52576 18.75 3 15.2242 3 10.875C3 6.52576 6.52576 3 10.875 3C15.2242 3 18.75 6.52576 18.75 10.875C18.75 15.2242 15.2242 18.75 10.875 18.75Z" fill-rule="evenodd" stroke="rgb(0,0,0)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="Vector" d="M16.4437 16.4437L21 21" stroke="rgb(0,0,0)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+</svg>

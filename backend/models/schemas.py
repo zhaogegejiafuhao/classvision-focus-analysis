@@ -115,9 +115,40 @@ class PersonOut(BaseModel):
     name: str
     role: str
     username: str | None = None
+    employee_id: str | None = None
+    phone: str | None = None
+    department_id: int | None = None
+    department_name: str | None = None
+    id_card: str | None = None
+    major: str | None = None
+    email: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DepartmentOut(BaseModel):
+    id: int
+    name: str
+    type: str = "class"
+    member_count: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ImportResultRow(BaseModel):
+    row: int
+    employee_id: str = ""
+    name: str = ""
+    error: str = ""
+
+
+class ImportResult(BaseModel):
+    total: int
+    success: int
+    failed: int
+    errors: list[ImportResultRow] = []
 
 
 # --- 认证 ---
@@ -171,6 +202,9 @@ class KnowledgeDocumentOut(BaseModel):
     total_chunks: int
     indexed: bool
     created_at: datetime
+    uploaded_by: int | None = None
+    uploader_name: str | None = None
+    visibility: str = "private"
 
     model_config = {"from_attributes": True}
 
@@ -269,3 +303,27 @@ class OjSubmissionOut(BaseModel):
     submitted_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- 学生个人报告 ---
+class StudentClassroomAttention(BaseModel):
+    """学生在某课堂的注意力数据"""
+    classroom_id: int
+    classroom_name: str
+    teacher: str
+    avg_attention: float
+    head_down_count: int
+    blink_count: int
+    duration: int = 0
+    started_at: datetime | None = None
+    timeline: list[TimelinePoint] = []
+
+
+class StudentPersonalReport(BaseModel):
+    """学生个人注意力报告"""
+    student_name: str
+    total_classrooms: int
+    overall_avg_attention: float
+    best_classroom: str
+    worst_classroom: str
+    classrooms: list[StudentClassroomAttention]

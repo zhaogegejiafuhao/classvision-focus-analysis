@@ -11,7 +11,7 @@ from PIL import Image
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, hash_password
-from backend.models.tables import RegisteredPerson, Classroom, Student
+from backend.models.tables import RegisteredPerson, Department, Classroom, Student
 from backend.models.schemas import PersonCreate, PersonUpdate, PersonOut, ClassroomWithTeacher
 from cv_engine.face_recognizer import recognizer, embedding_to_json, json_to_embedding
 
@@ -110,7 +110,26 @@ def list_persons(
         query = query.filter(RegisteredPerson.role == role)
     if current_user.role == "teacher":
         query = query.filter(RegisteredPerson.role == "student")
-    return query.order_by(RegisteredPerson.created_at.desc()).all()
+    persons = query.order_by(RegisteredPerson.created_at.desc()).all()
+
+    # 批量加载部门名称
+    dept_ids = {p.department_id for p in persons if p.department_id}
+    dept_map = {}
+    if dept_ids:
+        deps = db.query(Department).filter(Department.id.in_(dept_ids)).all()
+        dept_map = {d.id: d.name for d in deps}
+
+    return [
+        PersonOut(
+            id=p.id, name=p.name, role=p.role, username=p.username,
+            employee_id=p.employee_id, phone=p.phone,
+            department_id=p.department_id,
+            department_name=dept_map.get(p.department_id),
+            id_card=p.id_card, major=p.major, email=p.email,
+            created_at=p.created_at,
+        )
+        for p in persons
+    ]
 
 
 @router.get("/{person_id}", response_model=PersonOut)

@@ -1,0 +1,8 @@
+<svg viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="38.000000" height="38.000000" fill="none" customFrame="#000000">
+	<rect id="MicrophoneStage" width="38.000000" height="38.000000" x="0.000000" y="0.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+	<path id="Vector" d="M38 0L0 0L0 38L38 38L38 0Z" fill-rule="evenodd" />
+	<path id="Vector" d="M24.9375 22.5625C19.6908 22.5625 15.4375 18.3092 15.4375 13.0625C15.4375 7.81579 19.6908 3.5625 24.9375 3.5625C30.1842 3.5625 34.4375 7.81579 34.4375 13.0625C34.4375 18.3092 30.1842 22.5625 24.9375 22.5625Z" fill-rule="evenodd" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="Vector" d="M31.6618 19.7868L18.2134 6.33838" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="Vector" d="M14.8438 23.1562L13.0625 24.9375" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="Vector" d="M15.5563 14.532L4.17111 30.0585C3.99997 30.2864 3.91764 30.5687 3.93949 30.8528C3.96134 31.1369 4.08589 31.4033 4.28986 31.6023L6.39768 33.7101C6.59664 33.9141 6.86307 34.0386 7.14717 34.0605C7.43127 34.0823 7.71361 34 7.94143 33.8289L23.468 22.4437" fill-rule="evenodd" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+</svg>

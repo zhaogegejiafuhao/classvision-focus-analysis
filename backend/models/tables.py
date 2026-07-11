@@ -117,10 +117,29 @@ class RegisteredPerson(Base):
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)  # 登录用户名
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 密码哈希
     face_embedding: Mapped[str] = mapped_column(Text)  # JSON存储512维特征向量
+    employee_id: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 学号/工号（唯一索引由迁移创建）
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    department_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("department.id"), nullable=True)
+    id_card: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    major: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     students: Mapped[list["Student"]] = relationship(back_populates="person")
     classrooms_as_teacher: Mapped[list["Classroom"]] = relationship(back_populates="teacher_person")
+    department: Mapped["Department | None"] = relationship(back_populates="members")
+
+
+class Department(Base):
+    """部门/班级表"""
+    __tablename__ = "department"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    type: Mapped[str] = mapped_column(String(20), default="class")  # class(班级)/department(部门)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    members: Mapped[list["RegisteredPerson"]] = relationship(back_populates="department")
 
 
 class KnowledgeDocument(Base):
@@ -134,8 +153,11 @@ class KnowledgeDocument(Base):
     total_chunks: Mapped[int] = mapped_column(Integer, default=0)
     indexed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    uploaded_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    visibility: Mapped[str] = mapped_column(String(20), default="private")  # public/staff/private
 
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="document")
+    uploader: Mapped["RegisteredPerson | None"] = relationship()
 
 
 class KnowledgeChunk(Base):

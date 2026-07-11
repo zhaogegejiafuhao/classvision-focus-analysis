@@ -235,18 +235,34 @@
       <!-- 添加学生弹窗 -->
       <a-modal
         v-model:open="addStudentOpen"
-        title="添加学生"
+        title="添加学生到课堂"
         @ok="handleAddStudent"
         :confirm-loading="addStudentSaving"
         ok-text="添加"
         cancel-text="取消"
       >
         <a-form layout="vertical">
-          <a-form-item label="跟踪ID" required>
-            <a-input-number v-model:value="addStudentForm.track_id" :min="1" style="width: 100%" />
+          <a-form-item label="选择已注册人员" v-if="availablePersons.length > 0">
+            <a-select
+              v-model:value="addStudentForm.person_id"
+              placeholder="选择已注册学生加入课堂"
+              show-search
+              :filter-option="filterPerson"
+              allow-clear
+              style="width: 100%"
+            >
+              <a-select-option v-for="p in availablePersons" :key="p.id" :value="p.id">
+                {{ p.name }} ({{ p.username || 'ID:' + p.id }})
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-alert v-else message="暂无可添加的已注册学生，请先到人员管理页面注册" type="info" show-icon style="margin-bottom: 12px" />
+          <a-divider v-if="addStudentForm.person_id">或手动填写</a-divider>
+          <a-form-item label="跟踪ID" :required="!addStudentForm.person_id">
+            <a-input-number v-model:value="addStudentForm.track_id" :min="1" style="width: 100%" :disabled="!!addStudentForm.person_id" />
           </a-form-item>
           <a-form-item label="姓名">
-            <a-input v-model:value="addStudentForm.name" placeholder="可选" />
+            <a-input v-model:value="addStudentForm.name" placeholder="可选，选择已注册人员时自动填充" />
           </a-form-item>
         </a-form>
       </a-modal>
@@ -398,24 +414,49 @@ async function handleEditClassroom() {
 // ===== 学生管理 =====
 const addStudentOpen = ref(false)
 const addStudentSaving = ref(false)
-const addStudentForm = ref({ track_id: 1, name: '' })
+const addStudentForm = ref({ track_id: 1, name: '', person_id: null })
+const availablePersons = ref([])
+
+function filterPerson(input, option) {
+  const label = option.children?.[0]?.children?.[0] || ''
+  return label.toLowerCase().includes(input.toLowerCase())
+}
 
 function openAddStudent() {
   const maxTrackId = students.value.length > 0
     ? Math.max(...students.value.map(s => s.track_id || 0)) + 1
     : 1
-  addStudentForm.value = { track_id: maxTrackId, name: '' }
+  addStudentForm.value = { track_id: maxTrackId, name: '', person_id: null }
   addStudentOpen.value = true
+  loadAvailablePersons()
+}
+
+async function loadAvailablePersons() {
+  try {
+    const res = await api.get('/persons', { params: { role: 'student' } })
+    // 过滤掉已在课堂中的学生
+    const existingPersonIds = new Set(students.value.map(s => s.person_id).filter(Boolean))
+    availablePersons.value = (res.data || []).filter(p => !existingPersonIds.has(p.id))
+  } catch {
+    availablePersons.value = []
+  }
 }
 
 async function handleAddStudent() {
   addStudentSaving.value = true
   try {
-    await api.post(`/classrooms/${classroomId}/students`, {
+    const payload = {
       classroom_id: Number(classroomId),
       track_id: addStudentForm.value.track_id,
       name: addStudentForm.value.name || null,
-    })
+    }
+    if (addStudentForm.value.person_id) {
+      payload.person_id = addStudentForm.value.person_id
+      // 自动填充姓名
+      const person = availablePersons.value.find(p => p.id === addStudentForm.value.person_id)
+      if (person && !payload.name) payload.name = person.name
+    }
+    await api.post(`/classrooms/${classroomId}/students`, payload)
     message.success('学生已添加')
     addStudentOpen.value = false
     await loadStudents()

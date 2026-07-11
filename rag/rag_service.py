@@ -27,13 +27,20 @@ class RAGService:
         self.top_k = settings.RAG_TOP_K
         self._query_cache = {}  # 问题归一化 -> {content, sources, retrieved_chunks}
 
-    def query(self, question: str, top_k: int = None) -> dict:
-        """检索并生成回答"""
+    def query(self, question: str, top_k: int = None, visible_doc_ids: set = None) -> dict:
+        """检索并生成回答。visible_doc_ids: 可见文档ID集合，不在其中的文档块会被过滤掉"""
         if top_k is None:
             top_k = self.top_k
 
         # 检索相关内容
         retrieved_chunks = self.embedding_service.search(question, top_k)
+
+        # 按可见性过滤检索结果（在生成前过滤，防止私有文档内容泄露到 LLM 回答中）
+        if visible_doc_ids is not None:
+            retrieved_chunks = [
+                c for c in retrieved_chunks
+                if c.get('document_id') is None or c.get('document_id') in visible_doc_ids
+            ]
 
         if not retrieved_chunks:
             return {
@@ -98,29 +105,19 @@ class RAGService:
         except Exception as e:
             return f"生成回答失败: {e}"
 
-    def stream_query(self, question: str, top_k: int = None):
-        """流式检索并生成回答，yield 事件字典。
-
-        事件类型：
-        - meta: 检索完成，带 sources / retrieved_chunks
-        - delta: 文本增量（已过滤 <think> 标签）
-        - done: 流结束，带完整 content
-        - error: 出错
-        """
+    def stream_query(self, question: str, top_k: int = None, visible_doc_ids: set = None):
+        """流式检索并生成回答，yield 事件字典。visible_doc_ids: 可见文档ID集合，不在其中的文档块会在生成前被过滤掉。"""
         if top_k is None:
             top_k = self.top_k
 
-        # 缓存命中检查
-        cache_key = question.strip().lower()
-        if cache_key in self._query_cache:
-            cached = self._query_cache[cache_key]
-            yield {'type': 'meta', 'sources': cached['sources'], 'retrieved_chunks': cached['retrieved_chunks']}
-            yield {'type': 'delta', 'delta': cached['content']}
-            yield {'type': 'done', 'content': cached['content'], 'cached': True}
-            return
-
         retrieved_chunks = self.embedding_service.search(question, top_k)
-        sources = [r['source'] for r in retrieved_chunks]
+
+        # 按可见性过滤检索结果（在生成前过滤，防止私有文档内容泄露到 LLM 回答中）
+        if visible_doc_ids is not None:
+            retrieved_chunks = [
+                c for c in retrieved_chunks
+                if c.get('document_id') is None or c.get('document_id') in visible_doc_ids
+            ]
 
         if not retrieved_chunks:
             yield {'type': 'meta', 'sources': [], 'retrieved_chunks': []}
@@ -128,6 +125,7 @@ class RAGService:
             return
 
         # 先发检索元信息，前端可立即展示参考来源
+        sources = [r['source'] for r in retrieved_chunks]
         yield {'type': 'meta', 'sources': sources, 'retrieved_chunks': retrieved_chunks}
 
         context = self._build_context(retrieved_chunks)
@@ -225,14 +223,6 @@ class RAGService:
         # 流结束后也过滤一遍（防止未闭合 think 标签）
         full = _strip_think_tags(full)
 
-        # 存入缓存（上限 50 条，超出删最早）
-        if len(self._query_cache) >= 50:
-            self._query_cache.pop(next(iter(self._query_cache)))
-        self._query_cache[cache_key] = {
-            'content': full,
-            'sources': sources,
-            'retrieved_chunks': retrieved_chunks,
-        }
         yield {'type': 'done', 'content': full}
 
     def add_knowledge(self, chunks: List[str], source: str, document_id: int = None):

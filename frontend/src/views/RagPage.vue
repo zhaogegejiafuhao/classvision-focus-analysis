@@ -14,7 +14,7 @@
                 <a-statistic title="向量维度" :value="ragStatus.dimension || 384" />
               </a-col>
               <a-col :span="8">
-                <a-statistic title="文档数量" :value="documents.length" />
+                <a-statistic title="可见文档" :value="documents.length" />
               </a-col>
             </a-row>
             <template #extra>
@@ -24,26 +24,63 @@
 
           <!-- 文档管理 -->
           <a-card title="文档管理">
-            <a-space style="margin-bottom: 16px">
-              <a-upload
-                :before-upload="handleUpload"
-                accept=".pdf,.txt,.md,.docx,.pptx"
-                :show-upload-list="false"
-              >
-                <a-button type="primary" :loading="uploadLoading">
-                  上传文档（PDF/Word/PPT/TXT/MD）
-                </a-button>
-              </a-upload>
+            <!-- 上传区域 -->
+            <div style="margin-bottom: 16px">
+              <a-space direction="vertical" style="width: 100%">
+                <a-row :gutter="8" align="middle">
+                  <a-col flex="auto">
+                    <a-upload
+                      :before-upload="handleUpload"
+                      accept=".pdf,.txt,.md,.docx,.pptx"
+                      :show-upload-list="false"
+                    >
+                      <a-button type="primary" :loading="uploadLoading">
+                        上传文档（PDF/Word/PPT/TXT/MD）
+                      </a-button>
+                    </a-upload>
+                  </a-col>
+                  <a-col flex="200px">
+                    <a-select v-model:value="uploadVisibility" style="width: 100%">
+                      <a-select-option value="public" :disabled="currentRole === 'student'">
+                        <a-tag color="green" style="margin: 0">公开</a-tag>
+                        <span style="font-size: 12px; margin-left: 4px">所有用户可见</span>
+                      </a-select-option>
+                      <a-select-option value="staff" :disabled="currentRole === 'student'">
+                        <a-tag color="blue" style="margin: 0">同行可见</a-tag>
+                        <span style="font-size: 12px; margin-left: 4px">教师+管理员</span>
+                      </a-select-option>
+                      <a-select-option value="private">
+                        <a-tag color="orange" style="margin: 0">私有</a-tag>
+                        <span style="font-size: 12px; margin-left: 4px">仅自己</span>
+                      </a-select-option>
+                    </a-select>
+                  </a-col>
+                </a-row>
+                <a-typography-text type="secondary" style="font-size: 12px">
+                  <InfoCircleOutlined /> 可见性说明：公开=学生也能查看检索；同行可见=仅教师/管理员；私有=仅自己
+                </a-typography-text>
+              </a-space>
+            </div>
+
+            <a-space style="margin-bottom: 12px">
               <a-button @click="indexHistory" :loading="indexLoading">
                 索引历史课堂数据
               </a-button>
-              <a-popconfirm title="确定从数据库重建索引？将清理已删除向量并补充元数据。" @confirm="rebuildIndex">
+              <a-popconfirm title="确定从数据库重建索引？" @confirm="rebuildIndex">
                 <a-button :loading="rebuildLoading">重建索引</a-button>
               </a-popconfirm>
             </a-space>
 
             <a-table :columns="docColumns" :data-source="documents" row-key="id" size="small" :pagination="{ pageSize: 5 }">
               <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'visibility'">
+                  <a-tag :color="visColor(record.visibility)">
+                    {{ visLabel(record.visibility) }}
+                  </a-tag>
+                </template>
+                <template v-if="column.key === 'uploader'">
+                  {{ record.uploader_name || '未知' }}
+                </template>
                 <template v-if="column.key === 'indexed'">
                   <a-tag :color="record.indexed ? 'green' : 'red'">
                     {{ record.indexed ? '已索引' : '未索引' }}
@@ -54,9 +91,19 @@
                 </template>
                 <template v-if="column.key === 'action'">
                   <a-button type="link" size="small" @click="previewDoc(record.id)">预览</a-button>
-                  <a-popconfirm title="确定删除该文档？" @confirm="deleteDoc(record.id)">
-                    <a-button type="link" danger size="small">删除</a-button>
-                  </a-popconfirm>
+                  <a-dropdown>
+                    <a-button type="link" size="small">更多</a-button>
+                    <template #overlay>
+                      <a-menu>
+                        <a-menu-item @click="openEditDoc(record)">
+                          <EditOutlined /> 编辑可见性
+                        </a-menu-item>
+                        <a-menu-item v-if="canDelete(record)" danger @click="deleteDoc(record.id)">
+                          <DeleteOutlined /> 删除
+                        </a-menu-item>
+                      </a-menu>
+                    </template>
+                  </a-dropdown>
                 </template>
               </template>
             </a-table>
@@ -92,7 +139,7 @@
         <a-col :span="14">
           <a-card title="知识库问答">
             <a-alert
-              message="输入问题，AI 将从知识库中检索相关内容并生成回答。支持中英文查询。"
+              message="输入问题，AI 将从你可见的知识库文档中检索相关内容并生成回答。"
               type="info"
               show-icon
               style="margin-bottom: 16px"
@@ -137,7 +184,8 @@
 
               <!-- 参考来源 -->
               <a-card title="参考来源" size="small">
-                <a-collapse>
+                <a-empty v-if="!ragResult.retrieved_chunks || ragResult.retrieved_chunks.length === 0" description="无可见的参考来源" />
+                <a-collapse v-else>
                   <a-collapse-panel
                     v-for="(chunk, i) in ragResult.retrieved_chunks"
                     :key="i"
@@ -173,16 +221,50 @@
           </a-card>
         </a-col>
       </a-row>
+
+      <!-- 编辑文档可见性弹窗 -->
+      <a-modal
+        v-model:open="editDocOpen"
+        title="编辑文档"
+        @ok="handleEditDoc"
+        :confirm-loading="editDocSaving"
+        ok-text="保存"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="文件名">
+            <a-input v-model:value="editDocForm.filename" />
+          </a-form-item>
+          <a-form-item label="可见性">
+            <a-select v-model:value="editDocForm.visibility">
+              <a-select-option value="public" :disabled="currentRole === 'student'">
+                <a-tag color="green" style="margin: 0">公开</a-tag> 所有用户可见
+              </a-select-option>
+              <a-select-option value="staff" :disabled="currentRole === 'student'">
+                <a-tag color="blue" style="margin: 0">同行可见</a-tag> 教师+管理员
+              </a-select-option>
+              <a-select-option value="private">
+                <a-tag color="orange" style="margin: 0">私有</a-tag> 仅自己
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+        </a-form>
+      </a-modal>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, computed, onMounted } from 'vue'
+import api from '@/api'
+import { useUserStore } from '@/stores/user'
 import MarkdownIt from 'markdown-it'
 import { message } from 'ant-design-vue'
+import { InfoCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
+const userStore = useUserStore()
+const currentRole = computed(() => userStore.role || 'student')
+const currentUserId = computed(() => userStore.user?.id)
 
 const ragStatus = ref({})
 const documents = ref([])
@@ -192,6 +274,7 @@ const uploadLoading = ref(false)
 const queryLoading = ref(false)
 const indexLoading = ref(false)
 const queryHistory = ref([])
+const uploadVisibility = ref(currentRole.value === 'student' ? 'private' : 'public')
 
 const quickQuestions = [
   'OpenCV 是什么？有哪些主要模块？',
@@ -200,14 +283,34 @@ const quickQuestions = [
   '如何进行相机标定？',
 ]
 
-const docColumns = [
-  { title: '文件名', dataIndex: 'filename', key: 'filename', ellipsis: true },
-  { title: '类型', dataIndex: 'file_type', key: 'file_type', width: 60 },
-  { title: '文本块', dataIndex: 'total_chunks', key: 'total_chunks', width: 70 },
-  { title: '状态', dataIndex: 'indexed', key: 'indexed', width: 70 },
-  { title: '上传时间', dataIndex: 'created_at', key: 'created_at', width: 150 },
-  { title: '操作', key: 'action', width: 60 },
-]
+const docColumns = computed(() => {
+  const cols = [
+    { title: '文件名', dataIndex: 'filename', key: 'filename', ellipsis: true },
+    { title: '可见性', dataIndex: 'visibility', key: 'visibility', width: 80 },
+    { title: '上传者', dataIndex: 'uploader_name', key: 'uploader', width: 80 },
+    { title: '文本块', dataIndex: 'total_chunks', key: 'total_chunks', width: 60 },
+    { title: '状态', dataIndex: 'indexed', key: 'indexed', width: 60 },
+    { title: '上传时间', dataIndex: 'created_at', key: 'created_at', width: 140 },
+    { title: '操作', key: 'action', width: 100 },
+  ]
+  return cols
+})
+
+function visColor(v) {
+  if (v === 'public') return 'green'
+  if (v === 'staff') return 'blue'
+  return 'orange'
+}
+
+function visLabel(v) {
+  if (v === 'public') return '公开'
+  if (v === 'staff') return '同行可见'
+  return '私有'
+}
+
+function canDelete(record) {
+  return currentRole.value === 'admin' || record.uploaded_by === currentUserId.value
+}
 
 function renderMarkdown(text) {
   if (!text) return ''
@@ -216,7 +319,7 @@ function renderMarkdown(text) {
 
 async function loadStatus() {
   try {
-    const res = await axios.get('/api/rag/status')
+    const res = await api.get('/rag/status')
     ragStatus.value = res.data
   } catch {
     ragStatus.value = { total_vectors: 0 }
@@ -225,7 +328,7 @@ async function loadStatus() {
 
 async function loadDocuments() {
   try {
-    const res = await axios.get('/api/rag/documents')
+    const res = await api.get('/rag/documents')
     documents.value = res.data || []
   } catch {
     documents.value = []
@@ -236,12 +339,13 @@ async function handleUpload(file) {
   uploadLoading.value = true
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('visibility', uploadVisibility.value)
 
   try {
-    const res = await axios.post('/api/rag/upload', formData, {
+    const res = await api.post('/rag/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    message.success(`上传成功，已索引 ${res.data.total_chunks} 个文本块`)
+    message.success(`上传成功，已索引 ${res.data.total_chunks} 个文本块（${visLabel(res.data.visibility)}）`)
     await loadDocuments()
     await loadStatus()
   } catch (e) {
@@ -265,9 +369,13 @@ async function queryRag() {
   }
 
   try {
+    const token = userStore.token || localStorage.getItem('token') || ''
     const resp = await fetch('/api/rag/query/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify({ question: currentQuestion, top_k: 5 }),
     })
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
@@ -298,7 +406,6 @@ async function queryRag() {
         }
       }
     }
-    // 保存到历史
     if (ragResult.value.answer) {
       queryHistory.value.unshift({
         question: currentQuestion,
@@ -322,7 +429,7 @@ function clearHistory() {
 async function indexHistory() {
   indexLoading.value = true
   try {
-    const res = await axios.post('/api/rag/index/history')
+    const res = await api.post('/rag/index/history')
     message.success(`已索引 ${res.data.total_chunks} 个历史数据文本块`)
     await loadStatus()
   } catch (e) {
@@ -334,7 +441,7 @@ async function indexHistory() {
 
 async function deleteDoc(docId) {
   try {
-    await axios.delete(`/api/rag/documents/${docId}`)
+    await api.delete(`/rag/documents/${docId}`)
     message.success('文档已删除')
     await loadDocuments()
     await loadStatus()
@@ -347,7 +454,7 @@ const rebuildLoading = ref(false)
 async function rebuildIndex() {
   rebuildLoading.value = true
   try {
-    const res = await axios.post('/api/rag/rebuild')
+    const res = await api.post('/rag/rebuild')
     message.success(`重建完成：${res.data.documents} 个文档，${res.data.chunks} 个文本块`)
     await loadDocuments()
     await loadStatus()
@@ -366,12 +473,41 @@ async function previewDoc(docId) {
   previewLoading.value = true
   previewData.value = null
   try {
-    const res = await axios.get(`/api/rag/documents/${docId}/chunks`)
+    const res = await api.get(`/rag/documents/${docId}/chunks`)
     previewData.value = res.data
   } catch (e) {
     message.error('加载失败: ' + (e.response?.data?.detail || e.message))
   } finally {
     previewLoading.value = false
+  }
+}
+
+// 编辑文档
+const editDocOpen = ref(false)
+const editDocSaving = ref(false)
+const editDocForm = ref({ id: null, filename: '', visibility: 'private' })
+
+function openEditDoc(record) {
+  editDocForm.value = {
+    id: record.id,
+    filename: record.filename,
+    visibility: record.visibility || 'private',
+  }
+  editDocOpen.value = true
+}
+
+async function handleEditDoc() {
+  editDocSaving.value = true
+  try {
+    const params = { filename: editDocForm.value.filename, visibility: editDocForm.value.visibility }
+    await api.put(`/rag/documents/${editDocForm.value.id}`, null, { params })
+    message.success('文档已更新')
+    editDocOpen.value = false
+    await loadDocuments()
+  } catch (e) {
+    message.error('更新失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    editDocSaving.value = false
   }
 }
 

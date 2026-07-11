@@ -1,0 +1,8 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24.000000" height="24.000000" fill="none">
+	<rect id="计划" width="24.000000" height="24.000000" x="0.000000" y="0.000000" />
+	<path id="path" d="M2.5 9.5L21.5 9.5L21.5 20.5C21.5 21.0523 21.0523 21.5 20.5 21.5L3.5 21.5C2.94772 21.5 2.5 21.0523 2.5 20.5L2.5 9.5Z" fill="rgb(79,92,228)" fill-rule="evenodd" />
+	<path id="path" d="M21.5 9.5L21.5 20.5C21.5 21.0523 21.0523 21.5 20.5 21.5L3.5 21.5C2.94772 21.5 2.5 21.0523 2.5 20.5L2.5 9.5L21.5 9.5Z" fill-rule="evenodd" stroke="rgb(79,92,228)" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="path" d="M3.5 4L20.5 4C21.0523 4 21.5 4.44771 21.5 5L21.5 9.5L2.5 9.5L2.5 5C2.5 4.44771 2.94772 4 3.5 4Z" fill-rule="evenodd" stroke="rgb(79,92,228)" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="path" d="M0 0L4 0" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-width="1.500000" transform="matrix(0,1,-1,0,8,2.5)" />
+	<path id="path" d="M0 0L4 0" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-width="1.500000" transform="matrix(0,1,-1,0,16,2.5)" />
+</svg>

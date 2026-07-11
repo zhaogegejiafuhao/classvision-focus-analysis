@@ -12,6 +12,7 @@ from backend.api.person_routes import router as person_router
 from backend.api.rag_routes import router as rag_router
 from backend.api.oj_routes import router as oj_router
 from backend.api.auth_routes import router as auth_router
+from backend.api.import_routes import router as import_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
@@ -176,6 +177,7 @@ app.include_router(person_router)
 app.include_router(rag_router)
 app.include_router(oj_router)
 app.include_router(auth_router)
+app.include_router(import_router)
 
 
 @app.get("/api/health")

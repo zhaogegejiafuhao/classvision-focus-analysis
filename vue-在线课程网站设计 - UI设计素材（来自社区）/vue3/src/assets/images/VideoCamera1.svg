@@ -1,0 +1,6 @@
+<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="44.000000" height="44.000000" fill="none" customFrame="#000000">
+	<rect id="VideoCamera" width="44.000000" height="44.000000" x="0.000000" y="0.000000" fill="rgb(255,255,255)" fill-opacity="0" />
+	<path id="Vector" d="M44 0L0 0L0 44L44 44L44 0Z" fill-rule="evenodd" />
+	<path id="Vector" d="M26.125 10.3125C27.5837 10.3125 28.9826 10.892 30.0141 11.9234C31.0455 12.9549 31.625 14.3538 31.625 15.8125L31.625 32.3125C31.625 32.6772 31.4801 33.0269 31.2223 33.2848C30.9644 33.5426 30.6147 33.6875 30.25 33.6875L8.25 33.6875C6.79131 33.6875 5.39236 33.108 4.36091 32.0766C3.32946 31.0451 2.75 29.6462 2.75 28.1875L2.75 11.6875C2.75 11.3228 2.89487 10.9731 3.15273 10.7152C3.41059 10.4574 3.76033 10.3125 4.125 10.3125L26.125 10.3125Z" fill-rule="evenodd" stroke="rgb(255,194,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+	<path id="Vector" d="M31.625 19.25L41.25 13.75L41.25 30.25L31.625 24.75" fill-rule="evenodd" stroke="rgb(255,194,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
+</svg>

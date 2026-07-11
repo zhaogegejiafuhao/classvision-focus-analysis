@@ -4,7 +4,7 @@ import os
 import json
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,33 @@ from rag.knowledge_base import KnowledgeBase, get_knowledge_base
 from rag.rag_service import RAGService
 
 router = APIRouter(prefix="/api/rag", tags=["rag"])
+
+VALID_VISIBILITY = {"public", "staff", "private"}
+
+
+def _filter_visible_docs(query, current_user: RegisteredPerson):
+    """按当前用户角色和可见性过滤文档"""
+    if current_user.role == "admin":
+        return query  # admin 可见所有
+    if current_user.role == "teacher":
+        # 教师：public + staff + 自己的 private
+        return query.filter(
+            ((KnowledgeDocument.visibility == "public") |
+             (KnowledgeDocument.visibility == "staff") |
+             (KnowledgeDocument.uploaded_by == current_user.id))
+        )
+    # student：public + 自己的 private
+    return query.filter(
+        ((KnowledgeDocument.visibility == "public") |
+         (KnowledgeDocument.uploaded_by == current_user.id))
+    )
+
+
+def _visible_doc_ids(db: Session, current_user: RegisteredPerson) -> set[int]:
+    """获取当前用户可见的文档ID集合"""
+    q = db.query(KnowledgeDocument.id)
+    q = _filter_visible_docs(q, current_user)
+    return {row[0] for row in q.all()}
 
 # RAG服务实例（懒加载）
 _rag_service: RAGService | None = None
@@ -41,11 +68,16 @@ def get_rag_status():
 
 
 @router.post("/query", response_model=RAGQueryResponse)
-def query_knowledge(request: RAGQueryRequest, db: Session = Depends(get_db)):
-    """查询知识库"""
+def query_knowledge(
+    request: RAGQueryRequest,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """查询知识库（按用户可见性过滤，生成前过滤防止内容泄露）"""
     try:
         service = get_rag_service()
-        result = service.query(request.question, request.top_k)
+        visible_ids = _visible_doc_ids(db, current_user)
+        result = service.query(request.question, request.top_k, visible_doc_ids=visible_ids)
         return RAGQueryResponse(
             answer=result['answer'],
             sources=result['sources'],
@@ -56,13 +88,18 @@ def query_knowledge(request: RAGQueryRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/query/stream")
-async def query_knowledge_stream(request: RAGQueryRequest):
-    """流式查询知识库：SSE 逐字返回回答，先发检索到的参考来源"""
+async def query_knowledge_stream(
+    request: RAGQueryRequest,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """流式查询知识库：SSE 逐字返回回答，生成前按可见性过滤防止内容泄露"""
     service = get_rag_service()
+    visible_ids = _visible_doc_ids(db, current_user)
 
     def event_stream():
         try:
-            for event in service.stream_query(request.question, request.top_k):
+            for event in service.stream_query(request.question, request.top_k, visible_doc_ids=visible_ids):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -73,11 +110,16 @@ async def query_knowledge_stream(request: RAGQueryRequest):
 @router.post("/upload")
 async def upload_knowledge(
     file: UploadFile = File(...),
+    visibility: str = Form("private"),
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """上传知识文档（教师/管理员）"""
-    assert_teacher_or_admin(current_user)
+    """上传知识文档（所有角色可上传，学生只能 private）"""
+    if visibility not in VALID_VISIBILITY:
+        raise HTTPException(400, f"无效的可见性，可选: {VALID_VISIBILITY}")
+    # 学生只能上传 private
+    if current_user.role == "student" and visibility != "private":
+        raise HTTPException(403, "学生只能上传私有文档")
     # 检查文件类型
     allowed_types = ['.pdf', '.txt', '.md', '.docx', '.pptx']
     ext = os.path.splitext(file.filename)[1].lower()
@@ -107,6 +149,8 @@ async def upload_knowledge(
         file_type=ext.replace('.', ''),
         total_chunks=len(chunks),
         indexed=True,
+        uploaded_by=current_user.id,
+        visibility=visibility,
     )
     db.add(doc)
     db.commit()
@@ -132,6 +176,8 @@ async def upload_knowledge(
         "filename": file.filename,
         "total_chunks": len(chunks),
         "indexed": True,
+        "visibility": visibility,
+        "uploaded_by": current_user.id,
     }
 
 
@@ -140,24 +186,57 @@ def list_documents(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取所有知识文档"""
-    return db.query(KnowledgeDocument).order_by(KnowledgeDocument.created_at.desc()).all()
+    """获取当前用户可见的知识文档"""
+    q = db.query(KnowledgeDocument)
+    q = _filter_visible_docs(q, current_user)
+    docs = q.order_by(KnowledgeDocument.created_at.desc()).all()
+
+    # 批量获取上传者姓名
+    uploader_ids = {d.uploaded_by for d in docs if d.uploaded_by}
+    uploader_map = {}
+    if uploader_ids:
+        persons = db.query(RegisteredPerson).filter(RegisteredPerson.id.in_(uploader_ids)).all()
+        uploader_map = {p.id: p.name for p in persons}
+
+    result = []
+    for d in docs:
+        result.append(KnowledgeDocumentOut(
+            id=d.id,
+            filename=d.filename,
+            file_type=d.file_type,
+            total_chunks=d.total_chunks,
+            indexed=d.indexed,
+            created_at=d.created_at,
+            uploaded_by=d.uploaded_by,
+            uploader_name=uploader_map.get(d.uploaded_by, None),
+            visibility=d.visibility or "private",
+        ))
+    return result
 
 
 @router.put("/documents/{document_id}")
 def update_document(
     document_id: int,
     filename: str = None,
+    visibility: str = None,
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """重命名知识文档（教师/管理员）"""
-    assert_teacher_or_admin(current_user)
+    """重命名或修改可见性（上传者或管理员）"""
     doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
     if not doc:
         raise HTTPException(404, "文档不存在")
+    # 权限：上传者本人或 admin
+    if doc.uploaded_by != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "仅上传者或管理员可修改")
     if filename:
         doc.filename = filename
+    if visibility:
+        if visibility not in VALID_VISIBILITY:
+            raise HTTPException(400, f"无效的可见性，可选: {VALID_VISIBILITY}")
+        if current_user.role == "student" and visibility != "private":
+            raise HTTPException(403, "学生文档只能为私有")
+        doc.visibility = visibility
     db.commit()
     db.refresh(doc)
     return doc
@@ -169,11 +248,13 @@ def delete_document(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """删除知识文档（教师/管理员）"""
-    assert_teacher_or_admin(current_user)
+    """删除知识文档（上传者或管理员）"""
     doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
     if not doc:
         raise HTTPException(404, "文档不存在")
+    # 权限：上传者本人或 admin
+    if doc.uploaded_by != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "仅上传者或管理员可删除")
 
     # 软删除 FAISS 索引中的向量
     removed = 0

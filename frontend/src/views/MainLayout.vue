@@ -44,7 +44,7 @@
 
         <a-menu-item key="/report">
           <template #icon><BarChartOutlined /></template>
-          <span>注意力报告</span>
+          <span>{{ currentRole === 'student' ? '我的报告' : '注意力报告' }}</span>
         </a-menu-item>
 
         <a-divider style="margin: 8px 0" />
@@ -57,6 +57,10 @@
         <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/persons">
           <template #icon><TeamOutlined /></template>
           <span>{{ personsLabel }}</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'admin'" key="/roster">
+          <template #icon><SolutionOutlined /></template>
+          <span>花名册</span>
         </a-menu-item>
 
         <a-menu-item key="/rag">
@@ -72,11 +76,6 @@
         <a-menu-item v-if="currentRole === 'admin'" key="/analytics">
           <template #icon><DashboardOutlined /></template>
           <span>数据分析</span>
-        </a-menu-item>
-
-        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/invite">
-          <template #icon><UserAddOutlined /></template>
-          <span>邀请成员</span>
         </a-menu-item>
 
         <a-menu-item key="/help">
@@ -125,6 +124,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   TeamOutlined,
+  SolutionOutlined,
   FileTextOutlined,
   CodeOutlined,
   DashboardOutlined,
@@ -172,15 +172,16 @@ const currentPageTitle = computed(() => {
     '/app': '首页看板',
     '/classrooms': currentRole.value === 'student' ? '我的课堂' : '课堂管理',
     '/calendar': '课程日历',
-    '/report': '注意力报告',
+    '/report': currentRole.value === 'student' ? '我的报告' : '注意力报告',
+    '/my-report': '我的报告',
     '/settings': '设置',
     '/persons': personsLabel.value,
+    '/roster': '花名册',
     '/rag': 'RAG 文档库',
     '/oj': '题目列表',
     '/oj/run': '代码运行',
     '/oj/submissions': '提交记录',
     '/analytics': '数据分析',
-    '/invite': '邀请成员',
     '/help': '帮助',
   }
   if (titles[route.path]) return titles[route.path]
@@ -199,7 +200,11 @@ function navigate(path) {
 }
 
 function onMenuClick({ key }) {
-  router.push(key)
+  if (key === '/report' && currentRole.value === 'student') {
+    router.push('/my-report')
+  } else {
+    router.push(key)
+  }
 }
 
 function handleLogout() {

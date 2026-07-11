@@ -1,0 +1,19 @@
+<svg viewBox="0 0 5.60437 5.60437" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="5.604370" height="5.604370" fill="none" customFrame="#000000">
+	<defs>
+		<radialGradient id="paint_radial_3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(0,-4.89886,5.61577,0,2.84454,1.29351)">
+			<stop stop-color="rgb(254,255,255)" offset="0" stop-opacity="1" />
+			<stop stop-color="rgb(254,255,255)" offset="0.400000006" stop-opacity="1" />
+			<stop stop-color="rgb(249,252,252)" offset="0.50999999" stop-opacity="1" />
+			<stop stop-color="rgb(237,243,245)" offset="0.620000005" stop-opacity="1" />
+			<stop stop-color="rgb(222,233,236)" offset="0.699999988" stop-opacity="1" />
+			<stop stop-color="rgb(216,228,232)" offset="0.720000029" stop-opacity="1" />
+			<stop stop-color="rgb(204,216,223)" offset="0.75999999" stop-opacity="1" />
+			<stop stop-color="rgb(200,213,221)" offset="0.800000012" stop-opacity="1" />
+			<stop stop-color="rgb(204,214,222)" offset="0.829999983" stop-opacity="1" />
+			<stop stop-color="rgb(216,219,226)" offset="0.850000024" stop-opacity="1" />
+			<stop stop-color="rgb(237,227,233)" offset="0.879999995" stop-opacity="1" />
+			<stop stop-color="rgb(255,235,239)" offset="0.899999976" stop-opacity="1" />
+		</radialGradient>
+	</defs>
+	<path id="Vector" d="M2.80219 5.60437C4.34979 5.60437 5.60438 4.34979 5.60438 2.80219C5.60438 1.25458 4.34979 0 2.80219 0C1.25458 0 0 1.25458 0 2.80219C0 4.34979 1.25458 5.60437 2.80219 5.60437Z" fill="url(#paint_radial_3)" fill-rule="evenodd" />
+</svg>

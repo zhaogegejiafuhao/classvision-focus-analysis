@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
 from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson
-from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut
+from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut, StudentPersonalReport, StudentClassroomAttention
 from backend.services.ollama_service import generate_report
 
 router = APIRouter(prefix="/api", tags=["stats"])
@@ -204,9 +204,18 @@ def _get_student_avg_attention(student_id: int, db: Session) -> float:
 
 
 @router.get("/classrooms/{classroom_id}/students", response_model=list[StudentOut])
-def get_students(classroom_id: int, db: Session = Depends(get_db)):
+def get_students(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
+
+    # 学生只能看到自己的数据
+    if current_user.role == "student":
+        students = [s for s in students if s.person_id == current_user.id]
+
     result = []
     for s in students:
         records = db.query(AttentionRecord).filter(AttentionRecord.student_id == s.id).all()
@@ -459,7 +468,86 @@ def delete_student(
     if not student:
         raise HTTPException(404, "学生不存在")
     db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).delete()
-    db.query(ExamRiskRecord).filter(ExamRiskRecord.student_id == student_id).delete()
+    db.query(ExamRiskRecord).filter(AttentionRecord.student_id == student_id).delete()
     db.delete(student)
     db.commit()
     return {"message": "学生已删除"}
+
+
+# ===== 学生个人报告 =====
+
+@router.get("/me/attention-history", response_model=StudentPersonalReport)
+def get_my_attention_history(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取当前学生个人的注意力历史数据"""
+    if current_user.role != "student":
+        raise HTTPException(403, "仅学生可查看个人报告")
+
+    # 找到该 person 关联的所有 student 记录
+    my_students = db.query(Student).filter(Student.person_id == current_user.id).all()
+    if not my_students:
+        return StudentPersonalReport(
+            student_name=current_user.name,
+            total_classrooms=0,
+            overall_avg_attention=0,
+            best_classroom="",
+            worst_classroom="",
+            classrooms=[],
+        )
+
+    classroom_data = []
+    for s in my_students:
+        records = db.query(AttentionRecord).filter(AttentionRecord.student_id == s.id).all()
+        if not records:
+            continue
+        avg_att = sum(r.attention_score for r in records) / len(records)
+        head_down = sum(1 for r in records if abs(r.pitch) > 15)
+        blinks = records[-1].blink_count if records else 0
+
+        classroom = db.query(Classroom).filter(Classroom.id == s.classroom_id).first()
+        if not classroom:
+            continue
+
+        # 时间线
+        time_rows = (
+            db.query(
+                func.strftime("%H:%M", AttentionRecord.timestamp).label("minute"),
+                func.avg(AttentionRecord.attention_score).label("avg_att"),
+            )
+            .filter(AttentionRecord.student_id == s.id)
+            .group_by("minute")
+            .order_by("minute")
+            .all()
+        )
+        timeline = [
+            TimelinePoint(timestamp=r.minute, avg_attention=round(r.avg_att, 1), student_count=1)
+            for r in time_rows
+        ]
+
+        classroom_data.append(StudentClassroomAttention(
+            classroom_id=classroom.id,
+            classroom_name=classroom.name,
+            teacher=classroom.teacher,
+            avg_attention=round(avg_att, 1),
+            head_down_count=head_down,
+            blink_count=blinks,
+            duration=classroom.duration,
+            started_at=classroom.started_at,
+            timeline=timeline,
+        ))
+
+    total = len(classroom_data)
+    overall_avg = sum(c.avg_attention for c in classroom_data) / total if total else 0
+    best = max(classroom_data, key=lambda c: c.avg_attention).classroom_name if classroom_data else ""
+    worst = min(classroom_data, key=lambda c: c.avg_attention).classroom_name if classroom_data else ""
+
+    return StudentPersonalReport(
+        student_name=current_user.name,
+        total_classrooms=total,
+        overall_avg_attention=round(overall_avg, 1),
+        best_classroom=best,
+        worst_classroom=worst,
+        classrooms=classroom_data,
+    )
