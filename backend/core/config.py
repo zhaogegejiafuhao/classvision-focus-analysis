@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     RAG_CHUNK_OVERLAP: int = 50  # 文本块重叠
     RAG_TOP_K: int = 5  # 检索返回top-k结果
 
+    # OJ 判题机配置
+    OJ_JUDGER_URL: str = "http://127.0.0.1:12345"  # judger 容器映射地址
+
+    # JWT 认证配置
+    JWT_SECRET_KEY: str = "classeyes-secret-key-change-in-production-2026"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_HOURS: int = 24
+
     class Config:
         env_file = ".env"
 

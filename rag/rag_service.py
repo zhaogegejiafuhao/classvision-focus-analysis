@@ -1,11 +1,20 @@
 """RAG检索服务：检索 + 生成回答"""
 
 import json
+import re
 import requests
 from typing import List, Optional
 
 from backend.core.config import settings
 from rag.embedding_service import EmbeddingService
+
+
+def _strip_think_tags(content: str) -> str:
+    """过滤 LLM 输出中的 <think> 思考标签"""
+    if '</think>' in content:
+        content = content.rsplit('</think>', 1)[-1]
+    content = re.sub(r'<think>.*', '', content, flags=re.DOTALL)
+    return content.strip()
 
 
 class RAGService:
@@ -82,7 +91,10 @@ class RAGService:
         try:
             resp = requests.post(url, json=payload, timeout=120)
             resp.raise_for_status()
-            return resp.json()["message"]["content"]
+            content = resp.json()["message"]["content"]
+            return _strip_think_tags(content)
+        except requests.exceptions.ConnectionError:
+            return "⚠️ Ollama 服务未启动，请先运行 `ollama serve` 并拉取模型（`ollama pull qwen3:4b`）。"
         except Exception as e:
             return f"生成回答失败: {e}"
 
@@ -91,7 +103,7 @@ class RAGService:
 
         事件类型：
         - meta: 检索完成，带 sources / retrieved_chunks
-        - delta: 文本增量
+        - delta: 文本增量（已过滤 <think> 标签）
         - done: 流结束，带完整 content
         - error: 出错
         """
@@ -144,6 +156,8 @@ class RAGService:
         }
 
         full = ""
+        buffer = ""
+        in_think = False
         try:
             with requests.post(url, json=payload, stream=True, timeout=180) as resp:
                 resp.raise_for_status()
@@ -157,16 +171,59 @@ class RAGService:
                     if data.get("done"):
                         break
                     delta = data.get("message", {}).get("content", "")
-                    if delta:
-                        full += delta
-                        yield {'type': 'delta', 'delta': delta}
-        except Exception as e:
-            if isinstance(e, requests.exceptions.ConnectionError):
-                err_msg = "Ollama 服务未启动，请先运行 ollama serve 并拉取模型（ollama pull qwen3:4b）"
-            else:
-                err_msg = str(e)
-            yield {'type': 'error', 'error': err_msg}
+                    if not delta:
+                        continue
+
+                    full += delta
+                    buffer += delta
+
+                    # 流式过滤 <think> 标签
+                    while buffer:
+                        if in_think:
+                            end_idx = buffer.find('</think>')
+                            if end_idx != -1:
+                                buffer = buffer[end_idx + len('</think>'):]
+                                in_think = False
+                            else:
+                                buffer = ""
+                                break
+                        else:
+                            start_idx = buffer.find('<think>')
+                            if start_idx != -1:
+                                safe = buffer[:start_idx]
+                                if safe:
+                                    yield {'type': 'delta', 'delta': safe}
+                                buffer = buffer[start_idx:]
+                                in_think = True
+                            else:
+                                # 避免在可能的 <think 标签前缀处截断
+                                lt_idx = buffer.rfind('<')
+                                if lt_idx != -1 and lt_idx > len(buffer) - 8:
+                                    safe = buffer[:lt_idx]
+                                    if safe:
+                                        yield {'type': 'delta', 'delta': safe}
+                                    buffer = buffer[lt_idx:]
+                                    break
+                                else:
+                                    yield {'type': 'delta', 'delta': buffer}
+                                    buffer = ""
+                                    break
+
+                    # 流结束时 flush 残留 buffer
+                    if data.get("done"):
+                        if buffer and not in_think:
+                            yield {'type': 'delta', 'delta': buffer}
+                        break
+
+        except requests.exceptions.ConnectionError:
+            yield {'type': 'error', 'error': 'Ollama 服务未启动，请先运行 `ollama serve` 并拉取模型（`ollama pull qwen3:4b`）。'}
             return
+        except Exception as e:
+            yield {'type': 'error', 'error': str(e)}
+            return
+
+        # 流结束后也过滤一遍（防止未闭合 think 标签）
+        full = _strip_think_tags(full)
 
         # 存入缓存（上限 50 条，超出删最早）
         if len(self._query_cache) >= 50:

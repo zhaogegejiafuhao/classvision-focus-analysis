@@ -20,6 +20,34 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_student_last_seen()
     _migrate_classroom_exam_mode()
+    _migrate_registered_person_auth_fields()
+    _migrate_oj_problem_created_by()
+
+
+def _migrate_oj_problem_created_by():
+    """为 oj_problem 表添加 created_by 字段"""
+    insp = inspect(engine)
+    if "oj_problem" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("oj_problem")}
+        if "created_by" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE oj_problem ADD COLUMN created_by INTEGER"))
+                conn.commit()
+
+
+def _migrate_registered_person_auth_fields():
+    """为 registered_person 表添加 username 和 password_hash 字段"""
+    insp = inspect(engine)
+    if "registered_person" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("registered_person")}
+        if "username" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE registered_person ADD COLUMN username VARCHAR(50)"))
+                conn.commit()
+        if "password_hash" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE registered_person ADD COLUMN password_hash VARCHAR(255)"))
+                conn.commit()
 
 
 def _migrate_student_last_seen():

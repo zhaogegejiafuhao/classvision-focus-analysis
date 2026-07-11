@@ -2,7 +2,7 @@
   <a-layout style="min-height: 100vh">
     <a-layout-header style="display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
       <span style="color: #fff; font-size: 20px; font-weight: bold; cursor: pointer" @click="$router.push('/')">
-        ClassVision 课眼智析
+        ClassEyes 课堂学情智能实训平台
       </span>
       <a-space>
         <a-button type="link" style="color: #fff" @click="$router.push('/persons')">人员管理</a-button>

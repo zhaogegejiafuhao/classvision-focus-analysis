@@ -5,19 +5,28 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord
-from backend.models.schemas import ClassroomCreate, ClassroomOut, ClassroomDetail, ClassroomEndOut
+from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
+from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson, Report, ChatMessage
+from backend.models.schemas import ClassroomCreate, ClassroomUpdate, ClassroomOut, ClassroomDetail, ClassroomEndOut
 
 router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
 
 
 @router.post("", response_model=ClassroomOut)
-def create_classroom(data: ClassroomCreate, db: Session = Depends(get_db)):
+def create_classroom(
+    data: ClassroomCreate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    assert_teacher_or_admin(current_user)
+    teacher_person_id = data.teacher_person_id
+    if teacher_person_id is None and current_user.role in ("teacher", "admin"):
+        teacher_person_id = current_user.id
     classroom = Classroom(
         name=data.name,
         teacher=data.teacher,
         exam_mode=data.exam_mode,
-        teacher_person_id=data.teacher_person_id,
+        teacher_person_id=teacher_person_id,
     )
     db.add(classroom)
     db.commit()
@@ -26,12 +35,19 @@ def create_classroom(data: ClassroomCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[ClassroomOut])
-def list_classrooms(db: Session = Depends(get_db)):
+def list_classrooms(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     return db.query(Classroom).order_by(Classroom.started_at.desc()).all()
 
 
 @router.get("/{classroom_id}", response_model=ClassroomDetail)
-def get_classroom(classroom_id: int, db: Session = Depends(get_db)):
+def get_classroom(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
@@ -80,8 +96,61 @@ def get_classroom(classroom_id: int, db: Session = Depends(get_db)):
     return classroom
 
 
+@router.put("/{classroom_id}", response_model=ClassroomOut)
+def update_classroom(
+    classroom_id: int,
+    data: ClassroomUpdate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """编辑课堂（创建者或管理员）"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    assert_owner_or_admin(classroom.teacher_person_id, current_user)
+
+    if data.name is not None:
+        classroom.name = data.name
+    if data.teacher is not None:
+        classroom.teacher = data.teacher
+    if data.exam_mode is not None:
+        classroom.exam_mode = data.exam_mode
+    if data.teacher_person_id is not None:
+        classroom.teacher_person_id = data.teacher_person_id
+
+    db.commit()
+    db.refresh(classroom)
+    return classroom
+
+
+@router.delete("/{classroom_id}")
+def delete_classroom(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除课堂（创建者或管理员）级联删除关联数据"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    assert_owner_or_admin(classroom.teacher_person_id, current_user)
+
+    db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).delete()
+    db.query(ExamRiskRecord).filter(ExamRiskRecord.classroom_id == classroom_id).delete()
+    db.query(ChatMessage).filter(ChatMessage.classroom_id == classroom_id).delete()
+    db.query(Report).filter(Report.classroom_id == classroom_id).delete()
+    db.query(Student).filter(Student.classroom_id == classroom_id).delete()
+    db.delete(classroom)
+    db.commit()
+    return {"message": "课堂已删除"}
+
+
 @router.put("/{classroom_id}/end", response_model=ClassroomEndOut)
-def end_classroom(classroom_id: int, db: Session = Depends(get_db)):
+def end_classroom(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")

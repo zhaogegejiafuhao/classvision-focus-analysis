@@ -28,7 +28,8 @@ sqlalchemy==2.0.36           # ORM
 pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
-python-jose[cryptography]==3.3.0  # JWT 鉴权（可选）
+python-jose[cryptography]==3.3.0  # JWT 鉴权
+bcrypt>=4.0.0                     # 密码哈希
 
 # --- RAG 模块 ---
 sentence-transformers>=2.2.0   # 文本嵌入模型

@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from PIL import Image
 
 from backend.core.database import get_db
+from backend.core.security import get_current_user, hash_password
 from backend.models.tables import RegisteredPerson, Classroom, Student
-from backend.models.schemas import PersonCreate, PersonOut, ClassroomWithTeacher
+from backend.models.schemas import PersonCreate, PersonUpdate, PersonOut, ClassroomWithTeacher
 from cv_engine.face_recognizer import recognizer, embedding_to_json, json_to_embedding
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ def register_person(
     role: str = Form(...),  # "student" or "teacher"
     image_data: str = Form(None),  # Base64编码的图像数据
     file: UploadFile = File(None),  # 上传的图像文件
+    current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -34,6 +36,8 @@ def register_person(
     1. Base64编码的图像数据（前端摄像头捕获）
     2. 上传的图像文件
     """
+    _assert_register_permission(role, current_user)
+
     # 校验角色
     if role not in ("student", "teacher"):
         raise HTTPException(400, "角色必须是 student 或 teacher")
@@ -85,20 +89,36 @@ def register_person(
     return new_person
 
 
+def _assert_register_permission(target_role: str, current_user: RegisteredPerson):
+    """注册权限：admin 可注册学生和老师，teacher 只能注册学生"""
+    if current_user.role == "admin":
+        return
+    if current_user.role == "teacher" and target_role == "student":
+        return
+    raise HTTPException(403, "无权注册该角色的人员")
+
+
 @router.get("", response_model=list[PersonOut])
 def list_persons(
     role: str = None,  # 可选过滤
+    current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """获取已注册人员列表"""
     query = db.query(RegisteredPerson)
     if role:
         query = query.filter(RegisteredPerson.role == role)
+    if current_user.role == "teacher":
+        query = query.filter(RegisteredPerson.role == "student")
     return query.order_by(RegisteredPerson.created_at.desc()).all()
 
 
 @router.get("/{person_id}", response_model=PersonOut)
-def get_person(person_id: int, db: Session = Depends(get_db)):
+def get_person(
+    person_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取单个人员信息"""
     person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
     if not person:
@@ -106,12 +126,60 @@ def get_person(person_id: int, db: Session = Depends(get_db)):
     return person
 
 
-@router.delete("/{person_id}")
-def delete_person(person_id: int, db: Session = Depends(get_db)):
-    """删除已注册人员"""
+@router.put("/{person_id}", response_model=PersonOut)
+def update_person(
+    person_id: int,
+    data: PersonUpdate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """编辑人员信息（admin 可编辑所有，teacher 只能编辑学生）"""
     person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
     if not person:
         raise HTTPException(404, "人员不存在")
+
+    if current_user.role == "admin":
+        pass
+    elif current_user.role == "teacher" and person.role == "student":
+        pass
+    else:
+        raise HTTPException(403, "无权编辑该人员")
+
+    if data.name is not None:
+        person.name = data.name
+    if data.username is not None:
+        existing = db.query(RegisteredPerson).filter(
+            RegisteredPerson.username == data.username,
+            RegisteredPerson.id != person_id,
+        ).first()
+        if existing:
+            raise HTTPException(400, "用户名已被占用")
+        person.username = data.username
+    if data.password is not None:
+        person.password_hash = hash_password(data.password)
+
+    db.commit()
+    db.refresh(person)
+    return person
+
+
+@router.delete("/{person_id}")
+def delete_person(
+    person_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除已注册人员（admin 可删除所有，teacher 只能删除学生）"""
+    person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
+    if not person:
+        raise HTTPException(404, "人员不存在")
+
+    if current_user.role == "admin":
+        pass
+    elif current_user.role == "teacher" and person.role == "student":
+        pass
+    else:
+        raise HTTPException(403, "无权删除该人员")
 
     # 检查是否关联了课堂或学生
     classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == person_id).all()

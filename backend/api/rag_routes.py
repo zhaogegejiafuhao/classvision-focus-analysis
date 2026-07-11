@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.config import settings
-from backend.models.tables import KnowledgeDocument, KnowledgeChunk, Report, ChatMessage
+from backend.core.security import get_current_user, assert_teacher_or_admin
+from backend.models.tables import KnowledgeDocument, KnowledgeChunk, Report, ChatMessage, RegisteredPerson
 from backend.models.schemas import RAGQueryRequest, RAGQueryResponse, KnowledgeDocumentOut
 from rag.knowledge_base import KnowledgeBase, get_knowledge_base
 from rag.rag_service import RAGService
@@ -72,9 +73,11 @@ async def query_knowledge_stream(request: RAGQueryRequest):
 @router.post("/upload")
 async def upload_knowledge(
     file: UploadFile = File(...),
+    current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """上传知识文档"""
+    """上传知识文档（教师/管理员）"""
+    assert_teacher_or_admin(current_user)
     # 检查文件类型
     allowed_types = ['.pdf', '.txt', '.md', '.docx', '.pptx']
     ext = os.path.splitext(file.filename)[1].lower()
@@ -133,14 +136,41 @@ async def upload_knowledge(
 
 
 @router.get("/documents", response_model=List[KnowledgeDocumentOut])
-def list_documents(db: Session = Depends(get_db)):
+def list_documents(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取所有知识文档"""
     return db.query(KnowledgeDocument).order_by(KnowledgeDocument.created_at.desc()).all()
 
 
+@router.put("/documents/{document_id}")
+def update_document(
+    document_id: int,
+    filename: str = None,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """重命名知识文档（教师/管理员）"""
+    assert_teacher_or_admin(current_user)
+    doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
+    if not doc:
+        raise HTTPException(404, "文档不存在")
+    if filename:
+        doc.filename = filename
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
 @router.delete("/documents/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db)):
-    """删除知识文档（同步软删除 FAISS 索引向量）"""
+def delete_document(
+    document_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除知识文档（教师/管理员）"""
+    assert_teacher_or_admin(current_user)
     doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
     if not doc:
         raise HTTPException(404, "文档不存在")

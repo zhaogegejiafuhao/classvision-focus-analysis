@@ -11,6 +11,13 @@ class ClassroomCreate(BaseModel):
     teacher_person_id: int | None = None  # 关联已注册的老师身份
 
 
+class ClassroomUpdate(BaseModel):
+    name: str | None = None
+    teacher: str | None = None
+    exam_mode: bool | None = None
+    teacher_person_id: int | None = None
+
+
 class ClassroomOut(BaseModel):
     id: int
     name: str
@@ -35,6 +42,18 @@ class ClassroomEndOut(ClassroomOut):
 
 
 # --- 学生 ---
+class StudentCreate(BaseModel):
+    classroom_id: int
+    track_id: int
+    name: str | None = None
+    person_id: int | None = None
+
+
+class StudentUpdate(BaseModel):
+    name: str | None = None
+    person_id: int | None = None
+
+
 class StudentOut(BaseModel):
     id: int
     track_id: int
@@ -85,13 +104,41 @@ class PersonCreate(BaseModel):
     role: str  # "student" or "teacher"
 
 
+class PersonUpdate(BaseModel):
+    name: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+
 class PersonOut(BaseModel):
     id: int
     name: str
     role: str
+    username: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- 认证 ---
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    role: str
+    username: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
 
 
 class ClassroomWithTeacher(ClassroomDetail):
@@ -124,5 +171,101 @@ class KnowledgeDocumentOut(BaseModel):
     total_chunks: int
     indexed: bool
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- OJ 判题 ---
+class OjProblemOut(BaseModel):
+    id: int
+    title: str
+    difficulty: str
+    time_limit: int
+    memory_limit: int
+    submitted_count: int = 0
+    accepted_count: int = 0
+    created_by: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class OjTestCaseOut(BaseModel):
+    id: int
+    input: str
+    expected_output: str
+    is_sample: bool
+
+    model_config = {"from_attributes": True}
+
+
+class OjTestCaseCreate(BaseModel):
+    input: str
+    expected_output: str
+    is_sample: bool = False
+
+
+class OjProblemCreate(BaseModel):
+    title: str
+    description: str
+    input_format: str = ""
+    output_format: str = ""
+    sample_input: str = ""
+    sample_output: str = ""
+    hint: str = ""
+    time_limit: int = 1000
+    memory_limit: int = 256 * 1024 * 1024
+    difficulty: str = "简单"
+    test_cases: list[OjTestCaseCreate] = []
+
+
+class OjProblemUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    input_format: str | None = None
+    output_format: str | None = None
+    sample_input: str | None = None
+    sample_output: str | None = None
+    hint: str | None = None
+    time_limit: int | None = None
+    memory_limit: int | None = None
+    difficulty: str | None = None
+    test_cases: list[OjTestCaseCreate] | None = None
+
+
+class OjProblemDetail(BaseModel):
+    id: int
+    title: str
+    description: str
+    input_format: str
+    output_format: str
+    sample_input: str
+    sample_output: str
+    hint: str
+    time_limit: int
+    memory_limit: int
+    difficulty: str
+    created_by: int | None = None
+    sample_test_cases: list[OjTestCaseOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class OjSubmissionCreate(BaseModel):
+    problem_id: int
+    language: str = "cpp"
+    source_code: str
+
+
+class OjSubmissionOut(BaseModel):
+    id: int
+    problem_id: int
+    problem_title: str = ""
+    language: str
+    status: str
+    cpu_time: int
+    memory: int
+    error_message: str = ""
+    source_code: str = ""
+    submitted_at: datetime
 
     model_config = {"from_attributes": True}

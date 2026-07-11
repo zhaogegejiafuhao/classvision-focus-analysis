@@ -1,15 +1,27 @@
 <template>
-  <a-layout style="min-height: 100vh">
-    <a-layout-header style="display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
-      <span style="color: #fff; font-size: 18px; font-weight: bold; cursor: pointer" @click="$router.push('/')">
-        ClassVision 课眼智析
-      </span>
-      <a-button type="link" style="color: #fff" @click="$router.push('/classrooms')">返回列表</a-button>
-    </a-layout-header>
-    <a-layout-content style="padding: 24px">
+  <div class="cv-page" style="max-width: 1400px">
       <a-spin :spinning="loading">
+        <a-skeleton v-if="loading && !classroom" active :paragraph="{ rows: 4 }" />
         <template v-if="classroom">
-          <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟${classroom.exam_mode ? ' · 考场模式' : ''}`" />
+          <div class="page-header-wrap">
+            <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟${classroom.exam_mode ? ' · 考场模式' : ''}`" style="padding: 0 0 16px 0" />
+            <a-space v-if="canEditOrDelete || canManage">
+              <a-button v-if="!classroom.ended_at && canManage" @click="endClassroom" :loading="endLoading">
+                <template #icon><CheckCircleOutlined /></template>
+                结束课堂
+              </a-button>
+              <a-button v-if="canEditOrDelete" @click="openEditClassroom">
+                <template #icon><EditOutlined /></template>
+                编辑课堂
+              </a-button>
+              <a-popconfirm v-if="canEditOrDelete" title="确定删除该课堂？将同时删除所有关联数据（学生、记录、报告等）。" @confirm="deleteClassroom">
+                <a-button danger>
+                  <template #icon><DeleteOutlined /></template>
+                  删除课堂
+                </a-button>
+              </a-popconfirm>
+            </a-space>
+          </div>
 
           <a-row :gutter="16" style="margin-bottom: 16px">
             <a-col :span="6">
@@ -66,12 +78,26 @@
           <a-row :gutter="16">
             <a-col :span="12">
               <a-card title="学生列表">
+                <template #extra>
+                  <a-button v-if="canManage" type="primary" size="small" @click="openAddStudent">
+                    <template #icon><PlusOutlined /></template>
+                    添加学生
+                  </a-button>
+                </template>
                 <a-table :columns="studentCols" :data-source="students" row-key="id" size="small">
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'risk_level'">
                       <a-tag :color="record.risk_level === 'high' ? 'red' : record.risk_level === 'medium' ? 'orange' : 'green'">
                         {{ { low: '低风险', medium: '中风险', high: '高风险' }[record.risk_level] || '低风险' }}
                       </a-tag>
+                    </template>
+                    <template v-if="column.key === 'action'">
+                      <a-space>
+                        <a-button type="link" size="small" @click="openEditStudent(record)">编辑</a-button>
+                        <a-popconfirm title="确定删除该学生？将同时删除其注意力记录。" @confirm="deleteStudent(record.id)">
+                          <a-button type="link" danger size="small">删除</a-button>
+                        </a-popconfirm>
+                      </a-space>
                     </template>
                   </template>
                 </a-table>
@@ -80,6 +106,22 @@
             <a-col :span="12">
               <!-- AI 报告 -->
               <a-card title="AI 课堂分析报告">
+                <template #extra>
+                  <a-space v-if="report && canManage" size="small">
+                    <a-popconfirm title="确定重新生成报告？将覆盖当前内容。" @confirm="genReport(true)">
+                      <a-button type="link" size="small" :loading="genLoading">
+                        <template #icon><ReloadOutlined /></template>
+                        重新生成
+                      </a-button>
+                    </a-popconfirm>
+                    <a-popconfirm title="确定删除该报告？" @confirm="deleteReport">
+                      <a-button type="link" danger size="small">
+                        <template #icon><DeleteOutlined /></template>
+                        删除
+                      </a-button>
+                    </a-popconfirm>
+                  </a-space>
+                </template>
                 <div v-if="report">
                   <div v-html="renderMarkdown(report?.content)" style="max-height: 300px; overflow-y: auto" />
                   <a-typography-text type="secondary">
@@ -87,7 +129,7 @@
                   </a-typography-text>
                 </div>
                 <a-empty v-else description="尚未生成报告">
-                  <a-button type="primary" @click="genReport" :loading="genLoading">生成报告</a-button>
+                  <a-button v-if="canManage" type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
                 </a-empty>
               </a-card>
 
@@ -142,6 +184,7 @@
             </a-col>
           </a-row>
         </template>
+        <a-empty v-else-if="!loading" description="课堂不存在" />
       </a-spin>
 
       <!-- 出席详情弹窗 -->
@@ -166,25 +209,99 @@
           </a-tab-pane>
         </a-tabs>
       </a-modal>
-    </a-layout-content>
-  </a-layout>
+
+      <!-- 编辑课堂弹窗 -->
+      <a-modal
+        v-model:open="editClassroomOpen"
+        title="编辑课堂信息"
+        @ok="handleEditClassroom"
+        :confirm-loading="editClassroomSaving"
+        ok-text="保存"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="课堂名称">
+            <a-input v-model:value="editClassroomForm.name" />
+          </a-form-item>
+          <a-form-item label="教师">
+            <a-input v-model:value="editClassroomForm.teacher" />
+          </a-form-item>
+          <a-form-item label="考场模式">
+            <a-switch v-model:checked="editClassroomForm.exam_mode" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
+      <!-- 添加学生弹窗 -->
+      <a-modal
+        v-model:open="addStudentOpen"
+        title="添加学生"
+        @ok="handleAddStudent"
+        :confirm-loading="addStudentSaving"
+        ok-text="添加"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="跟踪ID" required>
+            <a-input-number v-model:value="addStudentForm.track_id" :min="1" style="width: 100%" />
+          </a-form-item>
+          <a-form-item label="姓名">
+            <a-input v-model:value="addStudentForm.name" placeholder="可选" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
+      <!-- 编辑学生弹窗 -->
+      <a-modal
+        v-model:open="editStudentOpen"
+        title="编辑学生"
+        @ok="handleEditStudent"
+        :confirm-loading="editStudentSaving"
+        ok-text="保存"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="姓名">
+            <a-input v-model:value="editStudentForm.name" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+    </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import * as echarts from 'echarts'
-import axios from 'axios'
-import { marked } from 'marked'
+import api from '@/api'
+import { message } from 'ant-design-vue'
+import MarkdownIt from 'markdown-it'
+import {
+  CheckCircleOutlined, EditOutlined, DeleteOutlined,
+  PlusOutlined, ReloadOutlined,
+} from '@ant-design/icons-vue'
+
+const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 const classroomId = route.params.id
+
+const canManage = computed(() => ['teacher', 'admin'].includes(userStore.role))
+const canEditOrDelete = computed(() => {
+  if (!classroom.value) return false
+  if (userStore.role === 'admin') return true
+  return classroom.value.teacher_person_id === userStore.user?.id
+})
 
 const classroom = ref(null)
 const students = ref([])
 const report = ref(null)
 const loading = ref(true)
 const genLoading = ref(false)
+const endLoading = ref(false)
 const timelineEl = ref(null)
 const riskChartEl = ref(null)
 const heatmapEl = ref(null)
@@ -215,27 +332,184 @@ const studentCols = computed(() => {
   if (classroom.value?.exam_mode) {
     base.push({ title: '风险等级', dataIndex: 'risk_level', key: 'risk_level' })
   }
+  if (canManage.value) {
+    base.push({ title: '操作', key: 'action' })
+  }
   return base
 })
 
 function renderMarkdown(text) {
   if (!text) return ''
-  return marked.parse(text, { breaks: true })
+  return md.render(text)
 }
 
-async function genReport() {
+// ===== 课堂操作 =====
+async function endClassroom() {
+  endLoading.value = true
+  try {
+    await api.put(`/classrooms/${classroomId}/end`)
+    message.success('课堂已结束')
+    await loadClassroom()
+  } catch (e) {
+    message.error(e.response?.data?.detail || '结束课堂失败')
+  } finally {
+    endLoading.value = false
+  }
+}
+
+async function deleteClassroom() {
+  try {
+    await api.delete(`/classrooms/${classroomId}`)
+    message.success('课堂已删除')
+    router.push('/classrooms')
+  } catch (e) {
+    message.error(e.response?.data?.detail || '删除课堂失败')
+  }
+}
+
+// 编辑课堂
+const editClassroomOpen = ref(false)
+const editClassroomSaving = ref(false)
+const editClassroomForm = ref({ name: '', teacher: '', exam_mode: false })
+
+function openEditClassroom() {
+  editClassroomForm.value = {
+    name: classroom.value.name || '',
+    teacher: classroom.value.teacher || '',
+    exam_mode: classroom.value.exam_mode || false,
+  }
+  editClassroomOpen.value = true
+}
+
+async function handleEditClassroom() {
+  editClassroomSaving.value = true
+  try {
+    await api.put(`/classrooms/${classroomId}`, editClassroomForm.value)
+    message.success('课堂信息已更新')
+    editClassroomOpen.value = false
+    await loadClassroom()
+  } catch (e) {
+    message.error(e.response?.data?.detail || '更新失败')
+  } finally {
+    editClassroomSaving.value = false
+  }
+}
+
+// ===== 学生管理 =====
+const addStudentOpen = ref(false)
+const addStudentSaving = ref(false)
+const addStudentForm = ref({ track_id: 1, name: '' })
+
+function openAddStudent() {
+  const maxTrackId = students.value.length > 0
+    ? Math.max(...students.value.map(s => s.track_id || 0)) + 1
+    : 1
+  addStudentForm.value = { track_id: maxTrackId, name: '' }
+  addStudentOpen.value = true
+}
+
+async function handleAddStudent() {
+  addStudentSaving.value = true
+  try {
+    await api.post(`/classrooms/${classroomId}/students`, {
+      classroom_id: Number(classroomId),
+      track_id: addStudentForm.value.track_id,
+      name: addStudentForm.value.name || null,
+    })
+    message.success('学生已添加')
+    addStudentOpen.value = false
+    await loadStudents()
+  } catch (e) {
+    message.error(e.response?.data?.detail || '添加学生失败')
+  } finally {
+    addStudentSaving.value = false
+  }
+}
+
+const editStudentOpen = ref(false)
+const editStudentSaving = ref(false)
+const editStudentForm = ref({ id: null, name: '' })
+
+function openEditStudent(record) {
+  editStudentForm.value = { id: record.id, name: record.name || '' }
+  editStudentOpen.value = true
+}
+
+async function handleEditStudent() {
+  editStudentSaving.value = true
+  try {
+    await api.put(`/classrooms/${classroomId}/students/${editStudentForm.value.id}`, {
+      name: editStudentForm.value.name,
+    })
+    message.success('学生信息已更新')
+    editStudentOpen.value = false
+    await loadStudents()
+  } catch (e) {
+    message.error(e.response?.data?.detail || '更新学生失败')
+  } finally {
+    editStudentSaving.value = false
+  }
+}
+
+async function deleteStudent(studentId) {
+  try {
+    await api.delete(`/classrooms/${classroomId}/students/${studentId}`)
+    message.success('学生已删除')
+    await loadStudents()
+  } catch (e) {
+    message.error(e.response?.data?.detail || '删除学生失败')
+  }
+}
+
+// ===== 报告操作 =====
+async function genReport(force = false) {
   genLoading.value = true
   try {
-    const res = await axios.post(`/api/classrooms/${classroomId}/report`)
+    const url = force
+      ? `/classrooms/${classroomId}/report?force=true`
+      : `/classrooms/${classroomId}/report`
+    const res = await api.post(url)
     report.value = res.data
+    message.success(force ? '报告已重新生成' : '报告生成成功')
+  } catch (e) {
+    message.error(e.response?.data?.detail || '报告生成失败')
   } finally {
     genLoading.value = false
   }
 }
 
+async function deleteReport() {
+  try {
+    await api.delete(`/classrooms/${classroomId}/report`)
+    report.value = null
+    message.success('报告已删除')
+  } catch (e) {
+    message.error(e.response?.data?.detail || '删除报告失败')
+  }
+}
+
+// ===== 数据加载 =====
+async function loadClassroom() {
+  try {
+    const res = await api.get(`/classrooms/${classroomId}`)
+    classroom.value = res.data
+  } catch (e) {
+    message.error('加载课堂信息失败')
+  }
+}
+
+async function loadStudents() {
+  try {
+    const res = await api.get(`/classrooms/${classroomId}/students`)
+    students.value = res.data
+  } catch (e) {
+    message.error('加载学生列表失败')
+  }
+}
+
 async function loadChatHistory() {
   try {
-    const res = await axios.get(`/api/classrooms/${classroomId}/chat/history`)
+    const res = await api.get(`/classrooms/${classroomId}/chat/history`)
     chatMessages.value = res.data || []
   } catch {
     chatMessages.value = []
@@ -244,16 +518,16 @@ async function loadChatHistory() {
 
 async function loadAttendance() {
   try {
-    const res = await axios.get(`/api/classrooms/${classroomId}/attendance`)
+    const res = await api.get(`/classrooms/${classroomId}/attendance`)
     attendance.value = res.data
   } catch {
-    // 忽略错误
+    // 忽略
   }
 }
 
 async function loadHeatmap() {
   try {
-    const res = await axios.get(`/api/classrooms/${classroomId}/heatmap`)
+    const res = await api.get(`/classrooms/${classroomId}/heatmap`)
     if (res.data.time_labels.length === 0) return
 
     const chart = echarts.init(heatmapEl.value)
@@ -305,7 +579,7 @@ async function loadHeatmap() {
       }],
     })
   } catch {
-    // 忽略错误
+    // 忽略
   }
 }
 
@@ -314,14 +588,12 @@ async function sendChat() {
   const userText = chatInput.value
   chatInput.value = ''
 
-  // 先展示用户消息
   chatMessages.value.push({
     id: 'tmp-user-' + Date.now(),
     role: 'user',
     content: userText,
     timestamp: new Date().toISOString(),
   })
-  // AI 占位消息，逐字填充
   chatMessages.value.push({
     id: 'tmp-ai-' + Date.now(),
     role: 'assistant',
@@ -333,9 +605,10 @@ async function sendChat() {
   chatLoading.value = true
 
   try {
+    const token = userStore.token || localStorage.getItem('token') || ''
     const resp = await fetch(`/api/classrooms/${classroomId}/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ content: userText }),
     })
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
@@ -368,7 +641,7 @@ async function sendChat() {
   } catch (e) {
     chatMessages.value[aiIdx].content += '\n\n[请求失败: ' + e.message + ']'
     chatMessages.value[aiIdx].streaming = false
-    console.error('对话失败', e)
+    message.error('对话请求失败')
   } finally {
     chatLoading.value = false
   }
@@ -376,7 +649,7 @@ async function sendChat() {
 
 async function downloadMarkdown() {
   try {
-    const res = await axios.get(`/api/classrooms/${classroomId}/chat/export`, {
+    const res = await api.get(`/classrooms/${classroomId}/chat/export`, {
       responseType: 'blob',
     })
     const blob = new Blob([res.data], { type: 'text/markdown' })
@@ -389,16 +662,16 @@ async function downloadMarkdown() {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
   } catch (e) {
-    console.error('下载失败', e)
+    message.error('下载报告失败')
   }
 }
 
 onMounted(async () => {
   try {
     const [classRes, studentRes, timelineRes] = await Promise.all([
-      axios.get(`/api/classrooms/${classroomId}`),
-      axios.get(`/api/classrooms/${classroomId}/students`),
-      axios.get(`/api/classrooms/${classroomId}/timeline`),
+      api.get(`/classrooms/${classroomId}`),
+      api.get(`/classrooms/${classroomId}/students`),
+      api.get(`/classrooms/${classroomId}/timeline`),
     ])
     classroom.value = classRes.data
     students.value = studentRes.data
@@ -434,19 +707,17 @@ onMounted(async () => {
       })
     }
 
-    // 加载热力图
     await loadHeatmap()
-
-    // 加载出席情况
     await loadAttendance()
 
     try {
-      const reportRes = await axios.get(`/api/classrooms/${classroomId}/report`)
+      const reportRes = await api.get(`/classrooms/${classroomId}/report`)
       report.value = reportRes.data
     } catch { /* 报告未生成 */ }
 
-    // 加载对话历史
     await loadChatHistory()
+  } catch (e) {
+    message.error('加载课堂数据失败')
   } finally {
     loading.value = false
   }
@@ -454,6 +725,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.page-header-wrap {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--cv-text-secondary, #475569);
+}
+
 .markdown-body :deep(table) {
   border-collapse: collapse;
   width: 100%;

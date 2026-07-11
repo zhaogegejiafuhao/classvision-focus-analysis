@@ -5,8 +5,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
+from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
 from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson
-from backend.models.schemas import StudentOut, TimelinePoint, ReportOut
+from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut
 from backend.services.ollama_service import generate_report
 
 router = APIRouter(prefix="/api", tags=["stats"])
@@ -232,14 +233,23 @@ def get_students(classroom_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/classrooms/{classroom_id}/report", response_model=ReportOut)
-def create_report(classroom_id: int, db: Session = Depends(get_db)):
+def create_report(
+    classroom_id: int,
+    force: bool = False,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    assert_teacher_or_admin(current_user)
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
 
     existing = db.query(Report).filter(Report.classroom_id == classroom_id).first()
-    if existing:
+    if existing and not force:
         return existing
+    if existing and force:
+        db.delete(existing)
+        db.commit()
 
     records = db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).all()
 
@@ -257,13 +267,70 @@ def create_report(classroom_id: int, db: Session = Depends(get_db)):
         if any(r.is_blinking for r in records if r.student_id == sid)
     )
 
+    # 计算每个学生的平均注意力
+    student_avg = {}
+    for sid in student_ids:
+        s_records = [r for r in records if r.student_id == sid]
+        if s_records:
+            student_avg[sid] = sum(r.attention_score for r in s_records) / len(s_records)
+
+    # 注意力分布区间
+    high_attention_count = sum(1 for v in student_avg.values() if v >= 75)
+    medium_attention_count = sum(1 for v in student_avg.values() if 50 <= v < 75)
+    low_attention_count = sum(1 for v in student_avg.values() if v < 50)
+
+    # 学生注意力排行（Top5 / Bottom5）
+    students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
+    student_name_map = {s.id: s.name or f"学生{s.track_id}" for s in students}
+    sorted_students = sorted(student_avg.items(), key=lambda x: x[1], reverse=True)
+    top_students = "\n".join(
+        f"- {student_name_map.get(sid, f'学生{sid}')}: {round(avg, 1)}%"
+        for sid, avg in sorted_students[:5]
+    ) or "暂无数据"
+    bottom_students = "\n".join(
+        f"- {student_name_map.get(sid, f'学生{sid}')}: {round(avg, 1)}%"
+        for sid, avg in sorted_students[-5:][::-1]
+    ) or "暂无数据"
+
+    # 时间趋势（按分钟分组的平均注意力）
+    time_rows = (
+        db.query(
+            func.strftime("%H:%M", AttentionRecord.timestamp).label("minute"),
+            func.avg(AttentionRecord.attention_score).label("avg_att"),
+        )
+        .filter(AttentionRecord.classroom_id == classroom_id)
+        .group_by("minute")
+        .order_by("minute")
+        .all()
+    )
+    if time_rows:
+        time_trend = "\n".join(f"- {r.minute}: {round(r.avg_att, 1)}%" for r in time_rows)
+    else:
+        time_trend = "暂无数据"
+
+    # 老师信息
+    teacher_name = classroom.teacher
+    if classroom.teacher_person_id:
+        person = db.query(RegisteredPerson).filter(RegisteredPerson.id == classroom.teacher_person_id).first()
+        if person:
+            teacher_name = person.name
+
     stats = {
+        "classroom_name": classroom.name,
+        "teacher_name": teacher_name,
         "total_students": classroom.total_students,
         "avg_attention": classroom.avg_attention,
         "head_down_count": head_down_count,
         "head_turn_count": head_turn_count,
         "fatigue_count": fatigue_count,
         "duration": classroom.duration,
+        "exam_mode": classroom.exam_mode,
+        "high_attention_count": high_attention_count,
+        "medium_attention_count": medium_attention_count,
+        "low_attention_count": low_attention_count,
+        "top_students": top_students,
+        "bottom_students": bottom_students,
+        "time_trend": time_trend,
     }
 
     content = generate_report(stats)
@@ -275,8 +342,124 @@ def create_report(classroom_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/classrooms/{classroom_id}/report", response_model=ReportOut)
-def get_report(classroom_id: int, db: Session = Depends(get_db)):
+def get_report(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     report = db.query(Report).filter(Report.classroom_id == classroom_id).first()
     if not report:
         raise HTTPException(404, "报告未生成")
     return report
+
+
+@router.delete("/classrooms/{classroom_id}/report")
+def delete_report(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除报告（创建者或管理员）"""
+    report = db.query(Report).filter(Report.classroom_id == classroom_id).first()
+    if not report:
+        raise HTTPException(404, "报告不存在")
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    assert_owner_or_admin(classroom.teacher_person_id if classroom else None, current_user)
+    db.delete(report)
+    db.commit()
+    return {"message": "报告已删除"}
+
+
+# ===== 学生管理 CRUD =====
+
+@router.post("/classrooms/{classroom_id}/students", response_model=StudentOut)
+def create_student(
+    classroom_id: int,
+    data: StudentCreate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """手动添加学生到课堂（教师/管理员）"""
+    assert_teacher_or_admin(current_user)
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    student = Student(
+        classroom_id=classroom_id,
+        track_id=data.track_id,
+        name=data.name,
+        person_id=data.person_id,
+    )
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return StudentOut(
+        id=student.id, track_id=student.track_id, name=student.name,
+        avg_attention=0, head_down_count=0, blink_count=0, risk_level=None,
+    )
+
+
+@router.put("/classrooms/{classroom_id}/students/{student_id}", response_model=StudentOut)
+def update_student(
+    classroom_id: int,
+    student_id: int,
+    data: StudentUpdate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """编辑学生信息（教师/管理员）"""
+    assert_teacher_or_admin(current_user)
+    student = db.query(Student).filter(
+        Student.id == student_id, Student.classroom_id == classroom_id,
+    ).first()
+    if not student:
+        raise HTTPException(404, "学生不存在")
+    if data.name is not None:
+        student.name = data.name
+    if data.person_id is not None:
+        student.person_id = data.person_id
+    db.commit()
+    db.refresh(student)
+
+    records = db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).all()
+    avg_att = sum(r.attention_score for r in records) / len(records) if records else 0
+    head_down = 1 if any(abs(r.pitch) > 15 for r in records) else 0
+    blinks = records[-1].blink_count if records else 0
+
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    risk_level = None
+    if classroom and classroom.exam_mode:
+        latest_risk = (
+            db.query(ExamRiskRecord)
+            .filter(ExamRiskRecord.student_id == student_id)
+            .order_by(ExamRiskRecord.timestamp.desc())
+            .first()
+        )
+        risk_level = latest_risk.risk_level if latest_risk else "low"
+
+    return StudentOut(
+        id=student.id, track_id=student.track_id, name=student.name or f"学生{student.track_id}",
+        avg_attention=round(avg_att, 1), head_down_count=head_down,
+        blink_count=blinks, risk_level=risk_level,
+    )
+
+
+@router.delete("/classrooms/{classroom_id}/students/{student_id}")
+def delete_student(
+    classroom_id: int,
+    student_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除学生（教师/管理员）级联删除注意力记录"""
+    assert_teacher_or_admin(current_user)
+    student = db.query(Student).filter(
+        Student.id == student_id, Student.classroom_id == classroom_id,
+    ).first()
+    if not student:
+        raise HTTPException(404, "学生不存在")
+    db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).delete()
+    db.query(ExamRiskRecord).filter(ExamRiskRecord.student_id == student_id).delete()
+    db.delete(student)
+    db.commit()
+    return {"message": "学生已删除"}

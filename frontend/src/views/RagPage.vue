@@ -1,12 +1,6 @@
 <template>
-  <a-layout style="min-height: 100vh">
-    <a-layout-header style="display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
-      <span style="color: #fff; font-size: 18px; font-weight: bold; cursor: pointer" @click="$router.push('/')">
-        ClassVision 课眼智析 - 知识库
-      </span>
-      <a-button type="link" style="color: #fff" @click="$router.push('/')">返回首页</a-button>
-    </a-layout-header>
-    <a-layout-content style="padding: 24px">
+  <div class="cv-page" style="max-width: 1400px">
+      <a-typography-title :level="3" style="margin-bottom: 16px">RAG 知识库</a-typography-title>
       <a-row :gutter="16">
         <!-- 左侧：知识库管理 -->
         <a-col :span="10">
@@ -14,7 +8,7 @@
           <a-card title="知识库状态" style="margin-bottom: 16px">
             <a-row :gutter="16">
               <a-col :span="8">
-                <a-statistic title="向量数量" :value="ragStatus.total_vectors || 0" :value-style="{ color: '#1890ff' }" />
+                <a-statistic title="向量数量" :value="ragStatus.total_vectors || 0" :value-style="{ color: '#3751FE' }" />
               </a-col>
               <a-col :span="8">
                 <a-statistic title="向量维度" :value="ragStatus.dimension || 384" />
@@ -84,7 +78,7 @@
                 <div
                   v-for="chunk in previewData.chunks"
                   :key="chunk.index"
-                  style="margin-bottom: 12px; padding: 12px; background: #fafafa; border-radius: 4px; border-left: 3px solid #1890ff"
+                  style="margin-bottom: 12px; padding: 12px; background: #fafafa; border-radius: 4px; border-left: 3px solid var(--cv-color-primary)"
                 >
                   <div style="font-size: 12px; color: #999; margin-bottom: 4px">块 #{{ chunk.index + 1 }}</div>
                   <div style="white-space: pre-wrap; line-height: 1.6; font-size: 14px">{{ chunk.content }}</div>
@@ -159,7 +153,12 @@
 
             <!-- 历史问答 -->
             <template v-if="queryHistory.length > 0 && !ragResult">
-              <a-divider>历史问答</a-divider>
+              <a-divider>
+                <a-space>
+                  <span>历史问答</span>
+                  <a-button type="link" size="small" danger @click="clearHistory">清空历史</a-button>
+                </a-space>
+              </a-divider>
               <a-list :data-source="queryHistory.slice(0, 5)" size="small">
                 <template #renderItem="{ item }">
                   <a-list-item style="cursor: pointer" @click="question = item.question; queryRag()">
@@ -174,15 +173,16 @@
           </a-card>
         </a-col>
       </a-row>
-    </a-layout-content>
-  </a-layout>
+    </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { marked } from 'marked'
+import MarkdownIt from 'markdown-it'
 import { message } from 'ant-design-vue'
+
+const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
 
 const ragStatus = ref({})
 const documents = ref([])
@@ -211,7 +211,7 @@ const docColumns = [
 
 function renderMarkdown(text) {
   if (!text) return ''
-  return marked.parse(text, { breaks: true })
+  return md.render(text)
 }
 
 async function loadStatus() {
@@ -314,6 +314,11 @@ async function queryRag() {
   }
 }
 
+function clearHistory() {
+  queryHistory.value = []
+  message.success('已清空历史问答')
+}
+
 async function indexHistory() {
   indexLoading.value = true
   try {
@@ -378,46 +383,94 @@ onMounted(async () => {
 
 <style scoped>
 .rag-answer-card {
-  background: #fafafa;
+  background: var(--cv-bg-subtle);
+}
+.rag-answer-card :deep(h1),
+.rag-answer-card :deep(h2),
+.rag-answer-card :deep(h3),
+.rag-answer-card :deep(h4) {
+  font-weight: 600;
+  margin: 12px 0 8px 0;
+  color: var(--cv-text-primary);
+}
+.rag-answer-card :deep(h1) { font-size: 18px; }
+.rag-answer-card :deep(h2) { font-size: 16px; }
+.rag-answer-card :deep(h3) { font-size: 15px; }
+.rag-answer-card :deep(h4) { font-size: 14px; }
+.rag-answer-card :deep(p) {
+  margin: 8px 0;
+}
+.rag-answer-card :deep(ul),
+.rag-answer-card :deep(ol) {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+.rag-answer-card :deep(li) {
+  margin: 4px 0;
+}
+.rag-answer-card :deep(strong) {
+  font-weight: 600;
+  color: var(--cv-text-primary);
 }
 .rag-answer-card :deep(table) {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
+  margin: 12px 0;
+  font-size: 13px;
 }
 .rag-answer-card :deep(th),
 .rag-answer-card :deep(td) {
-  border: 1px solid #d9d9d9;
-  padding: 6px 12px;
+  border: 1px solid var(--cv-border-base);
+  padding: 8px 12px;
   text-align: left;
 }
+.rag-answer-card :deep(th) {
+  background: var(--cv-bg-page);
+  font-weight: 600;
+  color: var(--cv-text-primary);
+}
+.rag-answer-card :deep(tr:nth-child(2n)) {
+  background: var(--cv-bg-subtle);
+}
 .rag-answer-card :deep(pre) {
-  background: #f6f8fa;
-  padding: 12px;
-  border-radius: 4px;
+  background: var(--cv-bg-page);
+  padding: 12px 16px;
+  border-radius: var(--cv-radius-base);
   overflow-x: auto;
+  margin: 12px 0;
 }
 .rag-answer-card :deep(code) {
-  background: #f6f8fa;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-family: Consolas, Monaco, monospace;
-  font-size: 0.9em;
+  background: var(--cv-bg-page);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--cv-color-primary);
 }
 .rag-answer-card :deep(pre code) {
   background: none;
   padding: 0;
+  color: var(--cv-text-secondary);
 }
 .rag-answer-card :deep(blockquote) {
-  border-left: 4px solid #1890ff;
-  padding-left: 12px;
-  margin: 8px 0;
-  color: #666;
+  border-left: 3px solid var(--cv-color-primary);
+  padding: 8px 16px;
+  margin: 12px 0;
+  background: var(--cv-bg-page);
+  border-radius: 0 6px 6px 0;
+  color: var(--cv-text-tertiary);
+  font-size: 13px;
+}
+.rag-answer-card :deep(a) {
+  color: var(--cv-color-primary);
+  text-decoration: none;
+}
+.rag-answer-card :deep(a:hover) {
+  text-decoration: underline;
 }
 .streaming-cursor {
   display: inline-block;
   animation: blink 1s step-end infinite;
-  color: #1890ff;
+  color: var(--cv-color-primary);
   font-weight: bold;
 }
 @keyframes blink {

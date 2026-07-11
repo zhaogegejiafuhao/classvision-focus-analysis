@@ -1,21 +1,19 @@
 <template>
-  <a-layout style="min-height: 100vh">
-    <a-layout-header style="display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
-      <span style="color: #fff; font-size: 18px; font-weight: bold; cursor: pointer" @click="$router.push('/')">
-        ClassVision 课眼智析
-      </span>
-      <a-space>
-        <a-button type="link" style="color: #fff" @click="$router.push('/classrooms')">课堂列表</a-button>
-        <a-button type="link" style="color: #fff" @click="$router.push('/persons')">人员管理</a-button>
-      </a-space>
-    </a-layout-header>
-    <a-layout-content style="padding: 24px">
-      <a-page-header title="人员管理" sub-title="人脸注册与身份绑定" />
+  <div class="cv-page" style="max-width: 1400px">
+      <a-page-header :title="pageTitle" :sub-title="pageSubtitle" style="padding: 0 0 16px 0" />
 
-      <a-row :gutter="16">
-        <!-- 注册区域 -->
+      <a-alert
+        v-if="currentRole === 'student'"
+        message="无访问权限"
+        description="学生账号无法访问人员管理功能，请联系教师或管理员。"
+        type="warning"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+
+      <a-row v-else :gutter="16">
         <a-col :span="8">
-          <a-card title="注册新人员">
+          <a-card :title="canRegisterTeacher ? '注册新人员' : '注册新学生'">
             <a-form layout="vertical">
               <a-form-item label="姓名">
                 <a-input v-model:value="form.name" placeholder="请输入姓名" />
@@ -23,12 +21,11 @@
               <a-form-item label="角色">
                 <a-radio-group v-model:value="form.role">
                   <a-radio value="student">学生</a-radio>
-                  <a-radio value="teacher">老师</a-radio>
+                  <a-radio v-if="canRegisterTeacher" value="teacher">老师</a-radio>
                 </a-radio-group>
               </a-form-item>
               <a-form-item label="人脸照片">
                 <a-space direction="vertical" style="width: 100%">
-                  <!-- 摄像头捕获 -->
                   <div v-if="cameraActive" style="text-align: center">
                     <video ref="videoEl" width="320" height="240" autoplay style="border: 1px solid #d9d9d9; border-radius: 4px" />
                     <a-space style="margin-top: 8px">
@@ -65,11 +62,10 @@
           </a-card>
         </a-col>
 
-        <!-- 已注册人员列表 -->
         <a-col :span="16">
-          <a-card title="已注册人员">
+          <a-card :title="canRegisterTeacher ? '已注册人员' : '学生列表'">
             <a-tabs v-model:activeKey="activeTab">
-              <a-tab-pane key="all" tab="全部">
+              <a-tab-pane v-if="canRegisterTeacher" key="all" tab="全部">
                 <a-table :columns="columns" :data-source="persons" row-key="id" size="small">
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'role'">
@@ -78,9 +74,12 @@
                       </a-tag>
                     </template>
                     <template v-if="column.key === 'action'">
-                      <a-popconfirm title="确定删除该人员？" @confirm="deletePerson(record.id)">
-                        <a-button type="link" danger size="small">删除</a-button>
-                      </a-popconfirm>
+                      <a-space>
+                        <a-button v-if="canEdit" type="link" size="small" @click="openEditPerson(record)">编辑</a-button>
+                        <a-popconfirm v-if="canDelete" title="确定删除该人员？" @confirm="deletePerson(record.id)">
+                          <a-button type="link" danger size="small">删除</a-button>
+                        </a-popconfirm>
+                      </a-space>
                     </template>
                   </template>
                 </a-table>
@@ -92,23 +91,29 @@
                       <a-tag color="green">学生</a-tag>
                     </template>
                     <template v-if="column.key === 'action'">
-                      <a-popconfirm title="确定删除该人员？" @confirm="deletePerson(record.id)">
-                        <a-button type="link" danger size="small">删除</a-button>
-                      </a-popconfirm>
+                      <a-space>
+                        <a-button v-if="canEdit" type="link" size="small" @click="openEditPerson(record)">编辑</a-button>
+                        <a-popconfirm v-if="canDelete" title="确定删除该人员？" @confirm="deletePerson(record.id)">
+                          <a-button type="link" danger size="small">删除</a-button>
+                        </a-popconfirm>
+                      </a-space>
                     </template>
                   </template>
                 </a-table>
               </a-tab-pane>
-              <a-tab-pane key="teacher" tab="老师">
+              <a-tab-pane v-if="canRegisterTeacher" key="teacher" tab="老师">
                 <a-table :columns="columns" :data-source="teachers" row-key="id" size="small">
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'role'">
                       <a-tag color="blue">老师</a-tag>
                     </template>
                     <template v-if="column.key === 'action'">
-                      <a-popconfirm title="确定删除该人员？" @confirm="deletePerson(record.id)">
-                        <a-button type="link" danger size="small">删除</a-button>
-                      </a-popconfirm>
+                      <a-space>
+                        <a-button v-if="canEdit" type="link" size="small" @click="openEditPerson(record)">编辑</a-button>
+                        <a-popconfirm v-if="canDelete" title="确定删除该人员？" @confirm="deletePerson(record.id)">
+                          <a-button type="link" danger size="small">删除</a-button>
+                        </a-popconfirm>
+                      </a-space>
                     </template>
                   </template>
                 </a-table>
@@ -117,14 +122,56 @@
           </a-card>
         </a-col>
       </a-row>
-    </a-layout-content>
-  </a-layout>
+
+      <!-- 编辑人员弹窗 -->
+      <a-modal
+        v-model:open="editModalOpen"
+        title="编辑人员"
+        @ok="handleEditSave"
+        :confirm-loading="editSaving"
+        ok-text="保存"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="姓名">
+            <a-input v-model:value="editForm.name" />
+          </a-form-item>
+          <a-form-item label="用户名">
+            <a-input v-model:value="editForm.username" placeholder="设置用户名后可用密码登录" />
+          </a-form-item>
+          <a-form-item label="重置密码">
+            <a-input-password v-model:value="editForm.password" placeholder="留空则不修改" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+    </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import axios from 'axios'
+import { message } from 'ant-design-vue'
 import { CameraOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import api from '@/api'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const currentRole = computed(() => userStore.role)
+
+const canRegisterTeacher = computed(() => currentRole.value === 'admin')
+const canEdit = computed(() => currentRole.value === 'admin' || currentRole.value === 'teacher')
+const canDelete = computed(() => currentRole.value === 'admin' || currentRole.value === 'teacher')
+
+const pageTitle = computed(() => {
+  if (currentRole.value === 'admin') return '用户管理'
+  if (currentRole.value === 'teacher') return '学生管理'
+  return '人员管理'
+})
+
+const pageSubtitle = computed(() => {
+  if (currentRole.value === 'admin') return '人脸注册与身份绑定 · 管理所有用户'
+  if (currentRole.value === 'teacher') return '注册学生 · 查看学生列表'
+  return ''
+})
 
 const form = ref({
   name: '',
@@ -140,22 +187,35 @@ const capturedImage = ref(null)
 const videoEl = ref(null)
 let mediaStream = null
 
-const columns = [
-  { title: '姓名', dataIndex: 'name', key: 'name' },
-  { title: '角色', dataIndex: 'role', key: 'role' },
-  { title: '注册时间', dataIndex: 'created_at', key: 'created_at' },
-  { title: '操作', key: 'action' },
-]
+const columns = computed(() => {
+  const cols = [
+    { title: '姓名', dataIndex: 'name', key: 'name' },
+    { title: '角色', dataIndex: 'role', key: 'role' },
+    { title: '用户名', dataIndex: 'username', key: 'username' },
+    { title: '注册时间', dataIndex: 'created_at', key: 'created_at' },
+  ]
+  if (canEdit.value || canDelete.value) {
+    cols.push({ title: '操作', key: 'action' })
+  }
+  return cols
+})
 
 const students = computed(() => persons.value.filter(p => p.role === 'student'))
 const teachers = computed(() => persons.value.filter(p => p.role === 'teacher'))
 
 async function loadPersons() {
   try {
-    const res = await axios.get('/api/persons')
+    const params = {}
+    if (currentRole.value === 'teacher') {
+      params.role = 'student'
+    }
+    const res = await api.get('/persons', { params })
     persons.value = res.data || []
+    if (currentRole.value === 'teacher') {
+      activeTab.value = 'student'
+    }
   } catch (e) {
-    console.error('加载人员列表失败', e)
+    message.error('加载人员列表失败')
   }
 }
 
@@ -168,8 +228,7 @@ async function startCamera() {
       videoEl.value.srcObject = mediaStream
     }
   } catch (e) {
-    console.error('无法访问摄像头', e)
-    alert('无法访问摄像头，请检查权限设置')
+    message.error('无法访问摄像头，请检查权限设置')
   }
 }
 
@@ -208,24 +267,25 @@ function handleUpload(file) {
 
 async function registerPerson() {
   if (!form.value.name || !capturedImage.value) return
+  if (form.value.role === 'teacher' && !canRegisterTeacher.value) {
+    message.error('无权注册教师账号')
+    return
+  }
   registering.value = true
   try {
-    // 提取 base64 数据
     const base64Data = capturedImage.value.split(',')[1]
     const formData = new FormData()
     formData.append('name', form.value.name)
     formData.append('role', form.value.role)
     formData.append('image_data', base64Data)
-    await axios.post('/api/persons/register', formData)
-    // 重置表单
+    await api.post('/persons/register', formData)
     form.value.name = ''
     capturedImage.value = null
-    // 刷新列表
     await loadPersons()
-    alert('注册成功')
+    message.success('注册成功')
   } catch (e) {
     const msg = e.response?.data?.detail || '注册失败'
-    alert(msg)
+    message.error(msg)
   } finally {
     registering.value = false
   }
@@ -233,16 +293,48 @@ async function registerPerson() {
 
 async function deletePerson(personId) {
   try {
-    await axios.delete(`/api/persons/${personId}`)
+    await api.delete(`/persons/${personId}`)
+    message.success('删除成功')
     await loadPersons()
   } catch (e) {
     const msg = e.response?.data?.detail || '删除失败'
-    alert(msg)
+    message.error(msg)
+  }
+}
+
+// --- 编辑人员 ---
+const editModalOpen = ref(false)
+const editSaving = ref(false)
+const editForm = ref({ id: null, name: '', username: '', password: '' })
+
+function openEditPerson(record) {
+  editForm.value = { id: record.id, name: record.name, username: record.username || '', password: '' }
+  editModalOpen.value = true
+}
+
+async function handleEditSave() {
+  editSaving.value = true
+  try {
+    const payload = { name: editForm.value.name, username: editForm.value.username }
+    if (editForm.value.password) {
+      payload.password = editForm.value.password
+    }
+    await api.put(`/persons/${editForm.value.id}`, payload)
+    message.success('更新成功')
+    editModalOpen.value = false
+    await loadPersons()
+  } catch (e) {
+    const msg = e.response?.data?.detail || '更新失败'
+    message.error(msg)
+  } finally {
+    editSaving.value = false
   }
 }
 
 onMounted(async () => {
-  await loadPersons()
+  if (currentRole.value !== 'student') {
+    await loadPersons()
+  }
 })
 
 onUnmounted(() => {

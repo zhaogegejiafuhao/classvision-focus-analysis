@@ -1,59 +1,62 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
 .venv/
 venv/
 env/
-
-# Node.js
-node_modules/
-frontend/dist/
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# 环境配置
-.env
-
-# YOLO 模型权重（首次运行会自动下载）
-*.pt
-*.onnx
-
-# MediaPipe 模型文件（首次运行会自动下载）
-cv_engine/models/*.task
-
-# SQLite 数据库
-*.db
-
-# RAG 索引和上传的文档（二进制大文件，可重建）
-data/
-
-# Trae IDE 文件
-.trae/
-
-# 参考仓库（已在 references/ 中，按需忽略）
-# references/
-
-# 系统文件
-.DS_Store
+# OS
 Thumbs.db
+.Desktop.ini
+.DS_Store
 
-# 日志
+# Database
+*.db
+*.db-journal
+*.sqlite3
+
+# RAG index data (large binary files)
+data/rag_index/
+
+# Knowledge documents (uploaded files)
+data/knowledge/
+
+# Logs
 *.log
+logs/
 
-# 未来模块：违规截图
-screenshots/
-captures/
+# Node
+node_modules/
+frontend/node_modules/
 
-# 未来模块：试卷上传图片
-paper_scanner/uploads/
-paper_scanner/results/
+# Build output
+frontend/dist/
 
-# 未来模块：PaddleOCR 缓存
-.paddleocr/
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Ollama 模型缓存（系统级，不在项目目录）
-# ~/.ollama/
+# Uploaded face images
+data/faces/
+
+# OJ judger sandbox
+judger/tmp/
+judger/sandbox/
+
+# Temporary files
+*.tmp
+*.bak

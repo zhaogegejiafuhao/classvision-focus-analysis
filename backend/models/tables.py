@@ -113,7 +113,9 @@ class RegisteredPerson(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50))
-    role: Mapped[str] = mapped_column(String(10))  # "student" or "teacher"
+    role: Mapped[str] = mapped_column(String(10))  # "student", "teacher", "admin"
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)  # 登录用户名
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 密码哈希
     face_embedding: Mapped[str] = mapped_column(Text)  # JSON存储512维特征向量
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -147,3 +149,57 @@ class KnowledgeChunk(Base):
     embedding_stored: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已存储到FAISS
 
     document: Mapped["KnowledgeDocument"] = relationship(back_populates="chunks")
+
+
+class OjProblem(Base):
+    """OJ 题目表"""
+    __tablename__ = "oj_problem"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    input_format: Mapped[str] = mapped_column(Text, default="")
+    output_format: Mapped[str] = mapped_column(Text, default="")
+    sample_input: Mapped[str] = mapped_column(Text, default="")
+    sample_output: Mapped[str] = mapped_column(Text, default="")
+    hint: Mapped[str] = mapped_column(Text, default="")
+    time_limit: Mapped[int] = mapped_column(Integer, default=1000)
+    memory_limit: Mapped[int] = mapped_column(Integer, default=256 * 1024 * 1024)
+    difficulty: Mapped[str] = mapped_column(String(10), default="简单")
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    test_cases: Mapped[list["OjTestCase"]] = relationship(back_populates="problem", cascade="all, delete-orphan")
+    submissions: Mapped[list["OjSubmission"]] = relationship(back_populates="problem")
+    creator: Mapped["RegisteredPerson | None"] = relationship()
+
+
+class OjTestCase(Base):
+    """OJ 测试用例表"""
+    __tablename__ = "oj_test_case"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"))
+    input: Mapped[str] = mapped_column(Text)
+    expected_output: Mapped[str] = mapped_column(Text)
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    problem: Mapped["OjProblem"] = relationship(back_populates="test_cases")
+
+
+class OjSubmission(Base):
+    """OJ 提交记录表"""
+    __tablename__ = "oj_submission"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"))
+    language: Mapped[str] = mapped_column(String(10))
+    source_code: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="Pending")
+    cpu_time: Mapped[int] = mapped_column(Integer, default=0)
+    memory: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str] = mapped_column(Text, default="")
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    problem: Mapped["OjProblem"] = relationship(back_populates="submissions")
