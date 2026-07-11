@@ -53,6 +53,9 @@ frontend/dist/
 # Uploaded face images
 data/faces/
 
+# InsightFace model files (large)
+models/insightface/
+
 # OJ judger sandbox
 judger/tmp/
 judger/sandbox/
