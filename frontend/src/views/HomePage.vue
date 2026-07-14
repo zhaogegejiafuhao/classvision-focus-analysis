@@ -7,6 +7,7 @@
       <a-space>
         <a-button type="link" style="color: #fff" @click="$router.push('/persons')">人员管理</a-button>
         <a-button type="link" style="color: #fff" @click="$router.push('/rag')">知识库问答</a-button>
+        <a-button type="link" style="color: #fff" @click="$router.push('/papers')">试卷批改</a-button>
         <a-button type="link" style="color: #fff" @click="$router.push('/classrooms')">历史课堂</a-button>
       </a-space>
     </a-layout-header>
@@ -50,6 +51,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { waitForBackend } from '../utils/api'
 
 const router = useRouter()
 const form = ref({ name: '', teacher: '', exam_mode: false, teacher_person_id: null })
@@ -80,6 +82,7 @@ async function startClass() {
 }
 
 onMounted(async () => {
+  await waitForBackend()
   await loadTeachers()
 })
 </script>

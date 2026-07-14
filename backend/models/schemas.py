@@ -126,3 +126,125 @@ class KnowledgeDocumentOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# --- 试卷扫描 ---
+
+class QuestionRegionIn(BaseModel):
+    question_index: int
+    question_type: str  # "objective" | "subjective"
+    x: float
+    y: float
+    w: float
+    h: float
+    max_score: float
+    standard_answer: str
+
+
+class PaperTemplateCreate(BaseModel):
+    name: str
+    classroom_id: int | None = None
+    questions: list[QuestionRegionIn]
+
+
+class QuestionRegionOut(BaseModel):
+    question_index: int
+    question_type: str
+    x: float
+    y: float
+    w: float
+    h: float
+    max_score: float
+    standard_answer: str
+
+
+class PaperTemplateOut(BaseModel):
+    id: int
+    name: str
+    classroom_id: int | None = None
+    question_count: int
+    total_score: float
+    regions_config: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PaperTemplateDetail(PaperTemplateOut):
+    questions: list[QuestionRegionOut]
+
+
+class ScanPaperRequest(BaseModel):
+    image_data: str
+    template_id: int
+    person_id: int | None = None
+    student_name: str | None = None
+    classroom_id: int | None = None
+    grade_subjective: bool = True
+
+
+class PaperAnswerOut(BaseModel):
+    id: int
+    paper_id: int
+    question_index: int
+    question_type: str
+    ocr_text: str
+    standard_answer: str
+    max_score: float
+    auto_score: float
+    final_score: float | None = None
+    ai_suggestion: str | None = None
+    correct: bool | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class PaperOut(BaseModel):
+    id: int
+    template_id: int
+    classroom_id: int | None = None
+    person_id: int | None = None
+    student_name: str | None = None
+    image_path: str | None = None
+    corrected_image_path: str | None = None
+    total_auto_score: float
+    final_score: float | None = None
+    status: str
+    scanned_at: datetime
+    graded_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class PaperDetail(PaperOut):
+    answers: list[PaperAnswerOut] = []
+    template_name: str | None = None
+
+
+class ScanPaperResponse(BaseModel):
+    paper_id: int
+    corrected_image: str | None = None
+    corners: list | None = None
+    answers: list[PaperAnswerOut]
+    total_auto_score: float
+
+
+class PaperAnswerUpdate(BaseModel):
+    final_score: float
+    ai_suggestion: str | None = None
+    ocr_text: str | None = None
+
+
+class PaperFinalScoreUpdate(BaseModel):
+    final_score: float
+
+
+class PaperStatistics(BaseModel):
+    template_id: int
+    template_name: str
+    total_papers: int
+    avg_score: float
+    max_score: float
+    min_score: float
+    score_distribution: dict[str, int]
+    per_question_accuracy: list[dict]

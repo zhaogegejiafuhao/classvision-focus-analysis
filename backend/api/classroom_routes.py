@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord
+from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, ChatMessage
 from backend.models.schemas import ClassroomCreate, ClassroomOut, ClassroomDetail, ClassroomEndOut
 
 router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
@@ -104,3 +104,20 @@ def end_classroom(classroom_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(classroom)
     return classroom
+
+
+@router.delete("/{classroom_id}")
+def delete_classroom(classroom_id: int, db: Session = Depends(get_db)):
+    """删除课堂及其所有关联数据（学生、注意力记录、考试风险记录、报告、聊天记录）"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+
+    db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).delete()
+    db.query(ExamRiskRecord).filter(ExamRiskRecord.classroom_id == classroom_id).delete()
+    db.query(Student).filter(Student.classroom_id == classroom_id).delete()
+    db.query(Report).filter(Report.classroom_id == classroom_id).delete()
+    db.query(ChatMessage).filter(ChatMessage.classroom_id == classroom_id).delete()
+    db.delete(classroom)
+    db.commit()
+    return {"message": "课堂已删除"}

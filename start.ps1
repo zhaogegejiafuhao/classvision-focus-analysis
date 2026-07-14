@@ -35,7 +35,27 @@ Write-Host "启动前端..." -ForegroundColor Yellow
 $frontendDir = Join-Path $ProjectRoot "frontend"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/c","npm run dev" -WorkingDirectory $frontendDir
 
-Start-Sleep -Seconds 4
+Start-Sleep -Seconds 2
+
+Write-Host "等待后端就绪..." -ForegroundColor Yellow
+$backendReady = $false
+for ($i = 0; $i -lt 30; $i++) {
+    try {
+        $response = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -Method Get -TimeoutSec 2 -ErrorAction Stop
+        if ($response.status -eq "ok") {
+            $backendReady = $true
+            break
+        }
+    } catch {
+        Start-Sleep -Seconds 2
+    }
+}
+
+if ($backendReady) {
+    Write-Host "后端已就绪！" -ForegroundColor Green
+} else {
+    Write-Host "警告: 后端未在60秒内就绪，前端可能无法加载数据" -ForegroundColor Red
+}
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green

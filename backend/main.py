@@ -10,6 +10,7 @@ from backend.api.stats_routes import router as stats_router
 from backend.api.chat_routes import router as chat_router
 from backend.api.person_routes import router as person_router
 from backend.api.rag_routes import router as rag_router
+from backend.api.paper_routes import router as paper_router
 from backend.core.database import init_db
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
 
@@ -38,6 +39,7 @@ app.include_router(stats_router)
 app.include_router(chat_router)
 app.include_router(person_router)
 app.include_router(rag_router)
+app.include_router(paper_router)
 
 
 @app.get("/api/health")
