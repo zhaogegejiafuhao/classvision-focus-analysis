@@ -48,25 +48,6 @@ class ClassroomEndOut(ClassroomOut):
     pass
 
 
-class PublicClassroomOut(BaseModel):
-    """公开课堂列表项（课堂加入页面）"""
-    id: int
-    name: str
-    teacher: str
-    course_code: str | None = None
-    is_public: bool = True
-    invite_code: str | None = None
-    total_students: int = 0
-    teacher_person_id: int | None = None
-    teacher_person_name: str | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class JoinByInviteCode(BaseModel):
-    invite_code: str
-
-
 class MyClassroomOut(BaseModel):
     """已加入课堂列表项"""
     id: int
@@ -391,12 +372,17 @@ class JoinByInviteCode(BaseModel):
 
 
 class PublicClassroomOut(BaseModel):
+    """公开课堂列表项（课堂加入页面）— 合并版"""
     id: int
     name: str
     teacher: str
     course_code: str | None = None
-    started_at: datetime
+    is_public: bool = True
+    invite_code: str | None = None
+    total_students: int = 0
     teacher_person_id: int | None = None
+    teacher_person_name: str | None = None
+    started_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

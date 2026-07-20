@@ -497,7 +497,10 @@ async function handleBatchTemplateSuccess(result) {
 async function urlToFile(url) {
   if (!url) return null
   try {
-    const resp = await fetch(url)
+    const token = localStorage.getItem('token') || ''
+    const resp = await fetch(url, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
     const blob = await resp.blob()
     const filename = url.split('/').pop() || 'blank.png'
     return new File([blob], filename, { type: blob.type || 'image/png' })
