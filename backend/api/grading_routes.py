@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import RegisteredPerson, HomeworkSubmission, GradingResult
+from backend.models.tables import RegisteredPerson, HomeworkSubmission, GradingResult, Homework
 from backend.models.schemas import AIGradeRequest, AIGradeResponse, GradingResultOut, GradeConfirmRequest
 from backend.services.grader import grading_service
 from backend.services.ocr import ocr_service
@@ -167,6 +167,17 @@ def get_grading_result(
     if not result:
         raise HTTPException(404, "批改结果不存在")
 
+    # 权限检查：学生只能看自己的，教师只能看自己作业的
+    submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == submission_id).first()
+    if current_user.role == "student":
+        if not submission or submission.student_id != current_user.id:
+            raise HTTPException(403, "无权查看此批改结果")
+    elif current_user.role == "teacher":
+        if submission:
+            homework = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+            if not homework or homework.teacher_id != current_user.id:
+                raise HTTPException(403, "无权查看此批改结果")
+
     return {
         "id": result.id,
         "submission_id": result.submission_id,
@@ -201,6 +212,14 @@ def confirm_grading(
     result = db.query(GradingResult).filter(GradingResult.id == result_id).first()
     if not result:
         raise HTTPException(404, "批改结果不存在")
+
+    # 权限检查：教师只能确认自己作业的批改结果
+    if current_user.role == "teacher":
+        submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == result.submission_id).first()
+        if submission:
+            homework = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+            if not homework or homework.teacher_id != current_user.id:
+                raise HTTPException(403, "无权确认此批改结果")
 
     result.confirmed = True
     if data.confirmed_score is not None:
