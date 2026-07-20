@@ -6,6 +6,10 @@
           <div class="page-header-wrap">
             <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟`" style="padding: 0 0 16px 0" />
             <a-space v-if="canEditOrDelete || canManage">
+              <a-button v-if="canManage && classroom.ended_at && !report" @click="genReport()" :loading="genLoading">
+                <template #icon><FileTextOutlined /></template>
+                生成报告
+              </a-button>
               <a-button v-if="!classroom.ended_at && canManage" type="primary" @click="$router.push(`/live/${classroomId}`)">
                 <template #icon><VideoCameraOutlined /></template>
                 {{ classroom.started_at ? '进入课堂检测' : '开始课堂' }}
@@ -100,8 +104,8 @@
               </a-card>
             </a-col>
             <a-col :span="12">
-              <!-- AI 报告：课堂未结束且无报告时不显示 -->
-              <a-card v-if="report || classroom.ended_at" title="AI 课堂分析报告">
+              <!-- AI 报告：无报告时不显示 -->
+              <a-card v-if="report" title="AI 课堂分析报告">
                 <template #extra>
                   <a-space v-if="report && canManage" size="small">
                     <a-popconfirm title="确定重新生成报告？将覆盖当前内容。" @confirm="genReport(true)">
@@ -124,9 +128,6 @@
                     生成时间：{{ new Date(report.created_at).toLocaleString('zh-CN') }}
                   </a-typography-text>
                 </div>
-                <template v-else-if="canManage && classroom.ended_at">
-                  <a-button type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
-                </template>
               </a-card>
 
               <!-- 对话区域 -->
@@ -377,7 +378,7 @@ import { message } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import {
   CheckCircleOutlined, EditOutlined, DeleteOutlined,
-  PlusOutlined, ReloadOutlined, VideoCameraOutlined,
+  PlusOutlined, ReloadOutlined, VideoCameraOutlined, FileTextOutlined,
 } from '@ant-design/icons-vue'
 
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
