@@ -1,8 +1,0 @@
-<svg viewBox="0 0 23.6001 23.6" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="23.600098" height="23.599976" fill="none" customFrame="#000000">
-	<g id="组合 3">
-		<circle id="circle" cx="11.8000488" cy="11.7999878" r="11" fill="rgb(0,0,0)" fill-opacity="0" />
-		<circle id="circle" cx="11.8000488" cy="11.7999878" r="11" stroke="rgb(233,84,84)" stroke-width="1.600000" />
-		<path id="path" d="M11.8 15.8C14.0092 15.8 15.8 14.0091 15.8 11.8C15.8 9.59083 14.0092 7.79999 11.8 7.79999C9.59089 7.79999 7.80005 9.59083 7.80005 11.8C7.80005 14.0091 9.59089 15.8 11.8 15.8L11.8 15.8Z" fill="rgb(233,84,84)" fill-rule="evenodd" />
-		<path id="path" d="M15.8 11.8C15.8 9.59083 14.0092 7.79999 11.8 7.79999C9.59089 7.79999 7.80005 9.59083 7.80005 11.8C7.80005 14.0091 9.59089 15.8 11.8 15.8C14.0092 15.8 15.8 14.0091 15.8 11.8Z" fill-rule="evenodd" stroke="rgb(233,84,84)" stroke-width="1.600000" />
-	</g>
-</svg>

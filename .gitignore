@@ -56,6 +56,7 @@ data/faces/
 # Model files (large)
 models/insightface/
 models/yolov8n.pt
+/yolov8n.pt
 
 # OJ judger sandbox
 oj/judger/tmp/

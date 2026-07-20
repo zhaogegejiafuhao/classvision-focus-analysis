@@ -1,7 +1,0 @@
-<svg viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="38.000000" height="38.000000" fill="none" customFrame="#000000">
-	<rect id="Database" width="38.000000" height="38.000000" x="0.000000" y="0.000000" fill="rgb(255,255,255)" fill-opacity="0" />
-	<path id="Vector" d="M38 0L0 0L0 38L38 38L38 0Z" fill-rule="evenodd" />
-	<path id="Vector" d="M19 19C11.7858 19 5.9375 15.81 5.9375 11.875C5.9375 7.93997 11.7858 4.75 19 4.75C26.2142 4.75 32.0625 7.93997 32.0625 11.875C32.0625 15.81 26.2142 19 19 19Z" fill-rule="evenodd" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="Vector" d="M5.9375 11.875L5.9375 19C5.9375 22.9336 11.7859 26.125 19 26.125C26.2141 26.125 32.0625 22.9336 32.0625 19L32.0625 11.875" fill-rule="evenodd" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="Vector" d="M5.9375 19L5.9375 26.125C5.9375 30.0586 11.7859 33.25 19 33.25C26.2141 33.25 32.0625 30.0586 32.0625 26.125L32.0625 19" fill-rule="evenodd" stroke="rgb(109,115,122)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-</svg>

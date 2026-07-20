@@ -1,8 +1,0 @@
-<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24.000000" height="24.000000" fill="none">
-	<rect id="叉子勺子" width="24.000000" height="24.000000" x="0.000000" y="0.000000" />
-	<path id="path" d="M0 0L20 0" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" transform="matrix(0,1,-1,0,7,2)" />
-	<path id="path" d="M4 2.5L4 7.5C4 10 7 10 7 10C7 10 10 10 10 7.5L10 2.5" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="path" d="M0 0L12 0" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" transform="matrix(0,1,-1,0,17,10)" />
-	<path id="path" d="M20 6C20 8.20915 18.6569 10 17 10C15.3432 10 14 8.20915 14 6C14 3.79086 15.3432 2 17 2C18.6569 2 20 3.79086 20 6L20 6Z" fill="rgb(79,92,228)" fill-rule="evenodd" />
-	<path id="path" d="M17 10C15.3432 10 14 8.20915 14 6C14 3.79086 15.3432 2 17 2C18.6569 2 20 3.79086 20 6C20 8.20915 18.6569 10 17 10Z" fill-rule="evenodd" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.530483" />
-</svg>

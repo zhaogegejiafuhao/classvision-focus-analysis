@@ -1,9 +1,0 @@
-<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="24.000000" height="24.000000" fill="none">
-	<rect id="人群" width="24.000000" height="24.000000" x="0.000000" y="0.000000" />
-	<path id="path" d="M9.5 10C11.433 10 13 8.433 13 6.5C13 4.56701 11.433 3 9.5 3C7.567 3 6 4.56701 6 6.5C6 8.433 7.567 10 9.5 10L9.5 10Z" fill="rgb(79,92,228)" fill-rule="evenodd" />
-	<path id="path" d="M13 6.5C13 4.56701 11.433 3 9.5 3C7.567 3 6 4.56701 6 6.5C6 8.433 7.567 10 9.5 10C11.433 10 13 8.433 13 6.5Z" fill-rule="evenodd" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="path" d="M16.3038 3.5C17.3202 4.11245 18 5.22685 18 6.5C18 7.77315 17.3202 8.88755 16.3038 9.5" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="path" d="M2 20.4L2 21L17 21L17 20.4C17 18.1598 17 17.0397 16.5641 16.184C16.1805 15.4314 15.5686 14.8195 14.816 14.436C13.9603 14 12.8402 14 10.6 14L8.4 14C6.1598 14 5.0397 14 4.18404 14.436C3.43139 14.8195 2.81946 15.4314 2.43598 16.184C2 17.0397 2 18.1598 2 20.4L2 20.4Z" fill="rgb(79,92,228)" fill-rule="evenodd" />
-	<path id="path" d="M2 21L17 21L17 20.4C17 18.1598 17 17.0397 16.5641 16.184C16.1805 15.4314 15.5686 14.8195 14.816 14.436C13.9603 14 12.8402 14 10.6 14L8.4 14C6.1598 14 5.0397 14 4.18404 14.436C3.43139 14.8195 2.81946 15.4314 2.43598 16.184C2 17.0397 2 18.1598 2 20.4L2 21Z" fill-rule="evenodd" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-	<path id="path" d="M22 21L22 20.4C22 18.1598 22 17.0397 21.564 16.184C21.1805 15.4314 20.5686 14.8194 19.8159 14.4359" stroke="rgb(79,92,228)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.500000" />
-</svg>
