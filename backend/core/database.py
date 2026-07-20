@@ -24,6 +24,10 @@ def init_db():
     _migrate_oj_problem_created_by()
     _migrate_knowledge_document_visibility()
     _migrate_person_extra_fields()
+    _migrate_knowledge_chunk_parent_child()
+    _migrate_classroom_join_fields()
+    _migrate_homework_exam_updated_at()
+    _migrate_attachment_file_fields()
 
 
 def _migrate_person_extra_fields():
@@ -131,3 +135,86 @@ def _migrate_classroom_exam_mode():
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE classroom ADD COLUMN exam_mode BOOLEAN DEFAULT 0"))
                 conn.commit()
+
+
+def _migrate_knowledge_chunk_parent_child():
+    """为 knowledge_chunk 表添加父子分块字段：is_parent 和 parent_chunk_id"""
+    insp = inspect(engine)
+    if "knowledge_chunk" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("knowledge_chunk")}
+        if "is_parent" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_chunk ADD COLUMN is_parent BOOLEAN DEFAULT 0"))
+                conn.commit()
+        if "parent_chunk_id" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_chunk ADD COLUMN parent_chunk_id INTEGER REFERENCES knowledge_chunk(id)"))
+                conn.commit()
+
+
+def _migrate_classroom_join_fields():
+    """为 classroom 表添加课堂加入相关字段，并创建 classroom_member 表"""
+    insp = inspect(engine)
+    tables = insp.get_table_names()
+
+    # 创建 classroom_member 表
+    if "classroom_member" not in tables:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE classroom_member (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    classroom_id INTEGER NOT NULL REFERENCES classroom(id),
+                    person_id INTEGER NOT NULL REFERENCES registered_person(id),
+                    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+    # 为 classroom 表添加新字段
+    if "classroom" in tables:
+        columns = {col["name"] for col in insp.get_columns("classroom")}
+        if "course_code" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE classroom ADD COLUMN course_code VARCHAR(50)"))
+                conn.commit()
+        if "is_public" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE classroom ADD COLUMN is_public BOOLEAN DEFAULT 1"))
+                conn.commit()
+        if "invite_code" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE classroom ADD COLUMN invite_code VARCHAR(13)"))
+                conn.commit()
+            # 创建 invite_code 唯一索引
+            indexes = {idx["name"] for idx in insp.get_indexes("classroom")}
+            if "ix_classroom_invite_code" not in indexes:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("CREATE UNIQUE INDEX ix_classroom_invite_code ON classroom(invite_code) WHERE invite_code IS NOT NULL"))
+                        conn.commit()
+                except Exception:
+                    pass
+
+
+def _migrate_homework_exam_updated_at():
+    """为 homework 和 exam 表添加 updated_at 字段"""
+    insp = inspect(engine)
+    for table_name in ("homework", "exam"):
+        if table_name in insp.get_table_names():
+            columns = {col["name"] for col in insp.get_columns(table_name)}
+            if "updated_at" not in columns:
+                with engine.connect() as conn:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN updated_at DATETIME"))
+                    conn.commit()
+
+
+def _migrate_attachment_file_fields():
+    """为 homework_attachment 和 submission_attachment 表添加 file_size 字段"""
+    insp = inspect(engine)
+    for table_name in ("homework_attachment", "submission_attachment"):
+        if table_name in insp.get_table_names():
+            columns = {col["name"] for col in insp.get_columns(table_name)}
+            if "file_size" not in columns:
+                with engine.connect() as conn:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN file_size INTEGER DEFAULT 0"))
+                    conn.commit()

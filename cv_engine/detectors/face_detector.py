@@ -2,7 +2,7 @@ from ultralytics import YOLO
 
 
 class FaceDetector:
-    def __init__(self, model_path: str = "yolov8n.pt"):
+    def __init__(self, model_path: str = "models/yolov8n.pt"):
         self._model_path = model_path
         self._model = None
 

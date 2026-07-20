@@ -6,11 +6,80 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
-from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson
+from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson, Homework, HomeworkSubmission, Exam, ExamSubmission, Attendance, CheckinSession, LeaveRequest
 from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut, StudentPersonalReport, StudentClassroomAttention, ExamRiskOut
 from backend.services.ollama_service import generate_report
 
 router = APIRouter(prefix="/api", tags=["stats"])
+
+
+@router.get("/dashboard")
+def get_dashboard(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """首页看板统计"""
+    today = datetime.now().date()
+
+    if current_user.role in ("teacher", "admin"):
+        # 教师看板
+        total_classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).count()
+        total_students = db.query(Student).join(Classroom, Student.classroom_id == Classroom.id).filter(Classroom.teacher_person_id == current_user.id).count()
+        today_classrooms = db.query(Classroom).filter(
+            Classroom.teacher_person_id == current_user.id,
+            func.date(Classroom.started_at) == today,
+        ).count()
+        pending_homework = db.query(HomeworkSubmission).join(Homework, HomeworkSubmission.homework_id == Homework.id).filter(
+            Homework.teacher_id == current_user.id,
+            HomeworkSubmission.status == "submitted",
+        ).count()
+        pending_exam = db.query(ExamSubmission).join(Exam, ExamSubmission.exam_id == Exam.id).filter(
+            Exam.teacher_id == current_user.id,
+            ExamSubmission.status == "submitted",
+        ).count()
+        avg_attention = db.query(func.avg(Classroom.avg_attention)).filter(
+            Classroom.teacher_person_id == current_user.id,
+        ).scalar() or 0
+
+        return {
+            "role": "teacher",
+            "total_classrooms": total_classrooms,
+            "total_students": total_students,
+            "today_classrooms": today_classrooms,
+            "pending_homework": pending_homework,
+            "pending_exam": pending_exam,
+            "avg_attention": round(avg_attention, 1),
+        }
+    else:
+        # 学生看板
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        my_classrooms = 1 if student and student.classroom_id else 0
+        pending_homework = 0
+        if student and student.classroom_id:
+            open_homeworks = db.query(Homework).filter(
+                Homework.classroom_id == student.classroom_id,
+                Homework.status == "open",
+            ).all()
+            for hw in open_homeworks:
+                submitted = db.query(HomeworkSubmission).filter(
+                    HomeworkSubmission.homework_id == hw.id,
+                    HomeworkSubmission.student_id == current_user.id,
+                ).first()
+                if not submitted:
+                    pending_homework += 1
+
+        my_exams = db.query(ExamSubmission).filter(ExamSubmission.student_id == current_user.id).count()
+        avg_attention = db.query(func.avg(Classroom.avg_attention)).join(
+            Student, Student.classroom_id == Classroom.id
+        ).filter(Student.person_id == current_user.id).scalar() or 0
+
+        return {
+            "role": "student",
+            "my_classrooms": my_classrooms,
+            "pending_homework": pending_homework,
+            "my_exams": my_exams,
+            "avg_attention": round(avg_attention, 1),
+        }
 
 
 @router.get("/classrooms/{classroom_id}/timeline", response_model=list[TimelinePoint])
@@ -591,3 +660,97 @@ def get_my_attention_history(
         worst_classroom=worst,
         classrooms=classroom_data,
     )
+
+
+# ===== 学习行为分析 =====
+@router.get("/students/{student_id}/behavior")
+def get_student_behavior(
+    student_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取学生学习行为画像"""
+    if current_user.role == "student" and current_user.id != student_id:
+        raise HTTPException(403, "无权查看他人数据")
+
+    student = db.query(Student).filter(Student.person_id == student_id).first()
+
+    # 作业行为
+    homework_subs = db.query(HomeworkSubmission).filter(
+        HomeworkSubmission.student_id == student_id
+    ).all()
+    homework_total = len(homework_subs)
+    homework_graded = sum(1 for s in homework_subs if s.status == "graded")
+    homework_avg = sum(s.score or 0 for s in homework_subs if s.score) / max(1, homework_graded)
+
+    # 考试行为
+    exam_subs = db.query(ExamSubmission).filter(
+        ExamSubmission.student_id == student_id
+    ).all()
+    exam_total = len(exam_subs)
+    exam_avg = sum(s.score or 0 for s in exam_subs if s.score) / max(1, sum(1 for s in exam_subs if s.score))
+
+    # 考勤行为
+    if student:
+        attendances = db.query(Attendance).filter(
+            Attendance.student_id == student.id
+        ).all()
+    else:
+        attendances = []
+    attendance_total = len(attendances)
+    present_count = sum(1 for a in attendances if a.status == "present")
+    late_count = sum(1 for a in attendances if a.status == "late")
+    absent_count = sum(1 for a in attendances if a.status == "absent")
+    leave_count = sum(1 for a in attendances if a.status == "leave")
+    attendance_rate = present_count / max(1, attendance_total) * 100
+
+    # 注意力行为
+    if student:
+        attention_records = db.query(AttentionRecord).filter(
+            AttentionRecord.student_id == student.id
+        ).all()
+    else:
+        attention_records = []
+    attention_avg = sum(r.attention_score for r in attention_records) / max(1, len(attention_records))
+
+    # 活跃度评分（0-100）
+    activity_score = min(100, (
+        homework_total * 5 +
+        exam_total * 10 +
+        attendance_rate * 0.3 +
+        attention_avg * 0.2
+    ))
+
+    # 请假次数
+    leave_count_total = db.query(LeaveRequest).filter(
+        LeaveRequest.student_id == student_id
+    ).count()
+
+    return {
+        "student_id": student_id,
+        "student_name": current_user.name if current_user.id == student_id else (student.person.name if student and student.person else f"学生{student_id}"),
+        "homework": {
+            "total": homework_total,
+            "graded": homework_graded,
+            "avg_score": round(homework_avg, 2),
+            "submission_rate": round(homework_total / max(1, homework_total + homework_graded - homework_graded) * 100, 1) if homework_total else 0,
+        },
+        "exams": {
+            "total": exam_total,
+            "avg_score": round(exam_avg, 2),
+        },
+        "attendance": {
+            "total": attendance_total,
+            "present": present_count,
+            "late": late_count,
+            "absent": absent_count,
+            "leave": leave_count,
+            "rate": round(attendance_rate, 1),
+        },
+        "attention": {
+            "avg_score": round(attention_avg, 2),
+            "records": len(attention_records),
+        },
+        "leaves": leave_count_total,
+        "activity_score": round(activity_score, 1),
+    }

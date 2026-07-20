@@ -1,4 +1,4 @@
-﻿# ClassVision 快速启动脚本
+# ClassVision 快速启动脚本
 # 使用方式: 右键 -> 使用 PowerShell 运行
 
 $ProjectRoot = $PSScriptRoot
@@ -20,13 +20,7 @@ if (-not (Test-Path $VenvPython)) {
     exit 1
 }
 
-Write-Host "检查 Ollama 服务..." -ForegroundColor Yellow
-$ollama = Get-Process -Name "ollama" -ErrorAction SilentlyContinue
-if ($null -eq $ollama) {
-    Write-Host "启动 Ollama..." -ForegroundColor Yellow
-    Start-Process ollama -ArgumentList "serve" -WindowStyle Hidden
-    Start-Sleep -Seconds 3
-}
+Write-Host "使用云端 LLM API (OpenRouter)..." -ForegroundColor Green
 
 # ===== OJ Docker 服务启动 =====
 $ojDir = Join-Path $ProjectRoot "oj"
@@ -62,7 +56,7 @@ if (Test-Path $composeFile) {
     if ($dockerOk) {
         Write-Host "启动 OJ Docker 容器..." -ForegroundColor Yellow
         Push-Location $ojDir
-        docker-compose up -d 2>&1 | Out-Host
+        docker compose up -d 2>&1 | Out-Host
         Pop-Location
 
         Write-Host "等待 OJ Judger 就绪..." -ForegroundColor Yellow

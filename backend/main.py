@@ -1,8 +1,15 @@
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager
+
+# 强制 HuggingFace 离线模式：模型已缓存，不联网检查更新（避免网络超时卡住）
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.api.routes import router as ws_router, _warmup_models
 from backend.api.classroom_routes import router as classroom_router
@@ -13,10 +20,37 @@ from backend.api.rag_routes import router as rag_router
 from backend.api.oj_routes import router as oj_router
 from backend.api.auth_routes import router as auth_router
 from backend.api.import_routes import router as import_router
+from backend.api.notification_routes import router as notification_router
+from backend.api.homework_routes import router as homework_router
+from backend.api.checkin_routes import router as checkin_router
+from backend.api.exam_routes import router as exam_router
+from backend.api.question_bank_routes import router as question_bank_router
+from backend.api.material_routes import router as material_router
+from backend.api.grade_routes import router as grade_router
+from backend.api.alert_routes import router as alert_router
+from backend.api.plagiarism_routes import router as plagiarism_router
+from backend.api.teaching_plan_routes import router as teaching_plan_router
+from backend.api.leave_routes import router as leave_router
+from backend.api.experiment_routes import router as experiment_router
+from backend.api.feedback_routes import router as feedback_router
+from backend.api.llm_routes import router as llm_router
+from backend.api.grading_routes import router as grading_router
+from backend.api.attribution_routes import router as attribution_router
+from backend.api.correction_routes import router as correction_router
+from backend.api.similar_question_routes import router as similar_question_router
+from backend.api.answer_sheet_routes import router as answer_sheet_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
 from backend.models.tables import RegisteredPerson, OjProblem, OjTestCase
+
+# 配置 RAG 检索链路日志
+os.makedirs("logs", exist_ok=True)
+_rag_logger = logging.getLogger("rag")
+_rag_logger.setLevel(logging.INFO)
+_rag_handler = logging.FileHandler("logs/rag_query.log", encoding="utf-8")
+_rag_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+_rag_logger.addHandler(_rag_handler)
 
 
 def _create_default_accounts():
@@ -44,6 +78,20 @@ def _create_default_accounts():
         db.close()
 
 
+def _preload_reranker():
+    """预加载 reranker 模型（避免首次 deep 请求的 7s 加载延迟）"""
+    try:
+        from backend.core.config import settings
+        if not settings.RAG_RERANKER_ENABLED:
+            return
+        from backend.api.rag_routes import get_rag_service
+        svc = get_rag_service()
+        svc._get_reranker()
+        logging.getLogger("rag").info("reranker_preloaded")
+    except Exception as e:
+        logging.getLogger("rag").warning("reranker_preload_failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -51,6 +99,7 @@ async def lifespan(app: FastAPI):
     _seed_oj_problems()
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _warmup_models)
+    await loop.run_in_executor(None, _preload_reranker)
     yield
 
 
@@ -178,6 +227,32 @@ app.include_router(rag_router)
 app.include_router(oj_router)
 app.include_router(auth_router)
 app.include_router(import_router)
+app.include_router(notification_router)
+app.include_router(homework_router)
+app.include_router(checkin_router)
+app.include_router(exam_router)
+app.include_router(question_bank_router)
+app.include_router(material_router)
+app.include_router(grade_router)
+app.include_router(alert_router)
+app.include_router(plagiarism_router)
+app.include_router(teaching_plan_router)
+app.include_router(leave_router)
+app.include_router(experiment_router)
+app.include_router(feedback_router)
+app.include_router(llm_router)
+app.include_router(grading_router)
+app.include_router(attribution_router)
+app.include_router(correction_router)
+app.include_router(similar_question_router)
+app.include_router(answer_sheet_router)
+
+# 挂载上传目录
+os.makedirs("uploads/materials", exist_ok=True)
+os.makedirs("uploads/experiments", exist_ok=True)
+os.makedirs("uploads/answer_sheets", exist_ok=True)
+os.makedirs("uploads/paper_templates", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/api/health")

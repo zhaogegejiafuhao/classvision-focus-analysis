@@ -3,7 +3,7 @@
         <div class="board-header">
             <div class="board-header-left">
                 <h2 class="board-title">{{ pageTitle }}</h2>
-                <span class="board-subtitle">ClassEyes 课堂学情智能实训平台 / 看板视图</span>
+                <span class="board-subtitle">Focus Mind 实时专注度量化与教学智能评估平台 / 看板视图</span>
             </div>
             <div class="board-header-right">
                 <div class="search-box">
@@ -24,6 +24,54 @@
 
         <div v-if="loading" class="loading-state">
             <a-spin size="large" tip="加载课堂..." />
+        </div>
+
+        <!-- 统计看板 -->
+        <div v-if="dashboard" class="dashboard-cards">
+          <template v-if="dashboard.role === 'teacher'">
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.total_classrooms }}</span>
+              <span class="dash-label">总课堂</span>
+            </div>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.total_students }}</span>
+              <span class="dash-label">总学生</span>
+            </div>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.today_classrooms }}</span>
+              <span class="dash-label">今日课堂</span>
+            </div>
+            <div class="dash-card dash-warn" v-if="dashboard.pending_homework > 0">
+              <span class="dash-value">{{ dashboard.pending_homework }}</span>
+              <span class="dash-label">待批改作业</span>
+            </div>
+            <div class="dash-card dash-warn" v-if="dashboard.pending_exam > 0">
+              <span class="dash-value">{{ dashboard.pending_exam }}</span>
+              <span class="dash-label">待批改考试</span>
+            </div>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.avg_attention }}</span>
+              <span class="dash-label">平均注意力</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.my_classrooms }}</span>
+              <span class="dash-label">我的课堂</span>
+            </div>
+            <div class="dash-card dash-warn" v-if="dashboard.pending_homework > 0">
+              <span class="dash-value">{{ dashboard.pending_homework }}</span>
+              <span class="dash-label">待提交作业</span>
+            </div>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.my_exams }}</span>
+              <span class="dash-label">已参加考试</span>
+            </div>
+            <div class="dash-card">
+              <span class="dash-value">{{ dashboard.avg_attention }}</span>
+              <span class="dash-label">平均注意力</span>
+            </div>
+          </template>
         </div>
 
         <div v-else-if="classrooms.length > 0" class="board-columns">
@@ -89,16 +137,20 @@
                     <input v-model="createForm.teacher" type="text" class="form-input" placeholder="教师姓名" />
                 </div>
                 <div class="form-group">
-                    <label>课堂模式</label>
+                    <label>课序号</label>
+                    <input v-model="createForm.course_code" type="text" class="form-input" placeholder="例如：CS101" />
+                </div>
+                <div class="form-group">
+                    <label>公开</label>
                     <div class="mode-toggle">
                         <button
-                            :class="['mode-btn', { active: !createForm.exam_mode }]"
-                            @click="createForm.exam_mode = false"
-                        >普通课堂</button>
+                            :class="['mode-btn', { active: createForm.is_public }]"
+                            @click="createForm.is_public = true"
+                        >公开</button>
                         <button
-                            :class="['mode-btn', { active: createForm.exam_mode }]"
-                            @click="createForm.exam_mode = true"
-                        >考试模式</button>
+                            :class="['mode-btn', { active: !createForm.is_public }]"
+                            @click="createForm.is_public = false"
+                        >私有</button>
                     </div>
                 </div>
             </div>
@@ -116,10 +168,11 @@ import api from '@/api'
 const router = useRouter()
 const userStore = useUserStore()
 const classrooms = ref([])
+const dashboard = ref(null)
 const loading = ref(true)
 const searchQuery = ref('')
 const creating = ref(false)
-const createForm = ref({ name: '', teacher: '', exam_mode: false })
+const createForm = ref({ name: '', teacher: '', course_code: '', is_public: true })
 
 const externalShowCreate = inject('showCreateModal', ref(false))
 const modalVisible = computed({
@@ -129,7 +182,7 @@ const modalVisible = computed({
 
 watch(externalShowCreate, (val) => {
   if (val) {
-    createForm.value = { name: '', teacher: userStore.displayName || '', exam_mode: false }
+    createForm.value = { name: '', teacher: userStore.displayName || '', course_code: '', is_public: true }
   }
 })
 
@@ -249,7 +302,7 @@ function openCreateModal() {
     router.push('/classrooms')
     return
   }
-  createForm.value = { name: '', teacher: userStore.displayName || '', exam_mode: false }
+  createForm.value = { name: '', teacher: userStore.displayName || '', exam_mode: false, course_code: '', is_public: true }
   externalShowCreate.value = true
 }
 
@@ -263,7 +316,8 @@ async function handleCreate() {
     await api.post('/classrooms', {
       name: createForm.value.name,
       teacher: createForm.value.teacher,
-      exam_mode: createForm.value.exam_mode,
+      course_code: createForm.value.course_code,
+      is_public: createForm.value.is_public,
     })
     message.success('课堂创建成功')
     externalShowCreate.value = false
@@ -279,8 +333,12 @@ async function handleCreate() {
 
 onMounted(async () => {
   try {
-    const res = await api.get('/classrooms')
-    classrooms.value = res.data || []
+    const [classRes, dashRes] = await Promise.all([
+      api.get('/classrooms'),
+      api.get('/dashboard').catch(() => ({ data: null })),
+    ])
+    classrooms.value = classRes.data || []
+    dashboard.value = dashRes.data
   } catch (e) {
     message.error('加载课堂数据失败')
   } finally {
@@ -294,6 +352,47 @@ onMounted(async () => {
     min-height: 100%;
     padding: var(--cv-spacing-page-y) var(--cv-spacing-page-x);
     background: var(--cv-bg-page);
+}
+
+.dashboard-cards {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.dash-card {
+  flex: 1;
+  min-width: 120px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.dash-card.dash-warn {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.dash-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.2;
+}
+
+.dash-warn .dash-value {
+  color: #fa8c16;
+}
+
+.dash-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
 }
 
 .board-header {

@@ -9,8 +9,8 @@
       class="app-sider"
     >
       <div class="logo-area" @click="navigate('/app')">
-        <span class="logo-icon">CE</span>
-        <span v-if="!collapsed" class="logo-text">ClassEyes</span>
+        <span class="logo-icon">FM</span>
+        <span v-if="!collapsed" class="logo-text">Focus Mind</span>
       </div>
 
       <div v-if="!collapsed && canCreate" class="create-btn-wrap">
@@ -37,6 +37,11 @@
           <span>{{ currentRole === 'student' ? '我的课堂' : '课堂管理' }}</span>
         </a-menu-item>
 
+        <a-menu-item v-if="currentRole === 'student' || currentRole === 'admin'" key="/join-class">
+          <template #icon><UserAddOutlined /></template>
+          <span>课堂加入</span>
+        </a-menu-item>
+
         <a-menu-item key="/calendar">
           <template #icon><CalendarOutlined /></template>
           <span>课程日历</span>
@@ -45,6 +50,61 @@
         <a-menu-item key="/report">
           <template #icon><BarChartOutlined /></template>
           <span>{{ currentRole === 'student' ? '我的报告' : '注意力报告' }}</span>
+        </a-menu-item>
+
+        <a-divider style="margin: 8px 0" />
+
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/question-bank">
+          <template #icon><DatabaseOutlined /></template>
+          <span>题库管理</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/materials">
+          <template #icon><FolderOutlined /></template>
+          <span>课件管理</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/grades">
+          <template #icon><FundOutlined /></template>
+          <span>综合成绩</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/teaching-plans">
+          <template #icon><EditOutlined /></template>
+          <span>教学计划</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/alerts">
+          <template #icon><AlertOutlined /></template>
+          <span>教学预警</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/ai-grading">
+          <template #icon><RobotOutlined /></template>
+          <span>AI数学批改</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/ai-essay-grading">
+          <template #icon><FormOutlined /></template>
+          <span>AI作文批改</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/knowledge-analysis">
+          <template #icon><RadarChartOutlined /></template>
+          <span>知识归因分析</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/similar-questions">
+          <template #icon><ThunderboltOutlined /></template>
+          <span>相似题推荐</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/answer-sheet">
+          <template #icon><ScanOutlined /></template>
+          <span>答题卡扫描</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/experiments">
+          <template #icon><DatabaseOutlined /></template>
+          <span>实验报告</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/leaves">
+          <template #icon><FileTextOutlined /></template>
+          <span>请假管理</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/behavior">
+          <template #icon><BarChartOutlined /></template>
+          <span>行为分析</span>
         </a-menu-item>
 
         <a-divider style="margin: 8px 0" />
@@ -73,6 +133,77 @@
           <span>OJ 判题</span>
         </a-menu-item>
 
+        <a-divider v-if="currentRole === 'student'" style="margin: 8px 0" />
+
+        <a-menu-item v-if="currentRole === 'student'" key="/student/homework">
+          <template #icon><FileTextOutlined /></template>
+          <span>我的作业</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'student'" key="/student/checkin">
+          <template #icon><CalendarOutlined /></template>
+          <span>签到考勤</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'student'" key="/student/exams">
+          <template #icon><SolutionOutlined /></template>
+          <span>我的考试</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'student'" key="/student/materials">
+          <template #icon><FolderOutlined /></template>
+          <span>课程资料</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'student'" key="/student/grades">
+          <template #icon><FundOutlined /></template>
+          <span>我的成绩</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/student/grading">
+          <template #icon><FileSearchOutlined /></template>
+          <span>我的批改</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/knowledge-analysis">
+          <template #icon><RadarChartOutlined /></template>
+          <span>我的知识画像</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/similar-questions">
+          <template #icon><ThunderboltOutlined /></template>
+          <span>错题强化</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/experiments">
+          <template #icon><DatabaseOutlined /></template>
+          <span>实验报告</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/leaves">
+          <template #icon><FileTextOutlined /></template>
+          <span>请假管理</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/behavior">
+          <template #icon><BarChartOutlined /></template>
+          <span>行为分析</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'student'" key="/notifications">
+          <template #icon><BellOutlined /></template>
+          <span>消息通知</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/homework">
+          <template #icon><FileTextOutlined /></template>
+          <span>作业管理</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/checkin">
+          <template #icon><CalendarOutlined /></template>
+          <span>考勤管理</span>
+        </a-menu-item>
+
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/exams">
+          <template #icon><SolutionOutlined /></template>
+          <span>考试管理</span>
+        </a-menu-item>
+
         <a-menu-item v-if="currentRole === 'admin'" key="/analytics">
           <template #icon><DashboardOutlined /></template>
           <span>数据分析</span>
@@ -95,6 +226,11 @@
           <span class="header-title">{{ currentPageTitle }}</span>
         </div>
         <div class="header-right">
+          <a-badge :count="unreadCount" :overflow-count="99" style="margin-right: 16px">
+            <a-button type="text" @click="$router.push('/notifications')">
+              <BellOutlined />
+            </a-button>
+          </a-badge>
           <span class="role-badge" :class="'role-' + currentRole">{{ roleLabel }}</span>
           <span class="user-name">{{ userStore.displayName }}</span>
           <button class="logout-btn" @click="handleLogout">退出</button>
@@ -132,6 +268,17 @@ import {
   QuestionCircleOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  BellOutlined,
+  DatabaseOutlined,
+  FolderOutlined,
+  FundOutlined,
+  EditOutlined,
+  AlertOutlined,
+  RobotOutlined,
+  FormOutlined,
+  FileSearchOutlined,
+  RadarChartOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
@@ -140,6 +287,7 @@ const userStore = useUserStore()
 
 const collapsed = ref(false)
 const selectedKeys = ref([route.path])
+let notificationTimer = null
 
 function checkScreenWidth() {
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
@@ -149,10 +297,32 @@ function checkScreenWidth() {
 onMounted(() => {
   checkScreenWidth()
   window.addEventListener('resize', checkScreenWidth)
+  fetchUnreadCount()
+  // 每30秒自动刷新通知未读数
+  notificationTimer = setInterval(fetchUnreadCount, 30000)
 })
 onUnmounted(() => {
   window.removeEventListener('resize', checkScreenWidth)
+  if (notificationTimer) clearInterval(notificationTimer)
 })
+
+const unreadCount = ref(0)
+
+async function fetchUnreadCount() {
+  try {
+    const token = userStore.token || localStorage.getItem('token')
+    if (!token) return
+    const resp = await fetch('/api/notifications/unread-count', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (resp.ok) {
+      const data = await resp.json()
+      unreadCount.value = data.unread_count
+    }
+  } catch (e) {
+    // 忽略错误
+  }
+}
 
 const currentRole = computed(() => userStore.role || 'teacher')
 
@@ -171,6 +341,7 @@ const currentPageTitle = computed(() => {
   const titles = {
     '/app': '首页看板',
     '/classrooms': currentRole.value === 'student' ? '我的课堂' : '课堂管理',
+    '/join-class': '课堂加入',
     '/calendar': '课程日历',
     '/report': currentRole.value === 'student' ? '我的报告' : '注意力报告',
     '/my-report': '我的报告',
@@ -183,12 +354,38 @@ const currentPageTitle = computed(() => {
     '/oj/submissions': '提交记录',
     '/analytics': '数据分析',
     '/help': '帮助',
+    '/homework': '作业管理',
+    '/checkin': '考勤管理',
+    '/exams': '考试管理',
+    '/notifications': '消息通知',
+    '/student/homework': '我的作业',
+    '/student/checkin': '签到考勤',
+    '/student/exams': '我的考试',
+    '/student/materials': '课程资料',
+    '/student/grades': '我的成绩',
+    '/question-bank': '题库管理',
+    '/materials': '课件管理',
+    '/grades': '综合成绩',
+    '/teaching-plans': '教学计划',
+    '/alerts': '教学预警',
+    '/experiments': '实验报告',
+    '/leaves': '请假管理',
+    '/behavior': '行为分析',
+    '/ai-grading': 'AI数学批改',
+    '/ai-essay-grading': 'AI作文批改',
+    '/student/grading': '我的批改',
+    '/knowledge-analysis': currentRole.value === 'student' ? '我的知识画像' : '知识归因分析',
+    '/similar-questions': currentRole.value === 'student' ? '错题强化' : '相似题推荐',
+    '/answer-sheet': '答题卡扫描批改',
   }
   if (titles[route.path]) return titles[route.path]
   if (route.path.startsWith('/oj/') && !route.path.startsWith('/oj/run') && !route.path.startsWith('/oj/submissions')) {
     return '题目详情'
   }
-  return 'ClassEyes'
+  if (route.path.match(/^\/homework\/\d+$/)) return '作业详情'
+  if (route.path.match(/^\/checkin\/\d+$/)) return '签到详情'
+  if (route.path.match(/^\/exams\/\d+$/)) return '考试详情'
+  return 'Focus Mind'
 })
 
 watch(() => route.path, (newPath) => {
@@ -230,6 +427,22 @@ function openCreateModal() {
   background: var(--cv-bg-container) !important;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-sider :deep(.ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.app-sider :deep(.ant-menu) {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: none;
 }
 
 .logo-area {

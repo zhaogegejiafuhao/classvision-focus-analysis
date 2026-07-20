@@ -1,13 +1,15 @@
+import random
+import string
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
-from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson, Report, ChatMessage
-from backend.models.schemas import ClassroomCreate, ClassroomUpdate, ClassroomOut, ClassroomDetail, ClassroomEndOut
+from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson, Report, ChatMessage, ClassroomMember
+from backend.models.schemas import ClassroomCreate, ClassroomUpdate, ClassroomOut, ClassroomDetail, ClassroomEndOut, PublicClassroomOut, JoinByInviteCode, ClassroomMemberOut, MyClassroomOut
 
 router = APIRouter(prefix="/api/classrooms", tags=["classrooms"])
 
@@ -27,6 +29,8 @@ def create_classroom(
         teacher=data.teacher,
         exam_mode=data.exam_mode,
         teacher_person_id=teacher_person_id,
+        course_code=data.course_code,
+        is_public=data.is_public,
     )
     db.add(classroom)
     db.commit()
@@ -151,6 +155,10 @@ def update_classroom(
         classroom.exam_mode = data.exam_mode
     if data.teacher_person_id is not None:
         classroom.teacher_person_id = data.teacher_person_id
+    if data.course_code is not None:
+        classroom.course_code = data.course_code
+    if data.is_public is not None:
+        classroom.is_public = data.is_public
 
     db.commit()
     db.refresh(classroom)
@@ -207,3 +215,137 @@ def end_classroom(
     db.commit()
     db.refresh(classroom)
     return classroom
+
+
+# ===================== 课堂加入相关端点 =====================
+
+
+@router.get("/public", response_model=list[PublicClassroomOut])
+def list_public_classrooms(
+    search: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """搜索公开课堂列表，支持按 name 或 course_code 搜索"""
+    q = db.query(Classroom).filter(Classroom.is_public == True)
+    if search:
+        keyword = f"%{search}%"
+        q = q.filter(or_(Classroom.name.ilike(keyword), Classroom.course_code.ilike(keyword)))
+    return q.order_by(Classroom.started_at.desc()).all()
+
+
+@router.post("/join", response_model=ClassroomMemberOut)
+def join_by_invite_code(
+    data: JoinByInviteCode,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """通过邀请码加入课堂"""
+    classroom = db.query(Classroom).filter(Classroom.invite_code == data.invite_code).first()
+    if not classroom:
+        raise HTTPException(404, "邀请码无效，未找到对应课堂")
+
+    # 检查是否已加入
+    existing = db.query(ClassroomMember).filter(
+        ClassroomMember.classroom_id == classroom.id,
+        ClassroomMember.person_id == current_user.id,
+    ).first()
+    if existing:
+        raise HTTPException(400, "你已加入该课堂")
+
+    member = ClassroomMember(classroom_id=classroom.id, person_id=current_user.id)
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@router.post("/join/{classroom_id}", response_model=ClassroomMemberOut)
+def join_public_classroom(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """直接加入公开课堂"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    if not classroom.is_public:
+        raise HTTPException(403, "该课堂不是公开课堂，无法直接加入")
+
+    # 检查是否已加入
+    existing = db.query(ClassroomMember).filter(
+        ClassroomMember.classroom_id == classroom_id,
+        ClassroomMember.person_id == current_user.id,
+    ).first()
+    if existing:
+        raise HTTPException(400, "你已加入该课堂")
+
+    member = ClassroomMember(classroom_id=classroom_id, person_id=current_user.id)
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+@router.post("/{classroom_id}/generate-invite")
+def generate_invite_code(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """生成邀请码：管理员可生成任何课堂，教师只能生成自己课堂的邀请码"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+
+    # 权限检查
+    if current_user.role == "admin":
+        pass
+    elif current_user.role == "teacher":
+        if classroom.teacher_person_id != current_user.id:
+            raise HTTPException(403, "你无权为该课堂生成邀请码")
+    else:
+        raise HTTPException(403, "仅教师或管理员可生成邀请码")
+
+    if classroom.invite_code:
+        raise HTTPException(400, "该课堂已存在邀请码，不可再次生成")
+
+    # 生成13位随机邀请码（数字+小写+大写字母），确保唯一
+    chars = string.ascii_letters + string.digits
+    for _ in range(100):
+        code = "".join(random.choices(chars, k=13))
+        if not db.query(Classroom).filter(Classroom.invite_code == code).first():
+            break
+    else:
+        raise HTTPException(500, "邀请码生成失败，请重试")
+
+    classroom.invite_code = code
+    db.commit()
+    db.refresh(classroom)
+    return {"invite_code": classroom.invite_code}
+
+
+@router.get("/{classroom_id}/invite-code")
+def get_invite_code(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """查看邀请码：管理员可查看所有课堂，教师只能查看自己课堂的邀请码"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+
+    # 权限检查
+    if current_user.role == "admin":
+        pass
+    elif current_user.role == "teacher":
+        if classroom.teacher_person_id != current_user.id:
+            raise HTTPException(403, "你无权查看该课堂邀请码")
+    else:
+        raise HTTPException(403, "仅教师或管理员可查看邀请码")
+
+    if not classroom.invite_code:
+        raise HTTPException(404, "该课堂尚未生成邀请码")
+
+    return {"invite_code": classroom.invite_code}

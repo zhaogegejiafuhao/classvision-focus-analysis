@@ -9,6 +9,8 @@ class ClassroomCreate(BaseModel):
     teacher: str
     exam_mode: bool = False
     teacher_person_id: int | None = None  # 关联已注册的老师身份
+    course_code: str | None = None
+    is_public: bool = True
 
 
 class ClassroomUpdate(BaseModel):
@@ -16,6 +18,8 @@ class ClassroomUpdate(BaseModel):
     teacher: str | None = None
     exam_mode: bool | None = None
     teacher_person_id: int | None = None
+    course_code: str | None = None
+    is_public: bool | None = None
 
 
 class ClassroomOut(BaseModel):
@@ -29,6 +33,8 @@ class ClassroomOut(BaseModel):
     total_students: int = 0
     exam_mode: bool = False
     teacher_person_id: int | None = None
+    course_code: str | None = None
+    is_public: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -40,6 +46,36 @@ class ClassroomDetail(ClassroomOut):
 
 class ClassroomEndOut(ClassroomOut):
     pass
+
+
+class PublicClassroomOut(BaseModel):
+    """公开课堂列表项（课堂加入页面）"""
+    id: int
+    name: str
+    teacher: str
+    course_code: str | None = None
+    is_public: bool = True
+    invite_code: str | None = None
+    total_students: int = 0
+    teacher_person_id: int | None = None
+    teacher_person_name: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class JoinByInviteCode(BaseModel):
+    invite_code: str
+
+
+class MyClassroomOut(BaseModel):
+    """已加入课堂列表项"""
+    id: int
+    name: str
+    course_code: str | None = None
+    teacher: str = ""
+    teacher_person_name: str | None = None
+
+    model_config = {"from_attributes": True}
 
 
 # --- 学生 ---
@@ -87,6 +123,9 @@ class ReportOut(BaseModel):
 # --- 对话 ---
 class ChatRequest(BaseModel):
     content: str
+    # mode: "fast"=快速回答（关闭 HyDE/Multi-Query，延迟低）
+    #       "deep"=深度思考（启用 HyDE/Multi-Query，检索质量高但延迟大）
+    mode: str = "fast"
 
 
 class ChatMessageOut(BaseModel):
@@ -344,3 +383,130 @@ class StudentPersonalReport(BaseModel):
     best_classroom: str
     worst_classroom: str
     classrooms: list[StudentClassroomAttention]
+
+
+# --- 课堂加入 ---
+class JoinByInviteCode(BaseModel):
+    invite_code: str
+
+
+class PublicClassroomOut(BaseModel):
+    id: int
+    name: str
+    teacher: str
+    course_code: str | None = None
+    started_at: datetime
+    teacher_person_id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ClassroomMemberOut(BaseModel):
+    id: int
+    classroom_id: int
+    person_id: int
+    joined_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- AI 智能批改 ---
+
+
+class AIGradeRequest(BaseModel):
+    """AI批改请求"""
+    submission_id: int | None = None         # 提交ID（可选，若不传则不持久化）
+    question: str                        # 题目文本
+    standard_answer: str = ""            # 标准答案/写作要求
+    total_score: float = 100.0
+    subject_type: str = "math"           # math / essay
+    image_base64: str | None = None      # 学生手写图片（可选，用于OCR+几何）
+    student_text: str | None = None      # 学生答案文本（可选，优先于submission.content使用）
+
+
+class AIGradeResponse(BaseModel):
+    """AI批改响应"""
+    submission_id: int
+    suggested_score: float
+    max_score: float
+    comment: str
+    rubric: dict | None = None
+    grading: dict | None = None
+    model_key: str = "standard"
+    confidence: float = 0.85
+    grading_method: str = "llm"
+    error_type: str | None = None
+    error_cause: str | None = None
+    knowledge_points: list[str] = []
+
+
+class GradingResultOut(BaseModel):
+    """批改结果输出"""
+    id: int
+    submission_id: int
+    score: float
+    max_score: float
+    comment: str
+    model_key: str
+    grading_method: str
+    confidence: float
+    error_type: str | None = None
+    error_cause: str | None = None
+    knowledge_points: list[str] = []
+    confirmed: bool = False
+    confirmed_score: float | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GradeConfirmRequest(BaseModel):
+    """教师确认/修正AI批改结果"""
+    confirmed_score: float | None = None  # 修正分数（None则确认AI分数）
+
+
+class KnowledgeAnalysisRequest(BaseModel):
+    """知识归因分析请求"""
+    student_id: int
+    analysis_type: str = "math"  # math / writing
+
+
+class KnowledgeAnalysisResponse(BaseModel):
+    """知识归因分析响应"""
+    student_id: int
+    analysis_type: str
+    radar: dict
+    weak_points: list[dict]
+    correction_status: dict | None = None
+
+
+class CorrectionSubmitRequest(BaseModel):
+    """订正提交请求"""
+    submission_id: int
+    corrections: list[dict]  # [{"question_id": "q1", "image_base64": "...", "text": "订正文本答案"}]
+
+
+class CorrectionComparisonOut(BaseModel):
+    """订正前后对比"""
+    question_id: str
+    original_score: float
+    correction_score: float
+    max_score: float
+    improved: bool
+    remaining_errors: list[str] = []
+    new_comment: str = ""
+
+
+class SimilarQuestionRequest(BaseModel):
+    """相似题生成请求"""
+    question: str
+    knowledge_points: list[str] = []
+    error_type: str = ""
+    tier: str = "中等生"  # 优等生/中等生/学困生
+    count: int = 3
+    standard_answer: str = ""
+
+
+class SimilarQuestionResponse(BaseModel):
+    """相似题生成响应"""
+    questions: list[dict]

@@ -4,7 +4,7 @@
         <a-skeleton v-if="loading && !classroom" active :paragraph="{ rows: 4 }" />
         <template v-if="classroom">
           <div class="page-header-wrap">
-            <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟${classroom.exam_mode ? ' · 考场模式' : ''}`" style="padding: 0 0 16px 0" />
+            <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟`" style="padding: 0 0 16px 0" />
             <a-space v-if="canEditOrDelete || canManage">
               <a-button v-if="!classroom.ended_at && canManage" @click="endClassroom" :loading="endLoading">
                 <template #icon><CheckCircleOutlined /></template>
@@ -56,84 +56,10 @@
             </a-row>
           </a-card>
 
-          <!-- 考场模式：风险分布饼图 + 时间线 + 风险记录 -->
-          <template v-if="classroom.exam_mode">
-            <a-row :gutter="16" style="margin-bottom: 16px">
-              <a-col :span="12">
-                <a-card title="风险等级分布">
-                  <div ref="riskChartEl" style="width: 100%; height: 300px" />
-                </a-card>
-              </a-col>
-              <a-col :span="12">
-                <a-card title="风险趋势时间线">
-                  <div ref="riskTimelineEl" style="width: 100%; height: 300px" />
-                </a-card>
-              </a-col>
-            </a-row>
-
-            <a-card title="作弊风险详情" style="margin-bottom: 16px">
-              <template #extra>
-                <a-select v-model:value="riskFilter" style="width: 120px" allow-clear placeholder="风险等级" @change="loadExamRisks">
-                  <a-select-option value="high">高风险</a-select-option>
-                  <a-select-option value="medium">中风险</a-select-option>
-                  <a-select-option value="low">低风险</a-select-option>
-                </a-select>
-              </template>
-              <a-table
-                :columns="riskColumns"
-                :data-source="examRisks"
-                :loading="riskLoading"
-                row-key="id"
-                size="small"
-                :pagination="{ pageSize: 10, showSizeChanger: true }"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'risk_level'">
-                    <a-tag :color="record.risk_level === 'high' ? 'red' : record.risk_level === 'medium' ? 'orange' : 'green'">
-                      {{ { low: '低风险', medium: '中风险', high: '高风险' }[record.risk_level] || record.risk_level }}
-                    </a-tag>
-                  </template>
-                  <template v-if="column.key === 'cheating_object_nearby'">
-                    <a-tag :color="record.cheating_object_nearby ? 'red' : 'green'">
-                      {{ record.cheating_object_nearby ? '检测到' : '无' }}
-                    </a-tag>
-                  </template>
-                  <template v-if="column.key === 'gaze_deviation_duration'">
-                    {{ record.gaze_deviation_duration.toFixed(1) }}s
-                  </template>
-                  <template v-if="column.key === 'head_down_duration'">
-                    {{ record.head_down_duration.toFixed(1) }}s
-                  </template>
-                  <template v-if="column.key === 'timestamp'">
-                    {{ new Date(record.timestamp).toLocaleString('zh-CN') }}
-                  </template>
-                </template>
-              </a-table>
-            </a-card>
-
-            <!-- 高风险学生汇总 -->
-            <a-card title="高风险学生汇总" style="margin-bottom: 16px" v-if="highRiskSummary.length > 0">
-              <a-row :gutter="16">
-                <a-col :span="8" v-for="item in highRiskSummary" :key="item.student_id">
-                  <a-card size="small" style="margin-bottom: 8px" :style="{ borderLeft: item.risk_level === 'high' ? '3px solid #cf1322' : item.risk_level === 'medium' ? '3px solid #fa8c16' : '3px solid #52c41a' }">
-                    <a-statistic :title="item.student_name" :value="item.total_events" suffix="次风险事件" />
-                    <div style="margin-top: 8px">
-                      <a-tag v-if="item.has_cheating_object" color="red">疑似作弊物品</a-tag>
-                      <a-tag color="orange">视线偏移 {{ item.total_gaze.toFixed(1) }}s</a-tag>
-                      <a-tag color="purple">低头 {{ item.total_head_down.toFixed(1) }}s</a-tag>
-                      <a-tag color="blue">转头 {{ item.total_head_turn }}次</a-tag>
-                    </div>
-                  </a-card>
-                </a-col>
-              </a-row>
-            </a-card>
-          </template>
-          <!-- 普通模式：注意力趋势 -->
-          <template v-else>
-            <a-card title="注意力趋势" style="margin-bottom: 16px">
-              <div ref="timelineEl" style="width: 100%; height: 300px" />
-            </a-card>
-          </template>
+          <!-- 注意力趋势 -->
+          <a-card title="注意力趋势" style="margin-bottom: 16px">
+            <div ref="timelineEl" style="width: 100%; height: 300px" />
+          </a-card>
 
           <!-- 热力图 -->
           <a-card title="学生注意力热力图" style="margin-bottom: 16px">
@@ -208,37 +134,56 @@
                   style="margin-bottom: 12px"
                 />
                 <!-- 对话历史 -->
-                <div v-if="chatMessages.length > 0" style="max-height: 400px; overflow-y: auto; margin-bottom: 16px">
-                  <div v-for="msg in chatMessages" :key="msg.id" style="margin-bottom: 12px">
-                    <a-tag :color="msg.role === 'user' ? 'blue' : 'green'">
-                      {{ msg.role === 'user' ? '用户' : 'AI' }}
-                    </a-tag>
-                    <span style="margin-left: 8px; font-size: 12px; color: #999">
-                      {{ new Date(msg.timestamp).toLocaleTimeString('zh-CN') }}
-                    </span>
-                    <div style="margin-top: 4px; padding: 8px; background: #f5f5f5; border-radius: 4px">
-                      <div v-if="msg.streaming && !msg.content" style="color: #999">
-                        <a-spin size="small" /> 正在检索知识库并生成回答...
+                <div ref="chatContainerRef" v-if="chatMessages.length > 0" class="chat-container">
+                  <div v-for="msg in chatMessages" :key="msg.id" :class="['chat-msg', msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-ai']">
+                    <div v-if="msg.role === 'assistant'" class="chat-avatar">🤖</div>
+                    <div class="chat-bubble-wrap">
+                      <div :class="['chat-bubble', msg.role === 'user' ? 'bubble-user' : 'bubble-ai']">
+                        <div v-if="msg.streaming && !msg.content" class="chat-loading">
+                          <span class="dot-pulse"></span>
+                          <span class="dot-pulse"></span>
+                          <span class="dot-pulse"></span>
+                          <span class="loading-text">{{ msg.loadingStage || 'AI 正在思考...' }}</span>
+                        </div>
+                        <div class="markdown-body" v-html="renderMarkdown(msg.content)" />
+                        <span v-if="msg.streaming && msg.content" class="streaming-cursor">▌</span>
                       </div>
-                      <div class="markdown-body" v-html="renderMarkdown(msg.content)" />
-                      <span v-if="msg.streaming && msg.content" class="streaming-cursor">▌</span>
+                      <div class="chat-meta">
+                        <span class="chat-time">{{ new Date(msg.timestamp).toLocaleTimeString('zh-CN') }}</span>
+                        <span v-if="msg.elapsed" class="chat-elapsed">{{ msg.elapsed }}</span>
+                        <a-button v-if="msg.error" type="link" size="small" @click="retryChat(msg)">重试</a-button>
+                      </div>
                     </div>
+                    <div v-if="msg.role === 'user'" class="chat-avatar">👤</div>
                   </div>
                 </div>
                 <a-empty v-else description="暂无对话记录" style="margin-bottom: 16px" />
 
                 <!-- 输入框 -->
-                <a-space style="width: 100%">
-                  <a-input
+                <div style="margin-bottom: 8px">
+                  <a-radio-group v-model:value="chatMode" size="small" :disabled="chatLoading">
+                    <a-radio-button value="fast">⚡ 快速回答</a-radio-button>
+                    <a-radio-button value="deep">🧠 深度思考</a-radio-button>
+                  </a-radio-group>
+                  <span style="margin-left: 12px; font-size: 12px; color: #999">
+                    {{ chatMode === 'fast'
+                      ? '约 20-70 秒 | qwen3:4b 思考模式'
+                      : '约 35-90 秒 | qwen3:4b 思考模式 + Reranker'
+                    }}
+                  </span>
+                </div>
+                <div class="chat-input-area">
+                  <a-textarea
                     v-model:value="chatInput"
-                    placeholder="输入问题，如：为什么疲劳人次这么高？"
-                    style="flex: 1"
+                    placeholder="输入问题，如：为什么疲劳人次这么高？（Enter 发送，Shift+Enter 换行）"
+                    :auto-size="{ minRows: 1, maxRows: 4 }"
                     :disabled="chatLoading"
+                    @keydown.enter.exact.prevent="sendChat()"
                   />
-                  <a-button type="primary" @click="sendChat" :loading="chatLoading" :disabled="!chatInput.trim()">
+                  <a-button type="primary" @click="sendChat()" :loading="chatLoading" :disabled="!chatInput.trim()">
                     发送
                   </a-button>
-                </a-space>
+                </div>
 
                 <!-- 下载按钮 -->
                 <a-space style="margin-top: 12px">
@@ -249,6 +194,95 @@
               </a-card>
             </a-col>
           </a-row>
+
+          <!-- 教学模块 Tab -->
+          <a-card title="教学活动" style="margin-top: 16px" v-if="canManage">
+            <a-tabs v-model:activeKey="teachingTab">
+              <a-tab-pane key="homework" tab="作业">
+                <a-table :columns="hwColumns" :data-source="classHomeworks" row-key="id" size="small" :loading="hwLoading">
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <a-tag :color="{ open: 'blue', closed: 'gray' }[record.status] || 'default'">{{ { open: '进行中', closed: '已截止' }[record.status] || record.status }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <a-button type="link" size="small" @click="$router.push(`/homework/${record.id}`)">详情</a-button>
+                    </template>
+                  </template>
+                </a-table>
+                <a-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/homework')">管理作业</a-button>
+              </a-tab-pane>
+              <a-tab-pane key="exam" tab="考试">
+                <a-table :columns="examColumns" :data-source="classExams" row-key="id" size="small" :loading="examLoading">
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <a-tag :color="{ draft: 'default', published: 'blue', closed: 'gray' }[record.status] || 'default'">{{ { draft: '草稿', published: '已发布', closed: '已结束' }[record.status] || record.status }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <a-button type="link" size="small" @click="$router.push(`/exams/${record.id}`)">详情</a-button>
+                    </template>
+                  </template>
+                </a-table>
+                <a-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/exams')">管理考试</a-button>
+              </a-tab-pane>
+              <a-tab-pane key="checkin" tab="签到">
+                <a-table :columns="checkinColumns" :data-source="classCheckins" row-key="id" size="small" :loading="checkinLoading">
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <a-tag :color="record.status === 'active' ? 'green' : 'gray'">{{ record.status === 'active' ? '进行中' : '已结束' }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <a-button type="link" size="small" @click="$router.push(`/checkin/${record.id}`)">详情</a-button>
+                    </template>
+                  </template>
+                </a-table>
+                <a-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/checkin')">管理签到</a-button>
+              </a-tab-pane>
+              <a-tab-pane key="materials" tab="课件">
+                <a-list :data-source="classMaterials" :loading="materialLoading" size="small">
+                  <template #renderItem="{ item }">
+                    <a-list-item>
+                      <a-list-item-meta>
+                        <template #title>{{ item.title }}</template>
+                        <template #description>{{ item.file_name }} · {{ formatFileSize(item.file_size) }}</template>
+                      </a-list-item-meta>
+                      <template #actions>
+                        <a-button type="link" size="small" @click="downloadMaterial(item)">下载</a-button>
+                      </template>
+                    </a-list-item>
+                  </template>
+                  <template #footer>
+                    <a-button type="primary" size="small" @click="$router.push('/materials')">管理课件</a-button>
+                  </template>
+                </a-list>
+                <a-empty v-if="classMaterials.length === 0 && !materialLoading" description="暂无课件" />
+              </a-tab-pane>
+              <a-tab-pane key="feedback" tab="课堂评价">
+                <div style="margin-bottom: 12px">
+                  <a-button v-if="userStore.role === 'student'" type="primary" size="small" @click="showFeedbackModal = true">评价课堂</a-button>
+                  <a-button v-if="userStore.role === 'teacher'" type="primary" size="small" @click="fetchFeedback">查看评价</a-button>
+                </div>
+                <div v-if="feedbackSummary" style="margin-bottom: 16px">
+                  <a-statistic title="平均评分" :value="feedbackSummary.avg_rating" suffix="/5" :precision="2" />
+                  <div style="display: flex; gap: 8px; margin-top: 8px">
+                    <span v-for="i in 5" :key="i">{{ i }}星: {{ feedbackSummary.distribution?.[String(i)] || 0 }}人</span>
+                  </div>
+                </div>
+                <a-list :data-source="feedbacks" size="small">
+                  <template #renderItem="{ item }">
+                    <a-list-item>
+                      <a-list-item-meta>
+                        <template #title>{{ item.student_name }} - {{ '★'.repeat(item.rating) }}</template>
+                        <template #description>{{ item.content || '无评价内容' }}</template>
+                      </a-list-item-meta>
+                      <template #actions>
+                        <span style="color: #999; font-size: 12px">{{ new Date(item.created_at).toLocaleDateString() }}</span>
+                      </template>
+                    </a-list-item>
+                  </template>
+                </a-list>
+              </a-tab-pane>
+            </a-tabs>
+          </a-card>
         </template>
         <a-empty v-else-if="!loading" description="课堂不存在" />
       </a-spin>
@@ -276,6 +310,18 @@
         </a-tabs>
       </a-modal>
 
+      <!-- 评价弹窗 -->
+      <a-modal v-model:open="showFeedbackModal" title="评价课堂" @ok="submitFeedback" :confirm-loading="feedbackSubmitting">
+        <a-form layout="vertical">
+          <a-form-item label="评分" required>
+            <a-rate v-model:value="feedbackForm.rating" />
+          </a-form-item>
+          <a-form-item label="评价内容">
+            <a-textarea v-model:value="feedbackForm.content" :rows="3" placeholder="请输入评价内容..." />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
       <!-- 编辑课堂弹窗 -->
       <a-modal
         v-model:open="editClassroomOpen"
@@ -292,8 +338,11 @@
           <a-form-item label="教师">
             <a-input v-model:value="editClassroomForm.teacher" />
           </a-form-item>
-          <a-form-item label="考场模式">
-            <a-switch v-model:checked="editClassroomForm.exam_mode" />
+          <a-form-item label="课序号">
+            <a-input v-model:value="editClassroomForm.course_code" placeholder="例如：CS101" />
+          </a-form-item>
+          <a-form-item label="公开">
+            <a-switch v-model:checked="editClassroomForm.is_public" checked-children="公开" un-checked-children="私有" />
           </a-form-item>
         </a-form>
       </a-modal>
@@ -404,6 +453,68 @@ const riskColumns = [
   { title: '时间', key: 'timestamp', width: 180 },
 ]
 
+// 教学模块 Tab
+const teachingTab = ref('homework')
+const classHomeworks = ref([])
+const classExams = ref([])
+const classCheckins = ref([])
+const hwLoading = ref(false)
+const examLoading = ref(false)
+const checkinLoading = ref(false)
+const classMaterials = ref([])
+const materialLoading = ref(false)
+const feedbacks = ref([])
+const feedbackSummary = ref(null)
+const showFeedbackModal = ref(false)
+const feedbackSubmitting = ref(false)
+const feedbackForm = ref({ rating: 5, content: '' })
+
+const hwColumns = [
+  { key: 'title', title: '标题', dataIndex: 'title' },
+  { key: 'status', title: '状态' },
+  { key: 'submission_count', title: '提交数', dataIndex: 'submission_count' },
+  { key: 'action', title: '操作' },
+]
+const examColumns = [
+  { key: 'title', title: '标题', dataIndex: 'title' },
+  { key: 'status', title: '状态' },
+  { key: 'question_count', title: '题目数', dataIndex: 'question_count' },
+  { key: 'action', title: '操作' },
+]
+const checkinColumns = [
+  { key: 'type', title: '类型', dataIndex: 'type' },
+  { key: 'status', title: '状态' },
+  { key: 'checked_count', title: '已签到', dataIndex: 'checked_count' },
+  { key: 'action', title: '操作' },
+]
+
+async function loadTeachingData() {
+  if (!canManage.value) return
+  hwLoading.value = true
+  examLoading.value = true
+  checkinLoading.value = true
+  materialLoading.value = true
+  try {
+    const [hwRes, examRes, checkinRes, matRes] = await Promise.all([
+      api.get('/homework', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
+      api.get('/exams', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
+      api.get('/checkin/sessions', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
+      api.get('/materials', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
+    ])
+    classHomeworks.value = hwRes.data
+    classExams.value = examRes.data
+    classCheckins.value = checkinRes.data
+    classMaterials.value = matRes.data
+  } catch {
+    // ignore
+  } finally {
+    hwLoading.value = false
+    examLoading.value = false
+    checkinLoading.value = false
+    materialLoading.value = false
+  }
+}
+
 const highRiskSummary = computed(() => {
   if (!examRisks.value.length) return []
   const map = {}
@@ -450,6 +561,16 @@ const showAttendanceModal = ref(false)
 const chatMessages = ref([])
 const chatInput = ref('')
 const chatLoading = ref(false)
+const chatContainerRef = ref(null)
+// 对话模式：fast=快速回答（关闭 HyDE/Multi-Query，~10-20s），deep=深度思考（启用，~40-84s）
+const chatMode = ref('fast')
+
+function scrollChatToBottom() {
+  nextTick(() => {
+    const el = chatContainerRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
 
 const studentCols = computed(() => {
   const base = [
@@ -458,9 +579,6 @@ const studentCols = computed(() => {
     { title: '低头人次', dataIndex: 'head_down_count', key: 'head_down_count' },
     { title: '眨眼次数', dataIndex: 'blink_count', key: 'blink_count' },
   ]
-  if (classroom.value?.exam_mode) {
-    base.push({ title: '风险等级', dataIndex: 'risk_level', key: 'risk_level' })
-  }
   if (canManage.value) {
     base.push({ title: '操作', key: 'action' })
   }
@@ -468,7 +586,7 @@ const studentCols = computed(() => {
 })
 
 function renderMarkdown(text) {
-  if (!text) return ''
+  if (!text || typeof text !== 'string') return ''
   return md.render(text)
 }
 
@@ -499,13 +617,14 @@ async function deleteClassroom() {
 // 编辑课堂
 const editClassroomOpen = ref(false)
 const editClassroomSaving = ref(false)
-const editClassroomForm = ref({ name: '', teacher: '', exam_mode: false })
+const editClassroomForm = ref({ name: '', teacher: '', course_code: '', is_public: true })
 
 function openEditClassroom() {
   editClassroomForm.value = {
     name: classroom.value.name || '',
     teacher: classroom.value.teacher || '',
-    exam_mode: classroom.value.exam_mode || false,
+    course_code: classroom.value.course_code || '',
+    is_public: classroom.value.is_public !== false,
   }
   editClassroomOpen.value = true
 }
@@ -665,6 +784,7 @@ async function loadChatHistory() {
   try {
     const res = await api.get(`/classrooms/${classroomId}/chat/history`)
     chatMessages.value = res.data || []
+    scrollChatToBottom()
   } catch {
     chatMessages.value = []
   }
@@ -752,10 +872,10 @@ async function loadHeatmap() {
   }
 }
 
-async function sendChat() {
-  if (!chatInput.value.trim()) return
-  const userText = chatInput.value
-  chatInput.value = ''
+async function sendChat(retryText) {
+  const userText = retryText || chatInput.value.trim()
+  if (!userText) return
+  if (!retryText) chatInput.value = ''
 
   chatMessages.value.push({
     id: 'tmp-user-' + Date.now(),
@@ -769,16 +889,35 @@ async function sendChat() {
     content: '',
     timestamp: new Date().toISOString(),
     streaming: true,
+    loadingStage: chatMode.value === 'deep' ? '正在检索知识库...' : 'AI 正在思考...',
   })
   const aiIdx = chatMessages.value.length - 1
   chatLoading.value = true
+  scrollChatToBottom()
+  const t0 = Date.now()
+  let receivedDone = false
+
+  // 加载阶段轮询
+  const stageTimer = setInterval(() => {
+    const elapsed = (Date.now() - t0) / 1000
+    const msg = chatMessages.value[aiIdx]
+    if (!msg.streaming) return
+    if (msg.content) {
+      msg.loadingStage = ''
+    } else if (chatMode.value === 'deep') {
+      if (elapsed > 30) msg.loadingStage = '正在生成回答...'
+      else if (elapsed > 15) msg.loadingStage = '正在深度检索知识库...'
+    } else {
+      if (elapsed > 20) msg.loadingStage = '正在生成回答...'
+    }
+  }, 5000)
 
   try {
     const token = userStore.token || localStorage.getItem('token') || ''
     const resp = await fetch(`/api/classrooms/${classroomId}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ content: userText }),
+      body: JSON.stringify({ content: userText, mode: chatMode.value }),
     })
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     const reader = resp.body.getReader()
@@ -796,24 +935,50 @@ async function sendChat() {
         try { data = JSON.parse(line.slice(6)) } catch { continue }
         if (data.delta) {
           chatMessages.value[aiIdx].content += data.delta
+          chatMessages.value[aiIdx].loadingStage = ''
+          scrollChatToBottom()
         }
         if (data.done) {
+          receivedDone = true
+          const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
           chatMessages.value[aiIdx].id = data.id
           chatMessages.value[aiIdx].streaming = false
+          chatMessages.value[aiIdx].elapsed = `耗时 ${elapsed}s`
+          scrollChatToBottom()
         }
         if (data.error) {
-          chatMessages.value[aiIdx].content += '\n\n[生成失败: ' + data.error + ']'
+          receivedDone = true
+          chatMessages.value[aiIdx].content = '[生成失败: ' + data.error + ']'
           chatMessages.value[aiIdx].streaming = false
+          chatMessages.value[aiIdx].error = true
         }
       }
     }
+    // 流异常中断：没有收到 done/error 但流结束了
+    if (!receivedDone) {
+      chatMessages.value[aiIdx].content = chatMessages.value[aiIdx].content || '[连接中断，请点击重试]'
+      chatMessages.value[aiIdx].streaming = false
+      chatMessages.value[aiIdx].error = true
+      message.warning('连接中断，可点击重试')
+    }
   } catch (e) {
-    chatMessages.value[aiIdx].content += '\n\n[请求失败: ' + e.message + ']'
+    chatMessages.value[aiIdx].content = '[请求失败: ' + e.message + ']'
     chatMessages.value[aiIdx].streaming = false
-    message.error('对话请求失败')
+    chatMessages.value[aiIdx].error = true
+    message.error('对话请求失败，可点击重试')
   } finally {
+    clearInterval(stageTimer)
     chatLoading.value = false
   }
+}
+
+function retryChat(msg) {
+  const userMsgs = chatMessages.value.filter(m => m.role === 'user')
+  const lastUserMsg = userMsgs[userMsgs.length - 1]
+  if (!lastUserMsg) return
+  const idx = chatMessages.value.indexOf(msg)
+  if (idx >= 0) chatMessages.value.splice(idx, 1)
+  sendChat(lastUserMsg.content)
 }
 
 async function downloadMarkdown() {
@@ -847,73 +1012,64 @@ onMounted(async () => {
 
     await nextTick()
 
-    if (classRes.data.exam_mode) {
-      const rd = classRes.data.stats?.risk_distribution || {}
-      const riskChart = echarts.init(riskChartEl.value)
-      riskChart.setOption({
-        tooltip: { trigger: 'item' },
-        legend: { bottom: 0 },
-        series: [{
-          type: 'pie',
-          radius: ['40%', '70%'],
-          data: [
-            { value: rd.low || 0, name: '低风险', itemStyle: { color: '#52c41a' } },
-            { value: rd.medium || 0, name: '中风险', itemStyle: { color: '#fa8c16' } },
-            { value: rd.high || 0, name: '高风险', itemStyle: { color: '#cf1322' } },
-          ],
-        }],
-      })
-
-      // 加载风险记录并绘制风险时间线
-      await loadExamRisks()
-      await nextTick()
-      if (riskTimelineEl.value && examRisks.value.length > 0) {
-        const riskTimelineChart = echarts.init(riskTimelineEl.value)
-        // 按时间排序的风险记录
-        const sortedRisks = [...examRisks.value].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-        const timeLabels = sortedRisks.map(r => new Date(r.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
-        // 按学生分组
-        const studentNames = [...new Set(sortedRisks.map(r => r.student_name))]
-        const series = studentNames.map(name => ({
-          name,
-          type: 'line',
-          data: sortedRisks.map(r => r.student_name === name ? (r.risk_level === 'high' ? 3 : r.risk_level === 'medium' ? 2 : 1) : null),
-          connectNulls: false,
-          symbolSize: 6,
-        }))
-        riskTimelineChart.setOption({
-          tooltip: {
-            trigger: 'item',
-            formatter: (p) => `${p.seriesName}<br/>${p.axisValue}: ${['', '低风险', '中风险', '高风险'][p.value] || '未知'}`
-          },
-          legend: { bottom: 0, type: 'scroll' },
-          grid: { top: 20, bottom: 50, left: 50, right: 20 },
-          xAxis: { type: 'category', data: timeLabels },
-          yAxis: {
-            type: 'value',
-            min: 0,
-            max: 3,
-            interval: 1,
-            axisLabel: { formatter: v => ['', '低', '中', '高'][v] || '' }
-          },
-          series,
-        })
-      }
-    } else {
-      const chart = echarts.init(timelineEl.value)
-      chart.setOption({
-        grid: { top: 20, bottom: 30, left: 50, right: 20 },
-        xAxis: { type: 'category', data: timelineRes.data.map(d => d.timestamp) },
-        yAxis: { type: 'value', max: 100, min: 0, name: '注意力' },
-        series: [{
-          type: 'line', data: timelineRes.data.map(d => d.avg_attention),
-          smooth: true, areaStyle: { opacity: 0.2 }, itemStyle: { color: '#1890ff' },
-        }],
-      })
-    }
+    const chart = echarts.init(timelineEl.value)
+    chart.setOption({
+      grid: { top: 20, bottom: 30, left: 50, right: 20 },
+      xAxis: { type: 'category', data: timelineRes.data.map(d => d.timestamp) },
+      yAxis: { type: 'value', max: 100, min: 0, name: '注意力' },
+      series: [{
+        type: 'line', data: timelineRes.data.map(d => d.avg_attention),
+        smooth: true, areaStyle: { opacity: 0.2 }, itemStyle: { color: '#1890ff' },
+      }],
+    })
 
     await loadHeatmap()
     await loadAttendance()
+    await loadTeachingData()
+
+function formatFileSize(bytes) {
+  if (!bytes) return '0B'
+  if (bytes < 1024) return bytes + 'B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB'
+  return (bytes / 1048576).toFixed(1) + 'MB'
+}
+
+function downloadMaterial(record) {
+  window.open(`/api/materials/${record.id}/download`, '_blank')
+}
+
+async function fetchFeedback() {
+  try {
+    const [listRes, sumRes] = await Promise.all([
+      api.get(`/feedback/${classroomId}`),
+      api.get(`/feedback/${classroomId}/summary`),
+    ])
+    feedbacks.value = listRes.data
+    feedbackSummary.value = sumRes.data
+  } catch (e) {
+    message.error('获取评价失败')
+  }
+}
+
+async function submitFeedback() {
+  if (!feedbackForm.value.rating) { message.warning('请选择评分'); return }
+  feedbackSubmitting.value = true
+  try {
+    await api.post('/feedback', {
+      classroom_id: parseInt(classroomId),
+      rating: feedbackForm.value.rating,
+      content: feedbackForm.value.content,
+    })
+    message.success('评价已提交')
+    showFeedbackModal.value = false
+    feedbackForm.value = { rating: 5, content: '' }
+    fetchFeedback()
+  } catch (e) {
+    message.error('提交失败')
+  } finally {
+    feedbackSubmitting.value = false
+  }
+}
 
     try {
       const reportRes = await api.get(`/classrooms/${classroomId}/report`)
@@ -980,5 +1136,138 @@ onMounted(async () => {
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
+}
+
+/* 聊天容器 */
+.chat-container {
+  max-height: 450px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  scroll-behavior: smooth;
+  padding: 4px;
+}
+
+/* 消息行 */
+.chat-msg {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 8px;
+}
+.chat-msg-user {
+  flex-direction: row-reverse;
+}
+.chat-msg-ai {
+  flex-direction: row;
+}
+
+/* 头像 */
+.chat-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+/* 气泡容器 */
+.chat-bubble-wrap {
+  max-width: 75%;
+  display: flex;
+  flex-direction: column;
+}
+.chat-msg-user .chat-bubble-wrap {
+  align-items: flex-end;
+}
+.chat-msg-ai .chat-bubble-wrap {
+  align-items: flex-start;
+}
+
+/* 气泡 */
+.chat-bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  word-break: break-word;
+  line-height: 1.6;
+}
+.bubble-user {
+  background: #1890ff;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.bubble-ai {
+  background: #f5f5f5;
+  color: #333;
+  border-bottom-left-radius: 4px;
+}
+.bubble-user .markdown-body {
+  color: #fff;
+}
+
+/* 元数据 */
+.chat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.chat-time {
+  color: #bbb;
+}
+.chat-elapsed {
+  color: #999;
+  background: #f5f5f5;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+/* 加载动画 */
+.chat-loading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #999;
+}
+.dot-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1890ff;
+  animation: dotPulse 1.4s infinite ease-in-out;
+}
+.dot-pulse:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.dot-pulse:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.loading-text {
+  margin-left: 6px;
+  font-size: 13px;
+}
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 输入框区域 */
+.chat-input-area {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.chat-input-area .ant-input {
+  flex: 1;
 }
 </style>

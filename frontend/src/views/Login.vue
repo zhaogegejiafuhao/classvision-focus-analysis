@@ -44,7 +44,7 @@
         </div>
 
         <h1 class="form-title">{{ isRegister ? '注册账号' : '欢迎登录' }}</h1>
-        <p class="form-subtitle">{{ isRegister ? `创建您的${roleConfig.label}账号` : `${roleConfig.label}登录 ClassEyes 平台` }}</p>
+        <p class="form-subtitle">{{ isRegister ? `创建您的${roleConfig.label}账号` : `${roleConfig.label}登录 Focus Mind 平台` }}</p>
 
         <form class="login-form" @submit.prevent="handleSubmit">
           <div v-if="isRegister" class="form-field">
@@ -212,7 +212,36 @@ function showHint(msg) {
 
 async function handleSubmit() {
   if (isRegister.value) {
-    errorMsg.value = '注册功能暂未开放，请联系管理员开通账号'
+    if (!form.name || !form.username || !form.password) {
+      errorMsg.value = '请填写完整信息'
+      return
+    }
+    if (form.password !== form.confirmPassword) {
+      errorMsg.value = '两次密码不一致'
+      return
+    }
+    if (form.password.length < 6) {
+      errorMsg.value = '密码至少6位'
+      return
+    }
+    loading.value = true
+    errorMsg.value = ''
+    try {
+      const res = await api.post('/auth/register', {
+        name: form.name,
+        username: form.username,
+        password: form.password,
+        role: 'student',
+      })
+      // 注册成功，自动登录
+      localStorage.setItem('token', res.data.access_token)
+      localStorage.setItem('user', JSON.stringify(res.data.user))
+      router.push('/app')
+    } catch (err) {
+      errorMsg.value = err.response?.data?.detail || '注册失败'
+    } finally {
+      loading.value = false
+    }
     return
   }
   if (!form.username || !form.password) {

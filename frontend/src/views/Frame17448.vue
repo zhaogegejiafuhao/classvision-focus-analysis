@@ -38,9 +38,9 @@
         </a-collapse-panel>
 
         <a-collapse-panel key="6" header="各角色的权限区别？">
-          <p><strong>教师：</strong>创建课堂、管理学生、查看课堂详情、实时监控</p>
-          <p><strong>学生：</strong>查看我的课堂、注意力报告、OJ训练</p>
-          <p><strong>管理员：</strong>管理所有用户、创建课堂、数据分析、全局总览</p>
+          <p><strong>教师：</strong>创建课堂、管理学生、布置/批改作业、创建考试、发起签到、查看课堂详情、实时监控</p>
+          <p><strong>学生：</strong>查看我的课堂、提交作业、参加考试、签到考勤、注意力报告、OJ训练</p>
+          <p><strong>管理员：</strong>管理所有用户、创建课堂、数据分析、全局总览、花名册</p>
         </a-collapse-panel>
 
         <a-collapse-panel key="7" header="遇到问题怎么办？">
@@ -49,6 +49,23 @@
           <p>2. 检查网络连接是否正常</p>
           <p>3. 确认使用的是正确的账号和密码</p>
           <p>4. 联系系统管理员获取帮助</p>
+        </a-collapse-panel>
+
+        <a-collapse-panel key="8" header="如何布置和提交作业？">
+          <p><strong>教师：</strong>在侧边栏点击"作业管理" → 创建作业 → 填写标题、描述、截止时间 → 在作业详情页批改学生提交</p>
+          <p><strong>学生：</strong>在侧边栏点击"我的作业" → 点击作业标题查看详情 → 在弹窗中输入内容并提交</p>
+          <p>作业截止后将无法提交，教师批改后学生可查看得分和评语</p>
+        </a-collapse-panel>
+
+        <a-collapse-panel key="9" header="如何创建和参加考试？">
+          <p><strong>教师：</strong>考试管理 → 创建考试 → 在详情页逐题添加题目（单选/多选/判断/填空/简答）→ 发布考试</p>
+          <p><strong>学生：</strong>我的考试 → 点击"开始考试" → 在倒计时内答题 → 提交。客观题自动评判，简答题需教师人工批改</p>
+          <p>注意：考试期间请勿刷新页面，系统会自动保存答题进度</p>
+        </a-collapse-panel>
+
+        <a-collapse-panel key="10" header="如何进行签到考勤？">
+          <p><strong>教师：</strong>考勤管理 → 选择课堂 → 创建签到（普通/加密）→ 加密签到会生成6位验证码 → 结束签到后自动标记缺勤学生</p>
+          <p><strong>学生：</strong>签到考勤 → 选择课堂 → 普通签到直接点击，加密签到需输入教师提供的验证码</p>
         </a-collapse-panel>
       </a-collapse>
     </div>

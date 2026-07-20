@@ -60,8 +60,11 @@
           <a-form-item label="授课教师">
             <a-input v-model:value="form.teacher" placeholder="教师姓名" />
           </a-form-item>
-          <a-form-item label="考试模式">
-            <a-switch v-model:checked="form.exam_mode" checked-children="考试" un-checked-children="普通" />
+          <a-form-item label="课序号">
+            <a-input v-model:value="form.course_code" placeholder="例如：CS101" />
+          </a-form-item>
+          <a-form-item label="公开">
+            <a-switch v-model:checked="form.is_public" checked-children="公开" un-checked-children="私有" />
           </a-form-item>
         </a-form>
       </a-modal>
@@ -85,7 +88,8 @@ const editingId = ref(null)
 const form = ref({
   name: '',
   teacher: '',
-  exam_mode: false,
+  course_code: '',
+  is_public: true,
 })
 
 const currentRole = computed(() => userStore.role)
@@ -139,7 +143,7 @@ async function loadClassrooms() {
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', teacher: '', exam_mode: false }
+  form.value = { name: '', teacher: '', course_code: '', is_public: true }
   showModal.value = true
 }
 
@@ -148,7 +152,8 @@ function openEdit(record) {
   form.value = {
     name: record.name,
     teacher: record.teacher,
-    exam_mode: record.exam_mode,
+    course_code: record.course_code || '',
+    is_public: record.is_public !== false,
   }
   showModal.value = true
 }
@@ -164,14 +169,16 @@ async function handleSave() {
       await api.put(`/classrooms/${editingId.value}`, {
         name: form.value.name,
         teacher: form.value.teacher,
-        exam_mode: form.value.exam_mode,
+        course_code: form.value.course_code,
+        is_public: form.value.is_public,
       })
       message.success('课堂已更新')
     } else {
       await api.post('/classrooms', {
         name: form.value.name,
         teacher: form.value.teacher || userStore.displayName,
-        exam_mode: form.value.exam_mode,
+        course_code: form.value.course_code,
+        is_public: form.value.is_public,
       })
       message.success('课堂创建成功')
     }

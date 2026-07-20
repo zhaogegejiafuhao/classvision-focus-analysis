@@ -15,7 +15,7 @@ CHEATING_OBJECT_CLASSES = {67: "cell phone", 63: "laptop", 73: "book", 28: "suit
 
 
 class FaceTracker:
-    def __init__(self, model_path: str = "yolov8n.pt"):
+    def __init__(self, model_path: str = "models/yolov8n.pt"):
         self._model_path = model_path
         self._model = None
         self._face_cascade = None

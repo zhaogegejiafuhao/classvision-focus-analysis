@@ -16,6 +16,13 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class RegisterRequest(BaseModel):
+    name: str
+    username: str
+    password: str
+    role: str = "student"
+
+
 @router.post("/login", response_model=LoginResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
     """用户名/密码登录，返回 JWT token"""
@@ -24,6 +31,33 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return LoginResponse(access_token=token, user=UserOut.model_validate(user))
+
+
+@router.post("/register", response_model=LoginResponse)
+def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    """用户自主注册（默认学生角色）"""
+    if len(req.password) < 6:
+        raise HTTPException(400, "密码至少6位")
+    if req.role not in ("student", "teacher"):
+        raise HTTPException(400, "只能注册学生或教师角色")
+
+    existing = db.query(RegisteredPerson).filter(RegisteredPerson.username == req.username).first()
+    if existing:
+        raise HTTPException(400, "用户名已存在")
+
+    person = RegisteredPerson(
+        name=req.name,
+        username=req.username,
+        password_hash=hash_password(req.password),
+        role=req.role,
+        face_embedding="[]",
+    )
+    db.add(person)
+    db.commit()
+    db.refresh(person)
+
+    token = create_access_token({"sub": str(person.id), "role": person.role})
+    return LoginResponse(access_token=token, user=UserOut.model_validate(person))
 
 
 @router.get("/me", response_model=UserOut)

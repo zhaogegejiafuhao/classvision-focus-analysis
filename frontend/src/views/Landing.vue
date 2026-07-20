@@ -2,7 +2,7 @@
   <div class="landing-page">
     <!-- 顶部导航栏（HiFiVE 风格） -->
     <header class="nav-bar">
-      <div class="nav-logo" @click="scrollTo('hero')">ClassEyes</div>
+      <div class="nav-logo" @click="scrollTo('hero')">Focus Mind</div>
       <nav class="nav-links">
         <a class="nav-link" @click="scrollTo('features')">产品功能</a>
         <a class="nav-link" @click="scrollTo('classroom')">课堂管理</a>
@@ -237,7 +237,7 @@
     <section class="cta-section">
       <div class="cta-content">
         <h2 class="cta-title">开启智能教学新体验</h2>
-        <p class="cta-desc">立即选择您的身份，开始使用 ClassEyes 课堂学情智能实训平台</p>
+        <p class="cta-desc">立即选择您的身份，开始使用 Focus Mind 实时专注度量化与教学智能评估平台</p>
         <div class="cta-buttons">
           <button class="btn-cta" @click="goLogin('teacher')">教师登录</button>
           <button class="btn-cta" @click="goLogin('student')">学生登录</button>
@@ -250,8 +250,8 @@
     <footer id="docs" class="footer">
       <div class="footer-content">
         <div class="footer-brand">
-          <div class="footer-logo">ClassEyes</div>
-          <p class="footer-desc">课堂学情智能实训平台<br />AI 驱动的一站式课堂教学管理解决方案</p>
+          <div class="footer-logo">Focus Mind</div>
+          <p class="footer-desc">实时专注度量化与教学智能评估平台<br />AI 驱动的一站式专注度分析与教学管理解决方案</p>
         </div>
         <div class="footer-links">
           <div class="footer-col">
@@ -275,7 +275,7 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <p>© 2026 ClassEyes 课堂学情智能实训平台</p>
+        <p>© 2026 Focus Mind 实时专注度量化与教学智能评估平台</p>
       </div>
     </footer>
   </div>

@@ -69,6 +69,9 @@
               <a-popconfirm title="确定从数据库重建索引？" @confirm="rebuildIndex">
                 <a-button :loading="rebuildLoading">重建索引</a-button>
               </a-popconfirm>
+              <a-button @click="chunkPreviewOpen = true">
+                分块调试
+              </a-button>
             </a-space>
 
             <a-table :columns="docColumns" :data-source="documents" row-key="id" size="small" :pagination="{ pageSize: 5 }">
@@ -138,85 +141,169 @@
         <!-- 右侧：问答区域 -->
         <a-col :span="14">
           <a-card title="知识库问答">
-            <a-alert
-              message="输入问题，AI 将从你可见的知识库文档中检索相关内容并生成回答。"
-              type="info"
-              show-icon
-              style="margin-bottom: 16px"
-            />
-
-            <!-- 快捷问题 -->
-            <div style="margin-bottom: 16px">
-              <a-typography-text type="secondary" style="margin-right: 8px">快捷提问：</a-typography-text>
-              <a-tag
-                v-for="q in quickQuestions"
-                :key="q"
-                style="cursor: pointer; margin-bottom: 4px"
-                @click="question = q; queryRag()"
-              >
-                {{ q }}
-              </a-tag>
-            </div>
-
-            <!-- 输入框 -->
-            <a-space style="width: 100%; margin-bottom: 16px">
-              <a-input
-                v-model:value="question"
-                placeholder="输入问题，如：什么是计算机视觉？如何提高学生注意力？"
-                style="flex: 1"
-                :disabled="queryLoading"
-                @pressEnter="queryRag"
+            <template #extra>
+              <a-switch
+                v-model:checked="conversationMode"
+                checked-children="对话"
+                un-checked-children="单轮"
+                @change="onModeChange"
               />
-              <a-button type="primary" @click="queryRag" :loading="queryLoading" :disabled="!question.trim()">
-                查询
-              </a-button>
-            </a-space>
-
-            <!-- 回答结果 -->
-            <template v-if="ragResult">
-              <a-card title="AI 回答" style="margin-bottom: 16px" :bordered="false" class="rag-answer-card">
-                <div v-if="ragResult.streaming && !ragResult.answer" style="color: #999; padding: 8px 0">
-                  <a-spin size="small" /> 正在检索知识库并生成回答...
-                </div>
-                <div v-html="renderMarkdown(ragResult.answer)" style="white-space: pre-wrap; line-height: 1.8" />
-                <span v-if="ragResult.streaming && ragResult.answer" class="streaming-cursor">▌</span>
-              </a-card>
-
-              <!-- 参考来源 -->
-              <a-card title="参考来源" size="small">
-                <a-empty v-if="!ragResult.retrieved_chunks || ragResult.retrieved_chunks.length === 0" description="无可见的参考来源" />
-                <a-collapse v-else>
-                  <a-collapse-panel
-                    v-for="(chunk, i) in ragResult.retrieved_chunks"
-                    :key="i"
-                    :header="`来源 ${i+1}: ${chunk.source} (相似度: ${chunk.score.toFixed(3)})`"
-                  >
-                    <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; max-height: 200px; overflow-y: auto; font-size: 13px; line-height: 1.6">
-                      {{ chunk.content }}
-                    </div>
-                  </a-collapse-panel>
-                </a-collapse>
-              </a-card>
             </template>
 
-            <!-- 历史问答 -->
-            <template v-if="queryHistory.length > 0 && !ragResult">
-              <a-divider>
-                <a-space>
-                  <span>历史问答</span>
-                  <a-button type="link" size="small" danger @click="clearHistory">清空历史</a-button>
+            <!-- 单轮模式 -->
+            <template v-if="!conversationMode">
+              <a-alert
+                message="输入问题，AI 将从你可见的知识库文档中检索相关内容并生成回答。"
+                type="info"
+                show-icon
+                style="margin-bottom: 16px"
+              />
+
+              <!-- 快捷问题 -->
+              <div style="margin-bottom: 16px">
+                <a-typography-text type="secondary" style="margin-right: 8px">快捷提问：</a-typography-text>
+                <a-tag
+                  v-for="q in quickQuestions"
+                  :key="q"
+                  style="cursor: pointer; margin-bottom: 4px"
+                  @click="question = q; queryRag()"
+                >
+                  {{ q }}
+                </a-tag>
+              </div>
+
+              <!-- 输入框 -->
+              <a-space style="width: 100%; margin-bottom: 16px">
+                <a-input
+                  v-model:value="question"
+                  placeholder="输入问题，如：什么是计算机视觉？如何提高学生注意力？"
+                  style="flex: 1"
+                  :disabled="queryLoading"
+                  @pressEnter="queryRag"
+                />
+                <a-button type="primary" @click="queryRag" :loading="queryLoading" :disabled="!question.trim()">
+                  查询
+                </a-button>
+              </a-space>
+
+              <!-- 回答结果 -->
+              <template v-if="ragResult">
+                <a-card title="AI 回答" style="margin-bottom: 16px" :bordered="false" class="rag-answer-card">
+                  <div v-if="ragResult.streaming && !ragResult.answer" style="color: #999; padding: 8px 0">
+                    <a-spin size="small" /> 正在检索知识库并生成回答...
+                  </div>
+                  <div v-html="renderMarkdown(ragResult.answer)" style="white-space: pre-wrap; line-height: 1.8" />
+                  <span v-if="ragResult.streaming && ragResult.answer" class="streaming-cursor">▌</span>
+                </a-card>
+
+                <!-- 参考来源 -->
+                <a-card title="参考来源" size="small">
+                  <a-empty v-if="!ragResult.retrieved_chunks || ragResult.retrieved_chunks.length === 0" description="无可见的参考来源" />
+                  <a-collapse v-else>
+                    <a-collapse-panel
+                      v-for="(chunk, i) in ragResult.retrieved_chunks"
+                      :key="i"
+                      :header="`来源 ${i+1}: ${chunk.source}${chunk.page ? ' 第' + chunk.page + '页' : ''} (相似度: ${(chunk.rerank_score || chunk.rrf_score || chunk.score || 0).toFixed(3)})`"
+                    >
+                      <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; max-height: 200px; overflow-y: auto; font-size: 13px; line-height: 1.6">
+                        {{ chunk.content }}
+                      </div>
+                    </a-collapse-panel>
+                  </a-collapse>
+                </a-card>
+              </template>
+
+              <!-- 历史问答 -->
+              <template v-if="queryHistory.length > 0 && !ragResult">
+                <a-divider>
+                  <a-space>
+                    <span>历史问答</span>
+                    <a-button type="link" size="small" danger @click="clearHistory">清空历史</a-button>
+                  </a-space>
+                </a-divider>
+                <a-list :data-source="queryHistory.slice(0, 5)" size="small">
+                  <template #renderItem="{ item }">
+                    <a-list-item style="cursor: pointer" @click="question = item.question; queryRag()">
+                      <a-list-item-meta>
+                        <template #title>{{ item.question }}</template>
+                        <template #description>{{ item.answer.substring(0, 80) }}...</template>
+                      </a-list-item-meta>
+                    </a-list-item>
+                  </template>
+                </a-list>
+              </template>
+            </template>
+
+            <!-- 多轮对话模式 -->
+            <template v-else>
+              <a-alert
+                message="多轮对话模式：AI 会记住上下文，支持追问。追问不会重新检索，直接基于上文回答。"
+                type="info"
+                show-icon
+                style="margin-bottom: 16px"
+              />
+
+              <!-- 会话列表 -->
+              <div style="margin-bottom: 12px">
+                <a-space style="width: 100%">
+                  <a-select
+                    v-model:value="currentConvId"
+                    style="flex: 1"
+                    placeholder="选择对话或新建"
+                    allow-clear
+                    @change="onConvChange"
+                  >
+                    <a-select-option v-for="c in conversations" :key="c.id" :value="c.id">
+                      {{ c.title }} ({{ c.message_count }}条)
+                    </a-select-option>
+                  </a-select>
+                  <a-button @click="newConversation" :disabled="queryLoading">
+                    <template #icon><PlusOutlined /></template>
+                    新对话
+                  </a-button>
+                  <a-popconfirm v-if="currentConvId" title="确定删除此对话？" @confirm="deleteConversation">
+                    <a-button danger :disabled="queryLoading">
+                      <template #icon><DeleteOutlined /></template>
+                    </a-button>
+                  </a-popconfirm>
                 </a-space>
-              </a-divider>
-              <a-list :data-source="queryHistory.slice(0, 5)" size="small">
-                <template #renderItem="{ item }">
-                  <a-list-item style="cursor: pointer" @click="question = item.question; queryRag()">
-                    <a-list-item-meta>
-                      <template #title>{{ item.question }}</template>
-                      <template #description>{{ item.answer.substring(0, 80) }}...</template>
-                    </a-list-item-meta>
-                  </a-list-item>
-                </template>
-              </a-list>
+              </div>
+
+              <!-- 对话消息列表 -->
+              <div class="conv-messages" ref="convMessagesEl">
+                <a-empty v-if="convMessages.length === 0" description="开始新的对话" style="padding: 40px 0" />
+                <div
+                  v-for="msg in convMessages"
+                  :key="msg.id"
+                  :class="['conv-msg', msg.role === 'user' ? 'conv-msg-user' : 'conv-msg-assistant']"
+                >
+                  <div class="conv-msg-role">
+                    <a-tag :color="msg.role === 'user' ? 'blue' : 'green'">
+                      {{ msg.role === 'user' ? '我' : 'AI' }}
+                    </a-tag>
+                    <a-tag v-if="msg.is_followup" color="orange" style="font-size: 11px">追问</a-tag>
+                  </div>
+                  <div v-html="renderMarkdown(msg.content)" class="conv-msg-content" />
+                </div>
+                <div v-if="queryLoading" class="conv-msg conv-msg-assistant">
+                  <div class="conv-msg-role"><a-tag color="green">AI</a-tag></div>
+                  <div class="conv-msg-content"><a-spin size="small" /> 正在思考...</div>
+                </div>
+              </div>
+
+              <!-- 输入框 -->
+              <a-space style="width: 100%; margin-top: 12px">
+                <a-input
+                  v-model:value="question"
+                  placeholder="输入问题，支持追问（如：那怎么应用？、再详细说说）"
+                  style="flex: 1"
+                  :disabled="queryLoading"
+                  @pressEnter="queryConversation"
+                />
+                <a-button type="primary" @click="queryConversation" :loading="queryLoading" :disabled="!question.trim()">
+                  发送
+                </a-button>
+              </a-space>
             </template>
           </a-card>
         </a-col>
@@ -250,16 +337,120 @@
           </a-form-item>
         </a-form>
       </a-modal>
+
+      <!-- 分块预览调试工具 -->
+      <a-drawer
+        v-model:open="chunkPreviewOpen"
+        title="分块预览调试"
+        placement="right"
+        width="680"
+      >
+        <a-space direction="vertical" style="width: 100%">
+          <a-alert message="粘贴 Markdown/纯文本片段，预览分块效果。不写入数据库/索引，可安全对比多套配置。" type="info" show-icon />
+
+          <a-form layout="inline" style="margin: 8px 0">
+            <a-form-item label="策略">
+              <a-select v-model:value="chunkPreviewStrategy" style="width: 160px">
+                <a-select-option value="auto">auto（自动择优）</a-select-option>
+                <a-select-option value="heading">heading（标题分块）</a-select-option>
+                <a-select-option value="heuristic">heuristic（启发式）</a-select-option>
+                <a-select-option value="legacy">legacy（递归分块）</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" @click="runChunkPreview" :loading="chunkPreviewLoading">运行预览</a-button>
+            </a-form-item>
+          </a-form>
+
+          <a-textarea
+            v-model:value="chunkPreviewText"
+            placeholder="粘贴待测试文本（最大 64KB）..."
+            :auto-size="{ minRows: 6, maxRows: 12 }"
+            style="font-family: monospace; font-size: 13px"
+          />
+
+          <!-- 预览结果 -->
+          <template v-if="chunkPreviewResult">
+            <!-- 配置摘要 -->
+            <a-card title="当前配置" size="small">
+              <a-descriptions :column="2" size="small">
+                <a-descriptions-item label="生效策略">
+                  <a-tag color="blue">{{ chunkPreviewResult.strategy }}</a-tag>
+                  <span style="font-size: 12px; color: #999">{{ chunkPreviewResult.strategy_source }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="总分块数">
+                  <a-statistic :value="chunkPreviewResult.total_chunks" :value-style="{ fontSize: '18px' }" />
+                </a-descriptions-item>
+                <a-descriptions-item label="分块大小">{{ chunkPreviewResult.config?.chunk_size }} 字符</a-descriptions-item>
+                <a-descriptions-item label="重叠度">{{ chunkPreviewResult.config?.chunk_overlap }} 字符</a-descriptions-item>
+                <a-descriptions-item label="父子分块">
+                  <a-tag :color="chunkPreviewResult.config?.parent_child_enabled ? 'green' : 'default'">
+                    {{ chunkPreviewResult.config?.parent_child_enabled ? '已开启' : '未开启' }}
+                  </a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item label="Token上限">{{ chunkPreviewResult.config?.embedding_token_limit || '关闭' }}</a-descriptions-item>
+              </a-descriptions>
+            </a-card>
+
+            <!-- 统计信息 -->
+            <a-card title="分块统计" size="small">
+              <a-row :gutter="16">
+                <a-col :span="6"><a-statistic title="平均字符" :value="chunkPreviewResult.stats?.avg_chars" /></a-col>
+                <a-col :span="6"><a-statistic title="最小" :value="chunkPreviewResult.stats?.min_chars" /></a-col>
+                <a-col :span="6"><a-statistic title="最大" :value="chunkPreviewResult.stats?.max_chars" /></a-col>
+                <a-col :span="6"><a-statistic title="标准差" :value="chunkPreviewResult.stats?.std_chars" /></a-col>
+              </a-row>
+            </a-card>
+
+            <!-- 父子分块统计 -->
+            <a-card v-if="chunkPreviewResult.parent_child" title="父子分块预览" size="small">
+              <a-row :gutter="16" style="margin-bottom: 12px">
+                <a-col :span="6"><a-statistic title="父分块" :value="chunkPreviewResult.parent_child.parent_count" /></a-col>
+                <a-col :span="6"><a-statistic title="子分块" :value="chunkPreviewResult.parent_child.child_count" /></a-col>
+                <a-col :span="6"><a-statistic title="父平均字符" :value="chunkPreviewResult.parent_child.parent_avg_chars" /></a-col>
+                <a-col :span="6"><a-statistic title="子平均字符" :value="chunkPreviewResult.parent_child.child_avg_chars" /></a-col>
+              </a-row>
+              <a-collapse size="small">
+                <a-collapse-panel v-for="p in chunkPreviewResult.parent_child.parents" :key="p.index" :header="`父分块 #${p.index + 1} (${p.chars}字符)`">
+                  <div style="font-size: 13px; white-space: pre-wrap; line-height: 1.6; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 8px; border-radius: 4px">{{ p.content_preview }}</div>
+                </a-collapse-panel>
+              </a-collapse>
+            </a-card>
+
+            <!-- 文档结构信号 -->
+            <a-card title="文档结构信号" size="small">
+              <a-row :gutter="8">
+                <a-col v-for="(val, key) in chunkPreviewResult.signals" :key="key" :span="4">
+                  <a-statistic :title="key" :value="typeof val === 'number' ? (Number.isInteger(val) ? val : val.toFixed(3)) : val" :value-style="{ fontSize: '16px' }" />
+                </a-col>
+              </a-row>
+            </a-card>
+
+            <!-- 分块详情 -->
+            <a-card title="分块详情" size="small">
+              <a-collapse size="small">
+                <a-collapse-panel
+                  v-for="chunk in chunkPreviewResult.chunks"
+                  :key="chunk.index"
+                  :header="`块 #${chunk.index + 1} (${chunk.chars}字符${chunk.page ? ' 第' + chunk.page + '页' : ''})`"
+                >
+                  <div style="font-size: 13px; white-space: pre-wrap; line-height: 1.6; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 8px; border-radius: 4px">{{ chunk.content }}</div>
+                </a-collapse-panel>
+              </a-collapse>
+            </a-card>
+          </template>
+        </a-space>
+      </a-drawer>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import api from '@/api'
 import { useUserStore } from '@/stores/user'
 import MarkdownIt from 'markdown-it'
 import { message } from 'ant-design-vue'
-import { InfoCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import { InfoCircleOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue'
 
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
 const userStore = useUserStore()
@@ -275,6 +466,13 @@ const queryLoading = ref(false)
 const indexLoading = ref(false)
 const queryHistory = ref([])
 const uploadVisibility = ref(currentRole.value === 'student' ? 'private' : 'public')
+
+// 多轮对话
+const conversationMode = ref(false)
+const conversations = ref([])
+const currentConvId = ref(null)
+const convMessages = ref([])
+const convMessagesEl = ref(null)
 
 const quickQuestions = [
   'OpenCV 是什么？有哪些主要模块？',
@@ -465,6 +663,33 @@ async function rebuildIndex() {
   }
 }
 
+// 分块预览调试工具
+const chunkPreviewOpen = ref(false)
+const chunkPreviewText = ref('')
+const chunkPreviewStrategy = ref('auto')
+const chunkPreviewLoading = ref(false)
+const chunkPreviewResult = ref(null)
+
+async function runChunkPreview() {
+  if (!chunkPreviewText.value.trim()) {
+    message.warning('请先输入待测试文本')
+    return
+  }
+  chunkPreviewLoading.value = true
+  chunkPreviewResult.value = null
+  try {
+    const res = await api.post('/rag/chunk-preview', {
+      text: chunkPreviewText.value,
+      strategy: chunkPreviewStrategy.value === 'auto' ? null : chunkPreviewStrategy.value,
+    })
+    chunkPreviewResult.value = res.data
+  } catch (e) {
+    message.error('预览失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    chunkPreviewLoading.value = false
+  }
+}
+
 const previewVisible = ref(false)
 const previewLoading = ref(false)
 const previewData = ref(null)
@@ -515,6 +740,110 @@ onMounted(async () => {
   await loadStatus()
   await loadDocuments()
 })
+
+// ===== 多轮对话方法 =====
+function onModeChange(checked) {
+  if (checked) {
+    loadConversations()
+  } else {
+    convMessages.value = []
+    currentConvId.value = null
+  }
+}
+
+async function loadConversations() {
+  try {
+    const res = await api.get('/rag/conversations')
+    conversations.value = res.data || []
+  } catch {
+    conversations.value = []
+  }
+}
+
+function newConversation() {
+  currentConvId.value = null
+  convMessages.value = []
+  question.value = ''
+}
+
+async function onConvChange(convId) {
+  if (!convId) {
+    convMessages.value = []
+    return
+  }
+  try {
+    const res = await api.get(`/rag/conversations/${convId}/messages`)
+    convMessages.value = res.data || []
+    await nextTick()
+    scrollToBottom()
+  } catch {
+    convMessages.value = []
+  }
+}
+
+async function deleteConversation() {
+  if (!currentConvId.value) return
+  try {
+    await api.delete(`/rag/conversations/${currentConvId.value}`)
+    message.success('对话已删除')
+    currentConvId.value = null
+    convMessages.value = []
+    await loadConversations()
+  } catch (e) {
+    message.error('删除失败')
+  }
+}
+
+async function queryConversation() {
+  if (!question.value.trim()) return
+  const currentQuestion = question.value
+  queryLoading.value = true
+
+  // 先在 UI 显示用户消息
+  convMessages.value.push({
+    id: 'temp-' + Date.now(),
+    role: 'user',
+    content: currentQuestion,
+    is_followup: false,
+  })
+  question.value = ''
+  await nextTick()
+  scrollToBottom()
+
+  try {
+    const res = await api.post('/rag/conversations/query', {
+      question: currentQuestion,
+      conversation_id: currentConvId.value,
+      top_k: 5,
+    })
+
+    // 添加 assistant 回答
+    convMessages.value.push({
+      id: res.data.message_id,
+      role: 'assistant',
+      content: res.data.answer,
+      is_followup: res.data.is_followup,
+    })
+
+    // 更新当前会话 ID（新对话首次查询时会分配）
+    if (!currentConvId.value) {
+      currentConvId.value = res.data.conversation_id
+    }
+    await loadConversations()
+    await nextTick()
+    scrollToBottom()
+  } catch (e) {
+    message.error('查询失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    queryLoading.value = false
+  }
+}
+
+function scrollToBottom() {
+  if (convMessagesEl.value) {
+    convMessagesEl.value.scrollTop = convMessagesEl.value.scrollHeight
+  }
+}
 </script>
 
 <style scoped>
@@ -612,5 +941,53 @@ onMounted(async () => {
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
+}
+
+/* 多轮对话样式 */
+.conv-messages {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--cv-bg-page);
+  border-radius: 8px;
+}
+.conv-msg {
+  margin-bottom: 16px;
+}
+.conv-msg-role {
+  margin-bottom: 4px;
+}
+.conv-msg-content {
+  padding: 10px 14px;
+  border-radius: 8px;
+  line-height: 1.7;
+  font-size: 14px;
+}
+.conv-msg-user .conv-msg-content {
+  background: var(--cv-color-primary);
+  color: white;
+  margin-left: 40px;
+}
+.conv-msg-assistant .conv-msg-content {
+  background: white;
+  border: 1px solid #e8e8e8;
+  margin-right: 40px;
+}
+.conv-msg-content :deep(p) {
+  margin: 6px 0;
+}
+.conv-msg-content :deep(ul),
+.conv-msg-content :deep(ol) {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.conv-msg-content :deep(code) {
+  background: rgba(0,0,0,0.06);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+.conv-msg-user .conv-msg-content :deep(code) {
+  background: rgba(255,255,255,0.2);
 }
 </style>
