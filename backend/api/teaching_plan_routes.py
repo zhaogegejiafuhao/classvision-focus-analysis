@@ -1,0 +1,135 @@
+"""教学计划/备课 API"""
+import json
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from backend.core.database import get_db
+from backend.core.security import get_current_user
+from backend.models.tables import TeachingPlan, RegisteredPerson
+
+router = APIRouter(prefix="/api/teaching-plans", tags=["teaching-plans"])
+
+
+class PlanCreate(BaseModel):
+    title: str
+    classroom_id: Optional[int] = None
+    objectives: Optional[str] = None
+    chapters: Optional[list] = None
+    schedule: Optional[list] = None
+    notes: Optional[str] = None
+
+
+class PlanUpdate(BaseModel):
+    title: Optional[str] = None
+    objectives: Optional[str] = None
+    chapters: Optional[list] = None
+    schedule: Optional[list] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+@router.get("")
+def list_plans(
+    classroom_id: Optional[int] = None,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取教学计划列表"""
+    query = db.query(TeachingPlan)
+    if current_user.role == "teacher":
+        query = query.filter(TeachingPlan.teacher_id == current_user.id)
+    if classroom_id:
+        query = query.filter(TeachingPlan.classroom_id == classroom_id)
+    query = query.order_by(TeachingPlan.updated_at.desc())
+
+    result = []
+    for p in query.all():
+        result.append({
+            "id": p.id,
+            "title": p.title,
+            "classroom_id": p.classroom_id,
+            "objectives": p.objectives,
+            "chapters": json.loads(p.chapters) if p.chapters else None,
+            "schedule": json.loads(p.schedule) if p.schedule else None,
+            "notes": p.notes,
+            "status": p.status,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        })
+    return result
+
+
+@router.post("")
+def create_plan(
+    data: PlanCreate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """创建教学计划"""
+    if current_user.role not in ("teacher", "admin"):
+        raise HTTPException(403, "只有教师可以创建教学计划")
+
+    plan = TeachingPlan(
+        teacher_id=current_user.id,
+        classroom_id=data.classroom_id,
+        title=data.title,
+        objectives=data.objectives,
+        chapters=json.dumps(data.chapters) if data.chapters else None,
+        schedule=json.dumps(data.schedule) if data.schedule else None,
+        notes=data.notes,
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    return {"id": plan.id, "title": plan.title}
+
+
+@router.put("/{plan_id}")
+def update_plan(
+    plan_id: int,
+    data: PlanUpdate,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """更新教学计划"""
+    plan = db.query(TeachingPlan).filter(TeachingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(404, "计划不存在")
+    if plan.teacher_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "无权修改")
+
+    if data.title is not None:
+        plan.title = data.title
+    if data.objectives is not None:
+        plan.objectives = data.objectives
+    if data.chapters is not None:
+        plan.chapters = json.dumps(data.chapters)
+    if data.schedule is not None:
+        plan.schedule = json.dumps(data.schedule)
+    if data.notes is not None:
+        plan.notes = data.notes
+    if data.status is not None:
+        plan.status = data.status
+
+    db.commit()
+    return {"success": True}
+
+
+@router.delete("/{plan_id}")
+def delete_plan(
+    plan_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """删除教学计划"""
+    plan = db.query(TeachingPlan).filter(TeachingPlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(404, "计划不存在")
+    if plan.teacher_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "无权删除")
+    db.delete(plan)
+    db.commit()
+    return {"success": True}
