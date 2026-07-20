@@ -1002,9 +1002,9 @@ function downloadMaterial(record) {
 }
 
     try {
-      const reportRes = await api.get(`/classrooms/${classroomId}/report`)
+      const reportRes = await api.get(`/classrooms/${classroomId}/report`, { _skipGlobalError: true })
       report.value = reportRes.data
-    } catch { /* 报告未生成 */ }
+    } catch { /* 报告未生成，静默忽略 */ }
 
     await loadChatHistory()
   } catch (e) {
