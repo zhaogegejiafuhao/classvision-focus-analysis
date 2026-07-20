@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
@@ -134,7 +134,10 @@ def list_exams(
     db: Session = Depends(get_db),
 ):
     """获取考试列表"""
-    query = db.query(Exam)
+    query = db.query(Exam).options(
+        joinedload(Exam.classroom),
+        joinedload(Exam.teacher),
+    )
     
     if current_user.role in ("teacher", "admin"):
         query = query.filter(Exam.teacher_id == current_user.id)
@@ -579,10 +582,12 @@ def list_submissions(
     db: Session = Depends(get_db),
 ):
     """获取考试提交列表"""
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = db.query(Exam).options(
+        joinedload(Exam.submissions).joinedload(ExamSubmission.student),
+    ).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(404, "考试不存在")
-    
+
     if exam.teacher_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权查看提交")
     
@@ -610,7 +615,10 @@ def get_exam_stats(
     db: Session = Depends(get_db),
 ):
     """获取考试统计分析数据"""
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = db.query(Exam).options(
+        joinedload(Exam.questions),
+        joinedload(Exam.submissions),
+    ).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(404, "考试不存在")
 
@@ -641,10 +649,16 @@ def get_exam_stats(
         count = sum(1 for s in scores if lo_scaled <= s < hi_scaled)
         distribution.append({"range": f"{lo}-{hi}", "count": count})
 
-    # 每题统计
+    # 每题统计（批量查询避免 N+1）
     question_stats = []
+    q_ids = [q.id for q in exam.questions]
+    all_answers = db.query(Answer).filter(Answer.question_id.in_(q_ids)).all() if q_ids else []
+    answers_by_q: dict[int, list[Answer]] = {}
+    for a in all_answers:
+        answers_by_q.setdefault(a.question_id, []).append(a)
+
     for q in sorted(exam.questions, key=lambda x: x.order):
-        answers = db.query(Answer).filter(Answer.question_id == q.id).all()
+        answers = answers_by_q.get(q.id, [])
         if not answers:
             continue
         correct_count = sum(1 for a in answers if a.is_correct == True)

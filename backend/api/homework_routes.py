@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
 from backend.core.database import get_db
@@ -124,7 +124,10 @@ def list_homework(
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "只有教师可以查看作业列表")
     
-    query = db.query(Homework).filter(Homework.teacher_id == current_user.id)
+    query = db.query(Homework).options(
+        joinedload(Homework.classroom),
+        joinedload(Homework.submissions),
+    ).filter(Homework.teacher_id == current_user.id)
     if classroom_id:
         query = query.filter(Homework.classroom_id == classroom_id)
     query = query.order_by(Homework.created_at.desc())
@@ -222,7 +225,10 @@ def list_assigned_homework(
     else:
         classroom_ids = None
 
-    query = db.query(Homework).filter(Homework.status == "open")
+    query = db.query(Homework).options(
+        joinedload(Homework.classroom),
+        joinedload(Homework.submissions),
+    ).filter(Homework.status == "open")
     if classroom_ids:
         query = query.filter(or_(Homework.classroom_id.in_(classroom_ids), Homework.classroom_id.is_(None)))
 
@@ -425,7 +431,9 @@ def list_submissions(
     db: Session = Depends(get_db),
 ):
     """获取作业的所有提交"""
-    homework = db.query(Homework).filter(Homework.id == homework_id).first()
+    homework = db.query(Homework).options(
+        joinedload(Homework.submissions).joinedload(HomeworkSubmission.student),
+    ).filter(Homework.id == homework_id).first()
     if not homework:
         raise HTTPException(404, "作业不存在")
     
