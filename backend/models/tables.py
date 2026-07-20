@@ -18,7 +18,7 @@ class Classroom(Base):
     avg_attention: Mapped[float] = mapped_column(Float, default=0)
     total_students: Mapped[int] = mapped_column(Integer, default=0)
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False)
-    teacher_person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    teacher_person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
     course_code: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 课序号
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否公开（课堂加入页可见）
     invite_code: Mapped[str | None] = mapped_column(String(13), nullable=True, unique=True)  # 邀请码（13位，生成后不可改）
@@ -37,8 +37,8 @@ class ClassroomMember(Base):
     __tablename__ = "classroom_member"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
-    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
+    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     classroom: Mapped["Classroom"] = relationship(back_populates="members")
@@ -49,11 +49,11 @@ class Student(Base):
     __tablename__ = "student"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     track_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
 
     classroom: Mapped["Classroom"] = relationship(back_populates="students")
     records: Mapped[list["AttentionRecord"]] = relationship(back_populates="student")
@@ -65,8 +65,8 @@ class AttentionRecord(Base):
     __tablename__ = "attention_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"))
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     attention_score: Mapped[float] = mapped_column(Float)
     pitch: Mapped[float] = mapped_column(Float, default=0)
@@ -87,8 +87,8 @@ class ExamRiskRecord(Base):
     __tablename__ = "exam_risk_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"))
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     risk_level: Mapped[str] = mapped_column(String(10))
     gaze_deviation_duration: Mapped[float] = mapped_column(Float, default=0)
@@ -116,7 +116,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_message"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     role: Mapped[str] = mapped_column(String(10))  # "user" or "assistant"
     content: Mapped[str] = mapped_column(Text)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -136,7 +136,7 @@ class RegisteredPerson(Base):
     face_embedding: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON存储512维特征向量
     employee_id: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 学号/工号（唯一索引由迁移创建）
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    department_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("department.id"), nullable=True)
+    department_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("department.id"), nullable=True, index=True)
     id_card: Mapped[str | None] = mapped_column(String(20), nullable=True)
     major: Mapped[str | None] = mapped_column(String(100), nullable=True)
     email: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -171,7 +171,7 @@ class KnowledgeDocument(Base):
     total_chunks: Mapped[int] = mapped_column(Integer, default=0)
     indexed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    uploaded_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    uploaded_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
     visibility: Mapped[str] = mapped_column(String(20), default="private")  # public/staff/private
 
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(back_populates="document")
@@ -183,12 +183,12 @@ class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunk"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("knowledge_document.id"))
+    document_id: Mapped[int] = mapped_column(Integer, ForeignKey("knowledge_document.id"), index=True)
     chunk_index: Mapped[int] = mapped_column(Integer)  # 在文档中的顺序
     content: Mapped[str] = mapped_column(Text)  # 文本内容
     embedding_stored: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已存储到FAISS
     is_parent: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否为父分块
-    parent_chunk_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("knowledge_chunk.id"), nullable=True)  # 子分块指向父分块
+    parent_chunk_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("knowledge_chunk.id"), nullable=True, index=True)  # 子分块指向父分块
 
     document: Mapped["KnowledgeDocument"] = relationship(back_populates="chunks")
     parent: Mapped["KnowledgeChunk | None"] = relationship(remote_side=[id], backref="children_chunks")
@@ -209,7 +209,7 @@ class OjProblem(Base):
     time_limit: Mapped[int] = mapped_column(Integer, default=1000)
     memory_limit: Mapped[int] = mapped_column(Integer, default=256 * 1024 * 1024)
     difficulty: Mapped[str] = mapped_column(String(10), default="简单")
-    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     test_cases: Mapped[list["OjTestCase"]] = relationship(back_populates="problem", cascade="all, delete-orphan")
@@ -222,7 +222,7 @@ class OjTestCase(Base):
     __tablename__ = "oj_test_case"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"))
+    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"), index=True)
     input: Mapped[str] = mapped_column(Text)
     expected_output: Mapped[str] = mapped_column(Text)
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -235,8 +235,8 @@ class OjSubmission(Base):
     __tablename__ = "oj_submission"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"))
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    problem_id: Mapped[int] = mapped_column(Integer, ForeignKey("oj_problem.id"), index=True)
     language: Mapped[str] = mapped_column(String(10))
     source_code: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="Pending")
@@ -253,7 +253,7 @@ class RagConversation(Base):
     __tablename__ = "rag_conversation"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     title: Mapped[str] = mapped_column(String(200), default="新对话")
     state: Mapped[str] = mapped_column(String(20), default="idle")  # idle/querying/clarifying/answering
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -267,7 +267,7 @@ class RagMessage(Base):
     __tablename__ = "rag_message"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("rag_conversation.id"))
+    conversation_id: Mapped[int] = mapped_column(Integer, ForeignKey("rag_conversation.id"), index=True)
     role: Mapped[str] = mapped_column(String(10))  # "user" or "assistant"
     content: Mapped[str] = mapped_column(Text)
     retrieved_chunks: Mapped[str | None] = mapped_column(Text, default=None)  # JSON 存储检索到的 chunk
@@ -285,9 +285,9 @@ class Notification(Base):
     title: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
     type: Mapped[str] = mapped_column(String(20), default="system")  # system/homework/exam/attendance
-    sender_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
-    receiver_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)  # NULL表示全体
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    sender_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
+    receiver_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)  # NULL表示全体
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
@@ -301,9 +301,9 @@ class Attendance(Base):
     __tablename__ = "attendance"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"))
-    checkin_session_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("checkin_session.id"), nullable=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    checkin_session_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("checkin_session.id"), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="present")  # present/absent/late/leave
     checkin_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     checkin_code: Mapped[str | None] = mapped_column(String(10), nullable=True)  # 学生输入的验证码
@@ -322,8 +322,8 @@ class Homework(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     total_score: Mapped[float] = mapped_column(Float, default=100.0)
     status: Mapped[str] = mapped_column(String(20), default="open")  # open/closed/archived
@@ -340,7 +340,7 @@ class HomeworkAttachment(Base):
     __tablename__ = "homework_attachment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"))
+    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"), index=True)
     filename: Mapped[str] = mapped_column(String(200))
     file_path: Mapped[str] = mapped_column(String(500))
     file_size: Mapped[int] = mapped_column(Integer, default=0)
@@ -353,8 +353,8 @@ class HomeworkSubmission(Base):
     __tablename__ = "homework_submission"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     content: Mapped[str] = mapped_column(Text, default="")
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     feedback: Mapped[str] = mapped_column(Text, default="")
@@ -373,7 +373,7 @@ class SubmissionAttachment(Base):
     __tablename__ = "submission_attachment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"))
+    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"), index=True)
     filename: Mapped[str] = mapped_column(String(200))
     file_path: Mapped[str] = mapped_column(String(500))
     file_size: Mapped[int] = mapped_column(Integer, default=0)
@@ -386,8 +386,8 @@ class CheckinSession(Base):
     __tablename__ = "checkin_session"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     type: Mapped[str] = mapped_column(String(20), default="normal")  # normal/encrypted
     code: Mapped[str | None] = mapped_column(String(6), nullable=True)  # 加密签到的验证码
     status: Mapped[str] = mapped_column(String(20), default="active")  # active/closed
@@ -407,8 +407,8 @@ class Exam(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     duration: Mapped[int] = mapped_column(Integer, default=60)  # 考试时长（分钟）
     total_score: Mapped[float] = mapped_column(Float, default=100.0)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft/published/closed
@@ -428,7 +428,7 @@ class Question(Base):
     __tablename__ = "question"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"))
+    exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"), index=True)
     type: Mapped[str] = mapped_column(String(20))  # single/multi/judge/fill/essay
     content: Mapped[str] = mapped_column(Text)
     options: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON格式选项
@@ -445,8 +445,8 @@ class ExamSubmission(Base):
     __tablename__ = "exam_submission"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="in_progress")  # in_progress/submitted/graded
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -463,8 +463,8 @@ class Answer(Base):
     __tablename__ = "answer"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam_submission.id"))
-    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"))
+    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam_submission.id"), index=True)
+    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"), index=True)
     content: Mapped[str] = mapped_column(Text, default="")
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -478,7 +478,7 @@ class QuestionBank(Base):
     __tablename__ = "question_bank"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     type: Mapped[str] = mapped_column(String(20))  # single/multi/judge/fill/essay
     content: Mapped[str] = mapped_column(Text)
     options: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
@@ -497,8 +497,8 @@ class CourseMaterial(Base):
     __tablename__ = "course_material"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str] = mapped_column(String(500))  # 存储路径
@@ -539,7 +539,7 @@ class AnswerRegradeHistory(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam_submission.id"))
     question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"))
-    operator_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    operator_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
 
     # 重批改方式与入参
     regrade_method: Mapped[str] = mapped_column(String(20))  # 'regrade_essay' / 'manual_input'
@@ -582,8 +582,8 @@ class TeachingPlan(Base):
     __tablename__ = "teaching_plan"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     objectives: Mapped[str | None] = mapped_column(Text, nullable=True)  # 教学目标
     chapters: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: 章节安排
@@ -602,8 +602,8 @@ class ExtensionRequest(Base):
     __tablename__ = "extension_request"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    homework_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     reason: Mapped[str] = mapped_column(Text)
     original_deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     requested_deadline: Mapped[datetime] = mapped_column(DateTime)
@@ -621,8 +621,8 @@ class LeaveRequest(Base):
     __tablename__ = "leave_request"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     start_date: Mapped[datetime] = mapped_column(DateTime)
     end_date: Mapped[datetime] = mapped_column(DateTime)
     leave_type: Mapped[str] = mapped_column(String(20), default="sick")  # sick/personal/official/other
@@ -641,8 +641,8 @@ class Experiment(Base):
     __tablename__ = "experiment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True)
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    classroom_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("classroom.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -661,8 +661,8 @@ class ExperimentReport(Base):
     __tablename__ = "experiment_report"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    experiment_id: Mapped[int] = mapped_column(Integer, ForeignKey("experiment.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    experiment_id: Mapped[int] = mapped_column(Integer, ForeignKey("experiment.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     content: Mapped[str] = mapped_column(Text, default="")
     file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -684,7 +684,7 @@ class GradingResult(Base):
     __tablename__ = "grading_result"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"))
+    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"), index=True)
     rubric_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     grading_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     score: Mapped[float] = mapped_column(Float, default=0.0)
@@ -708,7 +708,7 @@ class KnowledgeAnalysis(Base):
     __tablename__ = "knowledge_analysis"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     analysis_type: Mapped[str] = mapped_column(String(20))  # math / writing
     radar_json: Mapped[str] = mapped_column(Text)
     weak_points_json: Mapped[str] = mapped_column(Text)
@@ -723,7 +723,7 @@ class CorrectionRecord(Base):
     __tablename__ = "correction_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"))
+    submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("homework_submission.id"), index=True)
     original_score: Mapped[float] = mapped_column(Float)
     correction_score: Mapped[float] = mapped_column(Float)
     improved: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -739,9 +739,9 @@ class SimilarQuestion(Base):
     __tablename__ = "similar_question"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    source_grading_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("grading_result.id"), nullable=True)
-    source_correction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("correction_record.id"), nullable=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    source_grading_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("grading_result.id"), nullable=True, index=True)
+    source_correction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("correction_record.id"), nullable=True, index=True)
     question_text: Mapped[str] = mapped_column(Text)
     standard_answer: Mapped[str] = mapped_column(Text, default="")
     rubric_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
@@ -769,7 +769,7 @@ class PaperTemplate(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"), unique=True)
-    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    teacher_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     blank_image_path: Mapped[str] = mapped_column(String(500))  # 空白卷图片存储路径
     anchor_points: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: 4 个角点用于透视校正
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -795,8 +795,8 @@ class QuestionRegion(Base):
     __tablename__ = "question_region"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("paper_template.id"))
-    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"))
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("paper_template.id"), index=True)
+    question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"), index=True)
     region_type: Mapped[str] = mapped_column(String(20))  # bubble | fill | essay
     bbox: Mapped[str] = mapped_column(Text)  # JSON: {x, y, w, h}
     order: Mapped[int] = mapped_column(Integer, default=1)
