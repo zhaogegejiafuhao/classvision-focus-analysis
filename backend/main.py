@@ -28,11 +28,9 @@ from backend.api.question_bank_routes import router as question_bank_router
 from backend.api.material_routes import router as material_router
 from backend.api.grade_routes import router as grade_router
 from backend.api.alert_routes import router as alert_router
-from backend.api.plagiarism_routes import router as plagiarism_router
 from backend.api.teaching_plan_routes import router as teaching_plan_router
 from backend.api.leave_routes import router as leave_router
 from backend.api.experiment_routes import router as experiment_router
-from backend.api.feedback_routes import router as feedback_router
 from backend.api.llm_routes import router as llm_router
 from backend.api.grading_routes import router as grading_router
 from backend.api.attribution_routes import router as attribution_router
@@ -235,11 +233,9 @@ app.include_router(question_bank_router)
 app.include_router(material_router)
 app.include_router(grade_router)
 app.include_router(alert_router)
-app.include_router(plagiarism_router)
 app.include_router(teaching_plan_router)
 app.include_router(leave_router)
 app.include_router(experiment_router)
-app.include_router(feedback_router)
 app.include_router(llm_router)
 app.include_router(grading_router)
 app.include_router(attribution_router)

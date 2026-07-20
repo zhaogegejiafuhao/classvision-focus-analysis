@@ -159,60 +159,6 @@ def get_heatmap(classroom_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/compare")
-def compare_classrooms(
-    classroom_ids: str,  # 逗号分隔的课堂ID，如 "1,2,3"
-    db: Session = Depends(get_db),
-):
-    """多课堂对比数据"""
-    ids = [int(x) for x in classroom_ids.split(",") if x.strip()]
-    if not ids:
-        raise HTTPException(400, "请提供课堂ID")
-
-    classrooms = db.query(Classroom).filter(Classroom.id.in_(ids)).all()
-    if not classrooms:
-        raise HTTPException(404, "课堂不存在")
-
-    result = []
-    for c in classrooms:
-        # 获取每个课堂的学生数和平均注意力
-        student_count = db.query(Student).filter(Student.classroom_id == c.id).count()
-        
-        # 获取详细统计
-        records = db.query(AttentionRecord).filter(AttentionRecord.classroom_id == c.id).all()
-        student_ids = set(r.student_id for r in records)
-        head_down_count = sum(
-            1 for sid in student_ids
-            if any(abs(r.pitch) > 15 for r in records if r.student_id == sid)
-        )
-        fatigue_count = sum(
-            1 for sid in student_ids
-            if any(r.is_blinking for r in records if r.student_id == sid)
-        )
-
-        # 获取老师信息
-        teacher_name = c.teacher
-        if c.teacher_person_id:
-            person = db.query(RegisteredPerson).filter(RegisteredPerson.id == c.teacher_person_id).first()
-            if person:
-                teacher_name = person.name
-
-        result.append({
-            "id": c.id,
-            "name": c.name,
-            "teacher": teacher_name,
-            "duration": c.duration,
-            "avg_attention": round(c.avg_attention, 1),
-            "total_students": student_count,
-            "head_down_count": head_down_count,
-            "fatigue_count": fatigue_count,
-            "exam_mode": c.exam_mode,
-            "started_at": c.started_at.strftime("%Y-%m-%d %H:%M"),
-        })
-
-    return {"classrooms": result}
-
-
 @router.get("/classrooms/{classroom_id}/attendance")
 def get_attendance(classroom_id: int, db: Session = Depends(get_db)):
     """获取课堂出席情况（基于人脸识别匹配）"""
