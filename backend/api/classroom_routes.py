@@ -274,6 +274,25 @@ def join_by_invite_code(
 
     member = ClassroomMember(classroom_id=classroom.id, person_id=current_user.id)
     db.add(member)
+
+    # 同步创建 Student 记录，使 CV 检测能跟踪该学生
+    existing_student = db.query(Student).filter(
+        Student.classroom_id == classroom.id,
+        Student.person_id == current_user.id,
+    ).first()
+    if not existing_student:
+        # 分配一个不冲突的 track_id（取当前课堂最大 track_id + 1）
+        max_track = db.query(func.max(Student.track_id)).filter(
+            Student.classroom_id == classroom.id
+        ).scalar() or 0
+        student = Student(
+            classroom_id=classroom.id,
+            track_id=max_track + 1,
+            person_id=current_user.id,
+            name=current_user.name,
+        )
+        db.add(student)
+
     db.commit()
     db.refresh(member)
     return member
@@ -302,6 +321,24 @@ def join_public_classroom(
 
     member = ClassroomMember(classroom_id=classroom_id, person_id=current_user.id)
     db.add(member)
+
+    # 同步创建 Student 记录
+    existing_student = db.query(Student).filter(
+        Student.classroom_id == classroom_id,
+        Student.person_id == current_user.id,
+    ).first()
+    if not existing_student:
+        max_track = db.query(func.max(Student.track_id)).filter(
+            Student.classroom_id == classroom_id
+        ).scalar() or 0
+        student = Student(
+            classroom_id=classroom_id,
+            track_id=max_track + 1,
+            person_id=current_user.id,
+            name=current_user.name,
+        )
+        db.add(student)
+
     db.commit()
     db.refresh(member)
     return member

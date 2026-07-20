@@ -83,7 +83,11 @@ def get_dashboard(
 
 
 @router.get("/classrooms/{classroom_id}/timeline", response_model=list[TimelinePoint])
-def get_timeline(classroom_id: int, db: Session = Depends(get_db)):
+def get_timeline(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
@@ -111,7 +115,11 @@ def get_timeline(classroom_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/classrooms/{classroom_id}/heatmap")
-def get_heatmap(classroom_id: int, db: Session = Depends(get_db)):
+def get_heatmap(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取学生注意力热力图数据（学生x时间段的注意力矩阵）"""
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
@@ -160,7 +168,11 @@ def get_heatmap(classroom_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/classrooms/{classroom_id}/attendance")
-def get_attendance(classroom_id: int, db: Session = Depends(get_db)):
+def get_attendance(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取课堂出席情况（基于人脸识别匹配）"""
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:

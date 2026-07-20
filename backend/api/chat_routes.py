@@ -256,7 +256,11 @@ async def chat_stream(
 
 
 @router.get("/{classroom_id}/chat/history", response_model=list[ChatMessageOut])
-def get_chat_history(classroom_id: int, db: Session = Depends(get_db)):
+def get_chat_history(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取对话历史"""
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
@@ -268,7 +272,11 @@ def get_chat_history(classroom_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{classroom_id}/chat/export")
-def export_chat_markdown(classroom_id: int, db: Session = Depends(get_db)):
+def export_chat_markdown(
+    classroom_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """导出对话记录为 Markdown 文件"""
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
