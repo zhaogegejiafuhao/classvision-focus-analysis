@@ -59,6 +59,7 @@ const routes = [
       { path: '/mistake-book', name: 'mistake-book', component: () => import('@/views/MistakeBookPage.vue') },
       { path: '/mistake-book/:id', name: 'mistake-detail', component: () => import('@/views/MistakeDetailPage.vue') },
       { path: '/my-similar-questions', name: 'my-similar-questions', component: () => import('@/views/SimilarQuestionListPage.vue') },
+      { path: '/my-similar-questions/:id', name: 'similar-question-practice', component: () => import('@/views/SimilarQuestionPracticePage.vue') },
       { path: '/homework/extensions', name: 'homework-extensions', component: () => import('@/views/HomeworkPage.vue'), meta: { defaultTab: 'extensions' } },
     ]
   },

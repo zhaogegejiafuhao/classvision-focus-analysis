@@ -26,3 +26,10 @@ export function listSimilarQuestions(params = {}) {
 export function getSimilarQuestionDetail(similarId) {
   return api.get(`/similar-questions/${similarId}`)
 }
+
+/** 提交相似题练习答案 */
+export function submitSimilarAnswer(similarId, answerText) {
+  return api.post(`/similar-questions/${similarId}/submit`, {
+    answer_text: answerText,
+  }, { timeout: 120000 })
+}

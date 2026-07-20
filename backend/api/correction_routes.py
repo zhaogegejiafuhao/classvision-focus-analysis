@@ -400,6 +400,19 @@ async def generate_similar_from_mistake(
     standard_answer = homework.description if homework else ""
     knowledge_points = _parse_kp_list(grading.knowledge_points)
 
+    # 知识点标准化：用 ErrorMapper 映射到标准节点 ID
+    knowledge_point_ids = []
+    if knowledge_points:
+        try:
+            from backend.services.attribution import ErrorMapper
+            mapper = ErrorMapper()
+            for kp_text in knowledge_points:
+                ids = await mapper.map_error(kp_text)
+                knowledge_point_ids.extend(ids)
+            knowledge_point_ids = list(set(knowledge_point_ids))  # 去重
+        except Exception as e:
+            logger.warning(f"ErrorMapper 标准化失败: {e}, 使用原始知识点")
+
     # 调用相似题服务
     from backend.services.similar_question import similar_question_service
     generated = await similar_question_service.generate_similar_questions(
@@ -409,6 +422,7 @@ async def generate_similar_from_mistake(
         tier=data.tier,
         count=data.count,
         standard_answer=standard_answer,
+        knowledge_point_ids=knowledge_point_ids,
     )
 
     # 持久化
@@ -423,7 +437,7 @@ async def generate_similar_from_mistake(
             difficulty=q.get("difficulty", "中等"),
             variant_type=q.get("variant_type", "同类变式"),
             tier=data.tier,
-            knowledge_point_ids=json.dumps(knowledge_points, ensure_ascii=False) if knowledge_points else None,
+            knowledge_point_ids=json.dumps(knowledge_point_ids or knowledge_points, ensure_ascii=False) if (knowledge_point_ids or knowledge_points) else None,
             mastery_status="pending",
         )
         db.add(sq)

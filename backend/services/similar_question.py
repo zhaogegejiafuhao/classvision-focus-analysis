@@ -110,16 +110,18 @@ class SimilarQuestionService:
         tier: str = "中等生",
         count: int = 3,
         standard_answer: str = "",
+        knowledge_point_ids: list[str] | None = None,
     ) -> list[dict]:
         """根据分层策略生成相似练习题
 
         Args:
             question: 原题文本
-            knowledge_points: 涉及的知识点列表
+            knowledge_points: 涉及的知识点列表（自由文本）
             error_type: 错因类型
             tier: 学生分层（优等生/中等生/学困生）
             count: 生成题目数量
             standard_answer: 原题标准答案
+            knowledge_point_ids: 标准化知识点节点ID列表（可选，来自ErrorMapper）
 
         Returns:
             list[dict]: 生成的相似题列表，每项包含：
@@ -132,8 +134,10 @@ class SimilarQuestionService:
         # 选择Prompt模板
         prompt_template = self.TIER_PROMPT_MAP.get(tier, SAME_TYPE_PROMPT)
 
-        # 格式化知识点
+        # 格式化知识点（如果有标准ID则同时注入）
         kp_str = "、".join(knowledge_points) if knowledge_points else "综合"
+        if knowledge_point_ids:
+            kp_str += f"（标准知识点：{', '.join(knowledge_point_ids)}）"
 
         # 构建Prompt
         prompt = prompt_template.format(

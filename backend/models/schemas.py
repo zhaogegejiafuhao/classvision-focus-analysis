@@ -600,3 +600,8 @@ class SimilarQuestionListResponse(BaseModel):
     page: int
     page_size: int
     items: list[SimilarQuestionPersisted]
+
+
+class SimilarQuestionSubmitRequest(BaseModel):
+    """相似题练习提交请求"""
+    answer_text: str
