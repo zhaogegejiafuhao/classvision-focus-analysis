@@ -362,7 +362,10 @@ def delete_document(
 
 
 @router.post("/rebuild")
-def rebuild_index(db: Session = Depends(get_db)):
+def rebuild_index(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """从数据库重建索引：补充 document_id 元数据 + 清理已删除向量。
 
     旧索引（无 document_id）需执行一次本接口，后续删除才能生效。
@@ -373,7 +376,11 @@ def rebuild_index(db: Session = Depends(get_db)):
 
 
 @router.get("/documents/{document_id}/chunks")
-def get_document_chunks(document_id: int, db: Session = Depends(get_db)):
+def get_document_chunks(
+    document_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """获取文档的文本块列表，用于预览解析结果"""
     doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
     if not doc:
@@ -473,7 +480,10 @@ def chunk_preview(
 
 
 @router.post("/index/history")
-def index_history_data(db: Session = Depends(get_db)):
+def index_history_data(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """索引历史课堂数据（报告和对话）"""
     # 获取所有报告
     reports = db.query(Report).all()
