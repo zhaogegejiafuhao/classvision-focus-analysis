@@ -129,6 +129,9 @@ def get_problem(
     problem = db.query(OjProblem).filter(OjProblem.id == pid).first()
     if not problem:
         raise HTTPException(404, "题目不存在")
+    # IDOR 防护：教师只能查看自己创建的题目，学生可查看所有（需要做题），管理员可查看所有
+    if current_user.role == "teacher":
+        assert_owner_or_admin(problem.created_by, current_user)
     sample_cases = db.query(OjTestCase).filter(
         OjTestCase.problem_id == pid,
         OjTestCase.is_sample == True,

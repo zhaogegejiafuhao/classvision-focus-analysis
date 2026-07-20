@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, assert_owner_or_admin
 from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework, SimilarQuestion
 from backend.models.schemas import (
     CorrectionSubmitRequest,
@@ -50,9 +50,16 @@ async def submit_correction(
     if not submission:
         raise HTTPException(404, "提交不存在")
 
-    # 从 Homework 表取原题目和标准答案
-    from backend.models.tables import Homework
+    # IDOR 防护：学生只能订正自己的提交，教师只能订正自己作业下的提交，管理员可操作所有
     homework = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+    if current_user.role == "student":
+        if submission.student_id != current_user.id:
+            raise HTTPException(403, "无权订正他人的提交")
+    elif current_user.role == "teacher":
+        if homework and homework.teacher_id != current_user.id:
+            raise HTTPException(403, "无权订正其他教师的作业")
+
+    # 从 Homework 表取原题目和标准答案
     original_question = homework.title if homework else ""
     original_standard = homework.description if homework else ""
 
@@ -144,6 +151,16 @@ def get_correction_comparison(
     if not record:
         raise HTTPException(404, "订正记录不存在")
 
+    # IDOR 防护：验证当前用户有权访问该订正记录
+    submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == record.submission_id).first()
+    if submission:
+        if current_user.role == "student" and submission.student_id != current_user.id:
+            raise HTTPException(403, "无权查看他人的订正记录")
+        if current_user.role == "teacher":
+            homework = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+            if homework and homework.teacher_id != current_user.id:
+                raise HTTPException(403, "无权查看其他教师的订正记录")
+
     return {
         "correction_id": record.id,
         "submission_id": record.submission_id,
@@ -164,6 +181,21 @@ def get_personalized_correction(
     db: Session = Depends(get_db),
 ):
     """获取分层个性化订正任务"""
+    # IDOR 防护：学生只能查看自己的，教师只能查看自己作业下学生的，管理员可查看所有
+    if current_user.role == "student":
+        if student_id != current_user.id:
+            raise HTTPException(403, "学生只能查看自己的个性化订正")
+    elif current_user.role == "teacher":
+        # 教师只能查看自己作业下提交的学生
+        own_student_ids = {
+            s.student_id for s in
+            db.query(HomeworkSubmission).join(Homework, HomeworkSubmission.homework_id == Homework.id)
+            .filter(Homework.teacher_id == current_user.id)
+            .all()
+        }
+        if student_id not in own_student_ids:
+            raise HTTPException(403, "无权查看该学生的个性化订正")
+
     from backend.services.correction import tier_classify, get_push_strategy
     from backend.models.tables import KnowledgeAnalysis
 
@@ -312,6 +344,11 @@ def get_mistake_detail(
     # 学生只能看自己的错题
     if current_user.role == "student" and submission.student_id != current_user.id:
         raise HTTPException(403, "无权访问该错题")
+    # IDOR 防护：教师只能查看自己作业下的错题
+    if current_user.role == "teacher":
+        hw = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+        if hw and hw.teacher_id != current_user.id:
+            raise HTTPException(403, "无权访问其他教师的错题")
 
     homework = (
         db.query(Homework).filter(Homework.id == submission.homework_id).first()
@@ -390,6 +427,11 @@ async def generate_similar_from_mistake(
     # 学生只能给自己的错题生成
     if current_user.role == "student" and submission.student_id != current_user.id:
         raise HTTPException(403, "无权操作该错题")
+    # IDOR 防护：教师只能给自己作业下的错题生成相似题
+    if current_user.role == "teacher":
+        hw = db.query(Homework).filter(Homework.id == submission.homework_id).first()
+        if hw and hw.teacher_id != current_user.id:
+            raise HTTPException(403, "无权操作其他教师的错题")
 
     # 确定目标学生
     target_student_id = submission.student_id or current_user.id

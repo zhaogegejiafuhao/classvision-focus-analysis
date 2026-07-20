@@ -385,6 +385,10 @@ def get_document_chunks(
     doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == document_id).first()
     if not doc:
         raise HTTPException(404, "文档不存在")
+    # 可见性校验：非管理员必须对文档有可见权限
+    visible_ids = _visible_doc_ids(db, current_user)
+    if document_id not in visible_ids:
+        raise HTTPException(403, "无权访问该文档")
     chunks = db.query(KnowledgeChunk).filter(
         KnowledgeChunk.document_id == document_id
     ).order_by(KnowledgeChunk.chunk_index).all()

@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
@@ -12,7 +12,7 @@ from backend.models.tables import (
     Homework, HomeworkSubmission,
     Exam, ExamSubmission,
     Attendance, CheckinSession,
-    Notification,
+    Notification, ClassroomMember,
 )
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
@@ -27,11 +27,36 @@ def get_alerts(
     """获取教学预警列表"""
     alerts = []
 
-    # 确定查询范围
+    # 确定查询范围（按角色校验课堂归属）
     if classroom_id:
+        # 指定课堂时，校验用户是否有权访问该课堂
+        if current_user.role == "student":
+            member = db.query(ClassroomMember).filter(
+                ClassroomMember.classroom_id == classroom_id,
+                ClassroomMember.person_id == current_user.id,
+            ).first()
+            if not member:
+                raise HTTPException(403, "无权访问该课堂的告警")
+        elif current_user.role == "teacher":
+            cr = db.query(Classroom).filter(
+                Classroom.id == classroom_id,
+                Classroom.teacher_person_id == current_user.id,
+            ).first()
+            if not cr:
+                raise HTTPException(403, "无权访问该课堂的告警")
         classrooms = db.query(Classroom).filter(Classroom.id == classroom_id).all()
     elif current_user.role == "teacher":
         classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).all()
+    elif current_user.role == "student":
+        # 学生只能看自己所在课堂的告警
+        my_classroom_ids = {
+            m.classroom_id for m in
+            db.query(ClassroomMember).filter(ClassroomMember.person_id == current_user.id).all()
+        }
+        if my_classroom_ids:
+            classrooms = db.query(Classroom).filter(Classroom.id.in_(my_classroom_ids)).all()
+        else:
+            classrooms = []
     else:
         classrooms = db.query(Classroom).limit(20).all()
 

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import TeachingPlan, RegisteredPerson
+from backend.models.tables import TeachingPlan, RegisteredPerson, Classroom, ClassroomMember
 
 router = APIRouter(prefix="/api/teaching-plans", tags=["teaching-plans"])
 
@@ -41,7 +41,29 @@ def list_plans(
     query = db.query(TeachingPlan)
     if current_user.role == "teacher":
         query = query.filter(TeachingPlan.teacher_id == current_user.id)
+    elif current_user.role == "student":
+        # 学生只能看到自己所在课堂的教学计划
+        my_classroom_ids = {
+            m.classroom_id for m in
+            db.query(ClassroomMember).filter(ClassroomMember.person_id == current_user.id).all()
+        }
+        if my_classroom_ids:
+            query = query.filter(TeachingPlan.classroom_id.in_(my_classroom_ids))
+        else:
+            query = query.filter(TeachingPlan.teacher_id == -1)  # 无课堂，返回空
     if classroom_id:
+        # 校验用户是否有权访问该课堂
+        if current_user.role == "student":
+            my_classroom_ids = {
+                m.classroom_id for m in
+                db.query(ClassroomMember).filter(ClassroomMember.person_id == current_user.id).all()
+            }
+            if classroom_id not in my_classroom_ids:
+                raise HTTPException(403, "无权访问该课堂的教学计划")
+        elif current_user.role == "teacher":
+            cr = db.query(Classroom).filter(Classroom.id == classroom_id, Classroom.teacher_person_id == current_user.id).first()
+            if not cr:
+                raise HTTPException(403, "无权访问该课堂的教学计划")
         query = query.filter(TeachingPlan.classroom_id == classroom_id)
     query = query.order_by(TeachingPlan.updated_at.desc())
 

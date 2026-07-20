@@ -142,6 +142,11 @@ def get_person(
     person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
     if not person:
         raise HTTPException(404, "人员不存在")
+
+    # 权限校验：学生只能查看自己，教师可查看任何人，管理员可查看任何人
+    if current_user.role == "student" and current_user.id != person_id:
+        raise HTTPException(403, "无权查看该人员信息")
+
     return person
 
 
@@ -152,7 +157,7 @@ def update_person(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """编辑人员信息（admin 可编辑所有，teacher 只能编辑学生）"""
+    """编辑人员信息（admin 可编辑所有，teacher 只能编辑自己课堂的学生，student 只能编辑自己）"""
     person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
     if not person:
         raise HTTPException(404, "人员不存在")
@@ -160,7 +165,19 @@ def update_person(
     if current_user.role == "admin":
         pass
     elif current_user.role == "teacher" and person.role == "student":
-        pass
+        # 教师只能编辑自己课堂的学生
+        is_my_student = db.query(Student).join(
+            Classroom, Student.classroom_id == Classroom.id
+        ).filter(
+            Classroom.teacher_person_id == current_user.id,
+            Student.person_id == person_id,
+        ).first() is not None
+        if not is_my_student:
+            raise HTTPException(403, "只能编辑自己课堂的学生")
+    elif current_user.role == "student" and current_user.id == person_id:
+        # 学生只能编辑自己（且不能改角色）
+        if data.role is not None and data.role != person.role:
+            raise HTTPException(403, "不能修改自己的角色")
     else:
         raise HTTPException(403, "无权编辑该人员")
 
@@ -188,7 +205,7 @@ def delete_person(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """删除已注册人员（admin 可删除所有，teacher 只能删除学生）"""
+    """删除已注册人员（admin 可删除所有，teacher 只能删除自己课堂的学生）"""
     person = db.query(RegisteredPerson).filter(RegisteredPerson.id == person_id).first()
     if not person:
         raise HTTPException(404, "人员不存在")
@@ -196,7 +213,15 @@ def delete_person(
     if current_user.role == "admin":
         pass
     elif current_user.role == "teacher" and person.role == "student":
-        pass
+        # 教师只能删除自己课堂的学生
+        is_my_student = db.query(Student).join(
+            Classroom, Student.classroom_id == Classroom.id
+        ).filter(
+            Classroom.teacher_person_id == current_user.id,
+            Student.person_id == person_id,
+        ).first() is not None
+        if not is_my_student:
+            raise HTTPException(403, "只能删除自己课堂的学生")
     else:
         raise HTTPException(403, "无权删除该人员")
 
@@ -218,6 +243,7 @@ def match_face_in_frame(
     image_data: str,  # Base64编码的图像
     role: str = None,  # 可选，只匹配特定角色
     threshold: float = 0.5,
+    current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -271,6 +297,7 @@ def batch_match_faces(
     image_data: str,  # Base64编码的图像
     role: str = "student",
     threshold: float = 0.5,
+    current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """

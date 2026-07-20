@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import CourseMaterial, RegisteredPerson
+from backend.models.tables import CourseMaterial, RegisteredPerson, Classroom, Student
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
@@ -105,6 +105,20 @@ def download_material(
     material = db.query(CourseMaterial).filter(CourseMaterial.id == material_id).first()
     if not material:
         raise HTTPException(404, "课件不存在")
+
+    # 校验课堂访问权限
+    if material.classroom_id:
+        classroom = db.query(Classroom).filter(Classroom.id == material.classroom_id).first()
+        if classroom:
+            if current_user.role == "student":
+                is_member = db.query(Student).filter(
+                    Student.classroom_id == material.classroom_id,
+                    Student.person_id == current_user.id,
+                ).first() is not None
+                if not is_member:
+                    raise HTTPException(403, "无权下载该课件")
+            elif current_user.role == "teacher" and classroom.teacher_person_id != current_user.id:
+                raise HTTPException(403, "无权下载该课件")
 
     if not os.path.exists(material.file_path):
         raise HTTPException(404, "文件不存在")

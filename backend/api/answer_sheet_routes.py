@@ -15,10 +15,11 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, assert_owner_or_admin
 from backend.models.tables import RegisteredPerson, Exam, Question
 from backend.services.answer_sheet import answer_sheet_orchestrator
 from backend.services.paper_template import paper_template_service
@@ -49,6 +50,12 @@ async def scan_paper(
     """
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可调用此接口")
+
+    # 校验考试存在且属于当前教师
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
 
     # 读取图片
     image_bytes = await file.read()
@@ -209,6 +216,12 @@ def get_template(
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可查看模板")
 
+    # 校验考试归属
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
+
     template_info = paper_template_service.get_template(db, exam_id)
     if not template_info:
         raise HTTPException(404, f"考试 {exam_id} 未配置试卷模板")
@@ -232,6 +245,12 @@ def delete_template(
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可删除模板")
 
+    # 校验考试归属
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
+
     success = paper_template_service.delete_template(db, exam_id)
     if not success:
         raise HTTPException(404, f"考试 {exam_id} 未配置试卷模板")
@@ -250,6 +269,17 @@ def update_region(
     """更新某题区域坐标"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可更新区域")
+
+    # 通过 region → template → exam 校验归属
+    from backend.models.tables import PaperTemplate, QuestionRegion
+    region = db.query(QuestionRegion).filter(QuestionRegion.id == region_id).first()
+    if not region:
+        raise HTTPException(404, f"区域 {region_id} 不存在")
+    template = db.query(PaperTemplate).filter(PaperTemplate.id == region.template_id).first()
+    if template:
+        exam = db.query(Exam).filter(Exam.id == template.exam_id).first()
+        if exam:
+            assert_owner_or_admin(exam.teacher_id, current_user)
 
     success = paper_template_service.update_region(db, region_id, bbox, region_type)
     if not success:
@@ -497,6 +527,12 @@ def batch_update_regions(
     if not template:
         raise HTTPException(404, f"考试 {exam_id} 未配置试卷模板")
 
+    # 校验考试归属
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
+
     # 解析 regions_json
     try:
         regions = json.loads(regions_json)
@@ -646,10 +682,11 @@ async def scan_batch(
             f"文件数 ({len(files)}) 与学生数 ({len(sid_list)}) 不一致"
         )
 
-    # 校验考试存在
+    # 校验考试存在 + 归属
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
 
     # 预加载学生姓名（避免循环内反复查询）
     from backend.models.tables import RegisteredPerson as _RP
@@ -776,19 +813,28 @@ def list_exams_for_scan(
         query = query.filter(Exam.teacher_id == current_user.id)
     exams = query.order_by(Exam.created_at.desc()).all()
 
-    # 检查每个考试是否已配置模板
+    # 批量查询模板配置状态和题目数量（避免 N+1）
     from backend.models.tables import PaperTemplate
+    exam_ids = [e.id for e in exams]
+    template_exam_ids = {
+        row.exam_id for row in
+        db.query(PaperTemplate.exam_id).filter(PaperTemplate.exam_id.in_(exam_ids)).all()
+    } if exam_ids else set()
+    question_counts = dict(
+        db.query(Question.exam_id, sa_func.count(Question.id))
+        .filter(Question.exam_id.in_(exam_ids))
+        .group_by(Question.exam_id).all()
+    ) if exam_ids else {}
+
     result = []
     for e in exams:
-        has_template = db.query(PaperTemplate).filter(PaperTemplate.exam_id == e.id).first() is not None
-        question_count = db.query(Question).filter(Question.exam_id == e.id).count()
         result.append({
             "id": e.id,
             "title": e.title,
             "status": e.status,
             "total_score": e.total_score,
-            "question_count": question_count,
-            "has_template": has_template,
+            "question_count": question_counts.get(e.id, 0),
+            "has_template": e.id in template_exam_ids,
             "created_at": e.created_at.isoformat() if e.created_at else None,
         })
 
@@ -804,6 +850,12 @@ def list_exam_questions(
     """获取考试的题目列表（用于模板编辑器中选择题号）"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可调用")
+
+    # 校验考试归属
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(404, f"考试 {exam_id} 不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
 
     questions = db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order).all()
     return [
@@ -1701,6 +1753,15 @@ def export_excel_report(
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "仅教师/管理员可导出报告")
 
+    # 校验提交归属（通过 submission → exam → teacher）
+    from backend.models.tables import ExamSubmission
+    submission = db.query(ExamSubmission).filter(ExamSubmission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(404, f"提交 {submission_id} 不存在")
+    exam = db.query(Exam).filter(Exam.id == submission.exam_id).first()
+    if exam:
+        assert_owner_or_admin(exam.teacher_id, current_user)
+
     wb, student_name, exam_title, filename = _build_excel_workbook(db, submission_id)
 
     # 保存到内存
@@ -1750,15 +1811,20 @@ def export_excel_batch(
     if len(sid_list) > 100:
         raise HTTPException(400, f"单批最多导出 100 份报告，当前 {len(sid_list)} 份")
 
-    # 校验所有 submission 存在（避免中途失败）
-    existing_ids = {
-        s.id for s in db.query(ExamSubmission.id).filter(
-            ExamSubmission.id.in_(sid_list)
-        ).all()
-    }
-    missing = [sid for sid in sid_list if sid not in existing_ids]
+    # 校验所有 submission 存在 + 归属当前教师
+    submissions = db.query(ExamSubmission).filter(ExamSubmission.id.in_(sid_list)).all()
+    sub_map = {s.id: s for s in submissions}
+    missing = [sid for sid in sid_list if sid not in sub_map]
     if missing:
         raise HTTPException(404, f"以下 submission 不存在: {missing[:10]}{'...' if len(missing) > 10 else ''}")
+
+    # 校验每个 submission 的考试归属
+    exam_ids = list(set(s.exam_id for s in submissions))
+    exam_map = {e.id: e for e in db.query(Exam).filter(Exam.id.in_(exam_ids)).all()} if exam_ids else {}
+    for sub in submissions:
+        exam = exam_map.get(sub.exam_id)
+        if exam:
+            assert_owner_or_admin(exam.teacher_id, current_user)
 
     # 逐个生成 Excel 并打包成 ZIP
     zip_buf = io.BytesIO()

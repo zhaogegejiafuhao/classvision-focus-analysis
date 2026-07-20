@@ -7,11 +7,37 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import RegisteredPerson, SimilarQuestion
+from backend.models.tables import RegisteredPerson, SimilarQuestion, Classroom, Student
 from backend.models.schemas import SimilarQuestionRequest, SimilarQuestionResponse, SimilarQuestionSubmitRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/similar-questions", tags=["similar-questions"])
+
+
+def _assert_can_access_student(current_user: RegisteredPerson, student_id: int, db: Session) -> None:
+    """校验当前用户是否有权访问指定学生的数据。
+
+    - admin：始终通过
+    - student：仅能访问自己
+    - teacher：学生必须在自己的课堂中
+    """
+    if current_user.role == "admin":
+        return
+    if current_user.role == "student":
+        if student_id != current_user.id:
+            raise HTTPException(403, "无权访问该学生的数据")
+        return
+    # teacher：学生必须在该教师所辖课堂中
+    my_classroom_ids = {c.id for c in db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).all()}
+    if not my_classroom_ids:
+        raise HTTPException(403, "无权访问该学生的数据")
+    student_in_my_class = (
+        db.query(Student)
+        .filter(Student.person_id == student_id, Student.classroom_id.in_(my_classroom_ids))
+        .first()
+    )
+    if not student_in_my_class:
+        raise HTTPException(403, "无权访问该学生的数据")
 
 
 @router.post("/generate", response_model=SimilarQuestionResponse)
@@ -48,15 +74,33 @@ def list_similar_questions(
     """已持久化相似题列表
 
     - 学生角色：只能看自己的
-    - 教师/管理员：可通过 student_id 指定学生
+    - 教师：可通过 student_id 指定本课堂学生，否则返回本课堂所有学生
+    - 管理员：可查看任意
     - status: pending/passed/failed，不传则返回全部
     """
     if current_user.role == "student":
         target_student_id = current_user.id
+    elif current_user.role == "teacher":
+        # 教师指定了 student_id，需校验该学生属于自己课堂
+        if student_id is not None:
+            _assert_can_access_student(current_user, student_id, db)
+            target_student_id = student_id
+        else:
+            target_student_id = None  # 稍后用课堂过滤
     else:
         target_student_id = student_id or current_user.id
 
-    query = db.query(SimilarQuestion).filter(SimilarQuestion.student_id == target_student_id)
+    query = db.query(SimilarQuestion)
+    if target_student_id is not None:
+        query = query.filter(SimilarQuestion.student_id == target_student_id)
+    elif current_user.role == "teacher":
+        # 教师未指定 student_id：只显示本课堂学生的相似题
+        my_classroom_ids = {c.id for c in db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).all()}
+        my_student_ids = {s.person_id for s in db.query(Student).filter(Student.classroom_id.in_(my_classroom_ids)).all() if s.person_id}
+        if my_student_ids:
+            query = query.filter(SimilarQuestion.student_id.in_(my_student_ids))
+        else:
+            query = query.filter(SimilarQuestion.student_id == -1)  # 无学生，返回空
 
     if status:
         query = query.filter(SimilarQuestion.mastery_status == status)
@@ -109,8 +153,8 @@ async def submit_similar_answer(
     if not sq:
         raise HTTPException(404, "相似题不存在")
 
-    if current_user.role == "student" and sq.student_id != current_user.id:
-        raise HTTPException(403, "无权操作该相似题")
+    # 归属校验：学生仅操作自己的，教师仅操作本课堂学生的
+    _assert_can_access_student(current_user, sq.student_id, db)
 
     if not data.answer_text.strip():
         raise HTTPException(400, "答案不能为空")
@@ -185,8 +229,8 @@ def get_similar_question(
     if not sq:
         raise HTTPException(404, "相似题不存在")
 
-    if current_user.role == "student" and sq.student_id != current_user.id:
-        raise HTTPException(403, "无权访问该相似题")
+    # 归属校验：学生仅访问自己的，教师仅访问本课堂学生的
+    _assert_can_access_student(current_user, sq.student_id, db)
 
     rubric = None
     if sq.rubric_suggestion:

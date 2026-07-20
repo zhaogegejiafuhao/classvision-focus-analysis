@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, assert_owner_or_admin
 from backend.models.tables import (
     GradeConfig, Classroom, Student, RegisteredPerson,
     Homework, HomeworkSubmission, Exam, ExamSubmission, Attendance, CheckinSession,
@@ -29,6 +29,19 @@ def get_grade_config(
     db: Session = Depends(get_db),
 ):
     """获取成绩权重配置"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    # 学生必须是课堂成员
+    if current_user.role == "student":
+        is_member = db.query(Student).filter(
+            Student.classroom_id == classroom_id, Student.person_id == current_user.id
+        ).first() is not None
+        if not is_member:
+            raise HTTPException(403, "无权访问该课堂")
+    elif current_user.role == "teacher" and classroom.teacher_person_id != current_user.id:
+        raise HTTPException(403, "无权访问该课堂")
+
     config = db.query(GradeConfig).filter(GradeConfig.classroom_id == classroom_id).first()
     if not config:
         # 返回默认配置
@@ -58,6 +71,10 @@ def save_grade_config(
     """保存成绩权重配置"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "只有教师可以配置成绩权重")
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    assert_owner_or_admin(classroom.teacher_person_id, current_user)
 
     # 验证权重之和为1
     total = data.homework_weight + data.exam_weight + data.attendance_weight + data.usual_weight
@@ -90,6 +107,19 @@ def get_grade_report(
     db: Session = Depends(get_db),
 ):
     """获取课堂综合成绩报告"""
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    # 学生必须是课堂成员
+    if current_user.role == "student":
+        is_member = db.query(Student).filter(
+            Student.classroom_id == classroom_id, Student.person_id == current_user.id
+        ).first() is not None
+        if not is_member:
+            raise HTTPException(403, "无权访问该课堂")
+    elif current_user.role == "teacher" and classroom.teacher_person_id != current_user.id:
+        raise HTTPException(403, "无权访问该课堂")
+
     # 获取权重配置
     config = db.query(GradeConfig).filter(GradeConfig.classroom_id == classroom_id).first()
     if not config:
@@ -187,6 +217,10 @@ def update_usual_score(
     """更新学生平时分（简化实现：存储在内存，实际应持久化）"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "只有教师可以修改平时分")
+    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if not classroom:
+        raise HTTPException(404, "课堂不存在")
+    assert_owner_or_admin(classroom.teacher_person_id, current_user)
     if score < 0 or score > 100:
         raise HTTPException(400, "平时分应在0-100之间")
     # 实际项目中应存储到数据库，这里简化返回

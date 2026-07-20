@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, assert_teacher_or_admin
 from backend.models.tables import RegisteredPerson, GradingResult, KnowledgeAnalysis, HomeworkSubmission, Student, Classroom
 from backend.models.schemas import KnowledgeAnalysisRequest, KnowledgeAnalysisResponse
 from backend.services.attribution import (
@@ -174,6 +174,10 @@ def get_student_report(
     db: Session = Depends(get_db),
 ):
     """获取学生学情报告"""
+    # 权限校验：学生只能查看自己，教师/管理员可查看任意
+    if current_user.role == "student" and current_user.id != student_id:
+        raise HTTPException(403, "无权查看他人学情报告")
+
     analyses = db.query(KnowledgeAnalysis).filter(
         KnowledgeAnalysis.student_id == student_id
     ).order_by(KnowledgeAnalysis.created_at.desc()).all()
@@ -204,6 +208,10 @@ def get_radar_data(
     db: Session = Depends(get_db),
 ):
     """获取雷达图数据"""
+    # 权限校验：学生只能查看自己
+    if current_user.role == "student" and current_user.id != student_id:
+        raise HTTPException(403, "无权查看他人雷达图数据")
+
     analysis = db.query(KnowledgeAnalysis).filter(
         KnowledgeAnalysis.student_id == student_id,
         KnowledgeAnalysis.analysis_type == analysis_type,
@@ -273,6 +281,8 @@ def list_students_for_analysis(
 
     students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+    if classroom and current_user.role == "teacher" and classroom.teacher_person_id != current_user.id:
+        raise HTTPException(403, "只能查看自己课堂的学生")
     return {
         "classroom_id": classroom_id,
         "classroom_name": classroom.name if classroom else "",

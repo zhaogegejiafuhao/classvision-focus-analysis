@@ -12,6 +12,7 @@ from sqlalchemy import func
 from backend.core.database import get_db
 from backend.core.config import settings
 from backend.core.security import get_current_user
+from backend.api.stats_routes import _assert_classroom_access
 from backend.models.tables import Classroom, ChatMessage, Report, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson
 from backend.models.schemas import ChatRequest, ChatMessageOut
 from backend.services.llm_client import get_llm, LLMError
@@ -123,6 +124,7 @@ def send_chat(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+    _assert_classroom_access(classroom, current_user, db)
 
     # 保存用户消息
     user_msg = ChatMessage(
@@ -195,6 +197,7 @@ async def chat_stream(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+    _assert_classroom_access(classroom, current_user, db)
 
     # 保存用户消息
     user_msg = ChatMessage(classroom_id=classroom_id, role="user", content=data.content)
@@ -265,6 +268,7 @@ def get_chat_history(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+    _assert_classroom_access(classroom, current_user, db)
 
     return db.query(ChatMessage).filter(
         ChatMessage.classroom_id == classroom_id
@@ -281,6 +285,7 @@ def export_chat_markdown(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
+    _assert_classroom_access(classroom, current_user, db)
 
     messages = db.query(ChatMessage).filter(
         ChatMessage.classroom_id == classroom_id
