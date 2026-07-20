@@ -220,6 +220,26 @@ def end_classroom(
 # ===================== 课堂加入相关端点 =====================
 
 
+@router.get("/my", response_model=list[MyClassroomOut])
+def list_my_classrooms(
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取当前用户已加入的课堂列表（基于 ClassroomMember 表）"""
+    member_rows = (
+        db.query(ClassroomMember.classroom_id)
+        .filter(ClassroomMember.person_id == current_user.id)
+        .subquery()
+    )
+    classrooms = (
+        db.query(Classroom)
+        .filter(Classroom.id.in_(member_rows))
+        .order_by(Classroom.started_at.desc())
+        .all()
+    )
+    return classrooms
+
+
 @router.get("/public", response_model=list[PublicClassroomOut])
 def list_public_classrooms(
     search: str | None = None,

@@ -46,7 +46,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/api'
 
 const router = useRouter()
 const form = ref({ name: '', teacher: '', teacher_person_id: null, course_code: '' })
@@ -59,7 +59,7 @@ const teacherOptions = computed(() =>
 
 async function loadTeachers() {
   try {
-    const res = await axios.get('/api/persons', { params: { role: 'teacher' } })
+    const res = await api.get('/persons', { params: { role: 'teacher' } })
     teachers.value = res.data || []
   } catch {
     teachers.value = []
@@ -69,7 +69,7 @@ async function loadTeachers() {
 async function startClass() {
   loading.value = true
   try {
-    const res = await axios.post('/api/classrooms', form.value)
+    const res = await api.post('/classrooms', form.value)
     router.push(`/live/${res.data.id}`)
   } finally {
     loading.value = false

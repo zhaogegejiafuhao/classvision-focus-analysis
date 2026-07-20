@@ -222,18 +222,15 @@ async function handleExcelUpload(file) {
   const formData = new FormData()
   formData.append('file', file)
   try {
-    const token = localStorage.getItem('token') || ''
-    const res = await fetch(`/api/import/excel?role=${activeRole.value}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
+    const res = await api.post(`/import/excel?role=${activeRole.value}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
-    importResult.value = await res.json()
+    importResult.value = res.data
     resultOpen.value = true
     await loadPersons()
     await loadDepartments()
   } catch (e) {
-    message.error('导入失败: ' + e.message)
+    message.error('导入失败: ' + (e.response?.data?.detail || e.message))
   } finally {
     importLoading.value = false
   }

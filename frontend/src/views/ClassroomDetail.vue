@@ -256,31 +256,6 @@
                 </a-list>
                 <a-empty v-if="classMaterials.length === 0 && !materialLoading" description="暂无课件" />
               </a-tab-pane>
-              <a-tab-pane key="feedback" tab="课堂评价">
-                <div style="margin-bottom: 12px">
-                  <a-button v-if="userStore.role === 'student'" type="primary" size="small" @click="showFeedbackModal = true">评价课堂</a-button>
-                  <a-button v-if="userStore.role === 'teacher'" type="primary" size="small" @click="fetchFeedback">查看评价</a-button>
-                </div>
-                <div v-if="feedbackSummary" style="margin-bottom: 16px">
-                  <a-statistic title="平均评分" :value="feedbackSummary.avg_rating" suffix="/5" :precision="2" />
-                  <div style="display: flex; gap: 8px; margin-top: 8px">
-                    <span v-for="i in 5" :key="i">{{ i }}星: {{ feedbackSummary.distribution?.[String(i)] || 0 }}人</span>
-                  </div>
-                </div>
-                <a-list :data-source="feedbacks" size="small">
-                  <template #renderItem="{ item }">
-                    <a-list-item>
-                      <a-list-item-meta>
-                        <template #title>{{ item.student_name }} - {{ '★'.repeat(item.rating) }}</template>
-                        <template #description>{{ item.content || '无评价内容' }}</template>
-                      </a-list-item-meta>
-                      <template #actions>
-                        <span style="color: #999; font-size: 12px">{{ new Date(item.created_at).toLocaleDateString() }}</span>
-                      </template>
-                    </a-list-item>
-                  </template>
-                </a-list>
-              </a-tab-pane>
             </a-tabs>
           </a-card>
         </template>
@@ -308,18 +283,6 @@
             ]" row-key="id" size="small" />
           </a-tab-pane>
         </a-tabs>
-      </a-modal>
-
-      <!-- 评价弹窗 -->
-      <a-modal v-model:open="showFeedbackModal" title="评价课堂" @ok="submitFeedback" :confirm-loading="feedbackSubmitting">
-        <a-form layout="vertical">
-          <a-form-item label="评分" required>
-            <a-rate v-model:value="feedbackForm.rating" />
-          </a-form-item>
-          <a-form-item label="评价内容">
-            <a-textarea v-model:value="feedbackForm.content" :rows="3" placeholder="请输入评价内容..." />
-          </a-form-item>
-        </a-form>
       </a-modal>
 
       <!-- 编辑课堂弹窗 -->
@@ -463,11 +426,6 @@ const examLoading = ref(false)
 const checkinLoading = ref(false)
 const classMaterials = ref([])
 const materialLoading = ref(false)
-const feedbacks = ref([])
-const feedbackSummary = ref(null)
-const showFeedbackModal = ref(false)
-const feedbackSubmitting = ref(false)
-const feedbackForm = ref({ rating: 5, content: '' })
 
 const hwColumns = [
   { key: 'title', title: '标题', dataIndex: 'title' },
@@ -1036,39 +994,6 @@ function formatFileSize(bytes) {
 
 function downloadMaterial(record) {
   window.open(`/api/materials/${record.id}/download`, '_blank')
-}
-
-async function fetchFeedback() {
-  try {
-    const [listRes, sumRes] = await Promise.all([
-      api.get(`/feedback/${classroomId}`),
-      api.get(`/feedback/${classroomId}/summary`),
-    ])
-    feedbacks.value = listRes.data
-    feedbackSummary.value = sumRes.data
-  } catch (e) {
-    message.error('获取评价失败')
-  }
-}
-
-async function submitFeedback() {
-  if (!feedbackForm.value.rating) { message.warning('请选择评分'); return }
-  feedbackSubmitting.value = true
-  try {
-    await api.post('/feedback', {
-      classroom_id: parseInt(classroomId),
-      rating: feedbackForm.value.rating,
-      content: feedbackForm.value.content,
-    })
-    message.success('评价已提交')
-    showFeedbackModal.value = false
-    feedbackForm.value = { rating: 5, content: '' }
-    fetchFeedback()
-  } catch (e) {
-    message.error('提交失败')
-  } finally {
-    feedbackSubmitting.value = false
-  }
 }
 
     try {

@@ -284,6 +284,7 @@
 import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import api from '@/api'
 
 import {
   HomeOutlined,
@@ -343,23 +344,15 @@ async function handleStartClass() {
   }
   startClassLoading.value = true
   try {
-    const res = await fetch('/api/classrooms', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-      body: JSON.stringify({
-        name: startClassForm.value.name,
-        teacher: userStore.displayName,
-        course_code: startClassForm.value.course_code,
-        is_public: true,
-      }),
+    const res = await api.post('/classrooms', {
+      name: startClassForm.value.name,
+      teacher: userStore.displayName,
+      course_code: startClassForm.value.course_code,
+      is_public: true,
     })
-    const data = await res.json()
-    if (data.id) {
+    if (res.data.id) {
       showStartClassModal.value = false
-      router.push(`/live/${data.id}`)
+      router.push(`/live/${res.data.id}`)
     }
   } catch (e) {
     console.error('创建课堂失败', e)
@@ -391,13 +384,8 @@ async function fetchUnreadCount() {
   try {
     const token = userStore.token || localStorage.getItem('token')
     if (!token) return
-    const resp = await fetch('/api/notifications/unread-count', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (resp.ok) {
-      const data = await resp.json()
-      unreadCount.value = data.unread_count
-    }
+    const { data } = await api.get('/notifications/unread-count')
+    unreadCount.value = data.unread_count
   } catch (e) {
     // 忽略错误
   }

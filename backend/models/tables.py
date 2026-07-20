@@ -525,21 +525,6 @@ class GradeConfig(Base):
     classroom: Mapped["Classroom"] = relationship()
 
 
-class GradingHistory(Base):
-    """批改历史记录"""
-    __tablename__ = "grading_history"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    submission_id: Mapped[int] = mapped_column(Integer)  # homework_submission或exam_submission的id
-    submission_type: Mapped[str] = mapped_column(String(20))  # homework/exam
-    grader_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    score: Mapped[float] = mapped_column(Float)
-    feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-
-    grader: Mapped["RegisteredPerson"] = relationship()
-
-
 class AnswerRegradeHistory(Base):
     """答题重批改历史记录（大题 LLM 重批改 + 人工补录统一审计）
 
@@ -649,21 +634,6 @@ class LeaveRequest(Base):
 
     student: Mapped["RegisteredPerson"] = relationship()
     classroom: Mapped["Classroom"] = relationship()
-
-
-class ClassroomFeedback(Base):
-    """课堂评价"""
-    __tablename__ = "classroom_feedback"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"))
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
-    rating: Mapped[int] = mapped_column(Integer)  # 1-5
-    content: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-
-    classroom: Mapped["Classroom"] = relationship()
-    student: Mapped["RegisteredPerson"] = relationship()
 
 
 class Experiment(Base):
