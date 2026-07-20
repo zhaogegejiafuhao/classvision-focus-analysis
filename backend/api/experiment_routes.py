@@ -113,6 +113,12 @@ def create_experiment(
     """创建实验项目"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "只有教师可以创建实验")
+    
+    # 权限检查：教师只能为自己创建的课堂创建实验
+    if data.classroom_id and current_user.role == "teacher":
+        classroom = db.query(Classroom).filter(Classroom.id == data.classroom_id).first()
+        if not classroom or classroom.teacher_person_id != current_user.id:
+            raise HTTPException(403, "只能为自己创建的课堂创建实验")
 
     exp = Experiment(
         teacher_id=current_user.id,
@@ -147,6 +153,15 @@ def get_experiment(
     exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not exp:
         raise HTTPException(404, "实验不存在")
+    
+    # 权限检查
+    if current_user.role == "teacher":
+        if exp.teacher_id != current_user.id and current_user.role != "admin":
+            raise HTTPException(403, "无权查看此实验")
+    elif current_user.role == "student":
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        if not student or (exp.classroom_id and student.classroom_id != exp.classroom_id):
+            raise HTTPException(403, "无权查看此实验")
 
     return ExperimentOut(
         id=exp.id, title=exp.title, description=exp.description,
@@ -170,6 +185,8 @@ def delete_experiment(
         raise HTTPException(404, "实验不存在")
     if exp.teacher_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权删除")
+    # 级联删除实验报告
+    db.query(ExperimentReport).filter(ExperimentReport.experiment_id == experiment_id).delete()
     db.delete(exp)
     db.commit()
     return {"success": True}
@@ -185,9 +202,18 @@ def list_reports(
     exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not exp:
         raise HTTPException(404, "实验不存在")
+    
+    # 权限检查：教师只能看自己实验的报告
+    if current_user.role == "teacher" and exp.teacher_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(403, "无权查看此实验报告")
+    
+    query = db.query(ExperimentReport).filter(ExperimentReport.experiment_id == experiment_id)
+    # 学生只能看自己的报告
+    if current_user.role == "student":
+        query = query.filter(ExperimentReport.student_id == current_user.id)
 
     result = []
-    for rep in exp.reports:
+    for rep in query.all():
         result.append(ReportOut(
             id=rep.id, experiment_id=rep.experiment_id,
             student_id=rep.student_id, student_name=rep.student.name,
@@ -210,6 +236,12 @@ async def submit_report(
     exp = db.query(Experiment).filter(Experiment.id == experiment_id).first()
     if not exp:
         raise HTTPException(404, "实验不存在")
+    
+    # 权限检查：学生只能提交自己课堂的实验
+    if current_user.role == "student":
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        if not student or (exp.classroom_id and student.classroom_id != exp.classroom_id):
+            raise HTTPException(403, "无权提交此实验报告")
 
     file_path = None
     file_name = None
@@ -324,6 +356,15 @@ def download_report(
     report = db.query(ExperimentReport).filter(ExperimentReport.id == report_id).first()
     if not report:
         raise HTTPException(404, "报告不存在")
+    
+    # 权限检查：教师只能下载自己实验的报告，学生只能下载自己的报告
+    if current_user.role == "teacher":
+        if report.experiment.teacher_id != current_user.id and current_user.role != "admin":
+            raise HTTPException(403, "无权下载此报告")
+    elif current_user.role == "student":
+        if report.student_id != current_user.id:
+            raise HTTPException(403, "无权下载此报告")
+    
     if not report.file_path or not os.path.exists(report.file_path):
         raise HTTPException(404, "文件不存在")
 

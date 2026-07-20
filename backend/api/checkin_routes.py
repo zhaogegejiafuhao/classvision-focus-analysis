@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
 from backend.core.database import get_db
@@ -76,6 +76,10 @@ def create_session(
     if not classroom:
         raise HTTPException(404, "课堂不存在")
     
+    # 权限检查：教师只能为自己创建的课堂签到
+    if current_user.role == "teacher" and classroom.teacher_person_id != current_user.id:
+        raise HTTPException(403, "只能为自己创建的课堂发起签到")
+    
     # 检查是否已有进行中的签到
     active = db.query(CheckinSession).filter(
         CheckinSession.classroom_id == data.classroom_id,
@@ -141,7 +145,10 @@ def list_sessions(
     db: Session = Depends(get_db),
 ):
     """获取签到会话列表"""
-    query = db.query(CheckinSession)
+    query = db.query(CheckinSession).options(
+        joinedload(CheckinSession.classroom),
+        joinedload(CheckinSession.teacher),
+    )
     
     if current_user.role == "teacher":
         query = query.filter(CheckinSession.teacher_id == current_user.id)
@@ -153,16 +160,23 @@ def list_sessions(
     
     query = query.order_by(CheckinSession.created_at.desc())
     
+    sessions = query.all()
+    # 批量查询学生总数和签到数，避免 N+1
+    session_ids = [s.id for s in sessions]
+    classroom_ids = list(set(s.classroom_id for s in sessions))
+    student_counts = {cid: db.query(Student).filter(Student.classroom_id == cid).count() for cid in classroom_ids}
+    checked_counts = dict(
+        db.query(Attendance.checkin_session_id, db.func.count(Attendance.id))
+        .filter(Attendance.checkin_session_id.in_(session_ids), Attendance.status == "present")
+        .group_by(Attendance.checkin_session_id).all()
+    ) if session_ids else {}
+    
     result = []
-    for session in query.all():
+    for session in sessions:
         classroom_name = session.classroom.name if session.classroom else ""
         teacher_name = session.teacher.name if session.teacher else ""
-        students = db.query(Student).filter(Student.classroom_id == session.classroom_id).all()
-        total_count = len(students)
-        checked_count = db.query(Attendance).filter(
-            Attendance.checkin_session_id == session.id,
-            Attendance.status == "present",
-        ).count()
+        total_count = student_counts.get(session.classroom_id, 0)
+        checked_count = checked_counts.get(session.id, 0)
         
         result.append(CheckinSessionOut(
             id=session.id,
@@ -191,6 +205,15 @@ def get_session(
     session = db.query(CheckinSession).filter(CheckinSession.id == session_id).first()
     if not session:
         raise HTTPException(404, "签到会话不存在")
+    
+    # 权限检查：教师只能看自己课堂的，学生只能看自己参与的课堂
+    if current_user.role == "teacher":
+        if session.teacher_id != current_user.id and current_user.role != "admin":
+            raise HTTPException(403, "无权查看此签到会话")
+    elif current_user.role == "student":
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        if not student or student.classroom_id != session.classroom_id:
+            raise HTTPException(403, "无权查看此签到会话")
     
     classroom_name = session.classroom.name if session.classroom else ""
     teacher_name = session.teacher.name if session.teacher else ""
@@ -266,6 +289,15 @@ def get_attendances(
     if not session:
         raise HTTPException(404, "签到会话不存在")
     
+    # 权限检查：教师只能看自己课堂的，学生只能看自己参与的课堂
+    if current_user.role == "teacher":
+        if session.teacher_id != current_user.id and current_user.role != "admin":
+            raise HTTPException(403, "无权查看此签到记录")
+    elif current_user.role == "student":
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        if not student or student.classroom_id != session.classroom_id:
+            raise HTTPException(403, "无权查看此签到记录")
+    
     attendances = db.query(Attendance).filter(Attendance.checkin_session_id == session_id).all()
     result = []
     for att in attendances:
@@ -329,6 +361,12 @@ def get_active_checkin(
     db: Session = Depends(get_db),
 ):
     """获取当前课堂进行中的签到"""
+    # 权限检查：学生只能查自己参与的课堂
+    if current_user.role == "student":
+        student = db.query(Student).filter(Student.person_id == current_user.id).first()
+        if not student or student.classroom_id != classroom_id:
+            raise HTTPException(403, "无权查看该课堂签到")
+    
     session = db.query(CheckinSession).filter(
         CheckinSession.classroom_id == classroom_id,
         CheckinSession.status == "active",

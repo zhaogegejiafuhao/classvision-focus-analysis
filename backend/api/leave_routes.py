@@ -93,6 +93,13 @@ def create_leave(
     db: Session = Depends(get_db),
 ):
     """学生提交请假申请"""
+    # 验证学生属于该课堂
+    student = db.query(Student).filter(Student.person_id == current_user.id).first()
+    if not student:
+        raise HTTPException(403, "仅学生可提交请假")
+    if student.classroom_id != data.classroom_id:
+        raise HTTPException(403, "只能为自己参与的课堂请假")
+    
     leave = LeaveRequest(
         student_id=current_user.id,
         classroom_id=data.classroom_id,

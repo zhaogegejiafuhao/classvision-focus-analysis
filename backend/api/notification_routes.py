@@ -134,8 +134,8 @@ def mark_as_read(
     if not notification:
         raise HTTPException(404, "通知不存在")
     
-    # 验证接收者
-    if notification.receiver_id and notification.receiver_id != current_user.id:
+    # 验证接收者：receiver_id=NULL（全体通知）任何人可标记，其余仅接收者本人
+    if notification.receiver_id is not None and notification.receiver_id != current_user.id:
         raise HTTPException(403, "无权操作此通知")
     
     notification.is_read = True
@@ -168,8 +168,11 @@ def delete_notification(
     if not notification:
         raise HTTPException(404, "通知不存在")
     
-    # 验证权限
-    if notification.receiver_id and notification.receiver_id != current_user.id:
+    # 验证权限：receiver_id=NULL（全体通知）仅管理员/发送者可删，其余仅接收者本人
+    if notification.receiver_id is None:
+        if current_user.role not in ("admin",) and notification.sender_id != current_user.id:
+            raise HTTPException(403, "无权删除此全体通知")
+    elif notification.receiver_id != current_user.id:
         raise HTTPException(403, "无权操作此通知")
     
     db.delete(notification)

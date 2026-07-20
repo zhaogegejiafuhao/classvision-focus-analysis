@@ -231,6 +231,8 @@ def end_classroom(
         raise HTTPException(404, "课堂不存在")
     if classroom.ended_at:
         raise HTTPException(400, "课堂已结束")
+    # 权限检查：只有课堂创建者或管理员可以结束课堂
+    assert_owner_or_admin(classroom.teacher_person_id, current_user)
 
     classroom.ended_at = datetime.now()
     if classroom.started_at:
