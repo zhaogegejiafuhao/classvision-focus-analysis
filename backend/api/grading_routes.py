@@ -1,4 +1,5 @@
 """AI智能批改 API"""
+from datetime import datetime
 import json
 import base64
 import logging
@@ -211,6 +212,14 @@ def confirm_grading(
             question_type="calculation",
             was_corrected=not is_accurate,
         )
+
+    # 同步最终分数到 HomeworkSubmission（单一数据源）
+    final_score = result.confirmed_score if result.confirmed_score is not None else result.score
+    submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == result.submission_id).first()
+    if submission:
+        submission.score = final_score
+        submission.status = "graded"
+        submission.graded_at = datetime.now()
 
     db.commit()
     return {"message": "批改结果已确认", "confirmed_score": result.confirmed_score or result.score}

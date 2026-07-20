@@ -91,9 +91,9 @@
           <template #icon><RadarChartOutlined /></template>
           <span>知识归因分析</span>
         </a-menu-item>
-        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/similar-questions">
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/my-similar-questions">
           <template #icon><ThunderboltOutlined /></template>
-          <span>相似题推荐</span>
+          <span>相似题管理</span>
         </a-menu-item>
         <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/mistake-book">
           <template #icon><ReadOutlined /></template>
@@ -176,13 +176,13 @@
           <template #icon><RadarChartOutlined /></template>
           <span>我的知识画像</span>
         </a-menu-item>
-        <a-menu-item v-if="currentRole === 'student'" key="/similar-questions">
-          <template #icon><ThunderboltOutlined /></template>
-          <span>错题强化</span>
-        </a-menu-item>
         <a-menu-item v-if="currentRole === 'student'" key="/mistake-book">
           <template #icon><ReadOutlined /></template>
           <span>错题本</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/my-similar-questions">
+          <template #icon><ThunderboltOutlined /></template>
+          <span>错题强化</span>
         </a-menu-item>
         <a-menu-item v-if="currentRole === 'student'" key="/experiments">
           <template #icon><DatabaseOutlined /></template>

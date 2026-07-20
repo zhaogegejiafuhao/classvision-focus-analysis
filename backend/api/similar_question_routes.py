@@ -156,6 +156,10 @@ async def submit_similar_answer(
     sq.practice_score = score
     sq.mastery_status = mastery
     sq.practiced_at = datetime.now()
+
+    # 回写 KnowledgeAnalysis.correction_status_json（知识点掌握反馈）
+    _update_knowledge_mastery(sq, db)
+
     db.commit()
 
     logger.info(f"[similar-submit] id={similar_id}, score={score}/{max_score}, mastery={mastery}")
@@ -224,3 +228,48 @@ def get_model_router_stats(
     """获取模型路由统计"""
     from backend.services.model_router import model_router
     return model_router.get_performance_stats()
+
+
+def _update_knowledge_mastery(sq: SimilarQuestion, db: Session):
+    """相似题练习结果回写 KnowledgeAnalysis.correction_status_json
+
+    逻辑：查找该学生最近的 KnowledgeAnalysis，在 correction_status 中
+    更新相关知识点的订正状态。
+    """
+    from backend.models.tables import KnowledgeAnalysis
+
+    ka = (
+        db.query(KnowledgeAnalysis)
+        .filter(
+            KnowledgeAnalysis.student_id == sq.student_id,
+            KnowledgeAnalysis.analysis_type == "math",
+        )
+        .order_by(KnowledgeAnalysis.created_at.desc())
+        .first()
+    )
+    if not ka:
+        return
+
+    # 解析 correction_status_json
+    try:
+        correction_status = json.loads(ka.correction_status_json) if ka.correction_status_json else {}
+    except Exception:
+        correction_status = {}
+
+    # 更新相关知识点
+    kp_ids = []
+    if sq.knowledge_point_ids:
+        try:
+            kp_ids = json.loads(sq.knowledge_point_ids)
+        except Exception:
+            kp_ids = []
+
+    for kp in kp_ids:
+        if kp in correction_status:
+            if sq.mastery_status == "passed":
+                correction_status[kp] = "mastered"
+            elif correction_status.get(kp) != "mastered":
+                correction_status[kp] = "practicing"
+
+    # 写回
+    ka.correction_status_json = json.dumps(correction_status, ensure_ascii=False)

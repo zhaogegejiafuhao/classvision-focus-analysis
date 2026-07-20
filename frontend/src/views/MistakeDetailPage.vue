@@ -90,7 +90,7 @@
 
       <!-- 操作按钮 -->
       <div style="margin-top: 16px; text-align: center">
-        <a-button type="primary" @click="$router.push('/correction')">
+        <a-button type="primary" @click="goCorrection">
           去订正
         </a-button>
         <a-button type="default" style="margin-left: 12px" @click="showGenerateModal = true">
@@ -129,11 +129,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getMistakeDetail, generateSimilarFromMistake } from '@/api/correction'
 
 const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const detail = ref({})
 const showGenerateModal = ref(false)
@@ -183,6 +184,14 @@ function formatDate(dt) {
   } catch {
     return dt
   }
+}
+
+function goCorrection() {
+  // 传递 submission_id 和来源信息，订正完成后可跳回
+  const query = {}
+  if (detail.value.submission_id) query.submission_id = detail.value.submission_id
+  if (route.params.id) query.from_grading_id = route.params.id
+  router.push({ path: '/correction', query })
 }
 
 async function handleGenerate() {

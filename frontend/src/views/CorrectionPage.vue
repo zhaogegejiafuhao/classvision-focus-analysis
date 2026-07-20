@@ -216,7 +216,8 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   SearchOutlined, CheckCircleOutlined, ArrowRightOutlined,
@@ -227,6 +228,9 @@ import { submitCorrection } from '@/api/correction'
 import { getGradingResult } from '@/api/grading'
 import ScoreCounter from '@/components/ai-grading/ScoreCounter.vue'
 import '@/assets/styles/ai-grading-animations.css'
+
+const route = useRoute()
+const router = useRouter()
 
 const form = reactive({
   submissionId: null,
@@ -321,6 +325,12 @@ async function handleSubmit() {
     } else {
       message.info(`订正完成，分数未提升（${result.value.correction_score}分）`)
     }
+    // 如果从错题详情跳转来，订正成功后自动跳回
+    if (route.query.from_grading_id) {
+      setTimeout(() => {
+        router.push(`/mistake-book/${route.query.from_grading_id}`)
+      }, 2000)
+    }
   } catch (e) {
     message.error('订正提交失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
   } finally {
@@ -345,6 +355,15 @@ function handleReset() {
   imagePreview.value = ''
   result.value = null
 }
+
+// 从错题详情跳转时，自动填充 submission_id 并查询原题
+onMounted(() => {
+  const sid = route.query.submission_id
+  if (sid) {
+    form.submissionId = parseInt(sid)
+    loadOriginal()
+  }
+})
 </script>
 
 <style scoped>

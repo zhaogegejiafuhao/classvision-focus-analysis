@@ -132,6 +132,11 @@
               :error-type="gradingData.error_cause || gradingData.error_type || ''"
               :standard-answer="gradingData.standard_answer || ''"
             />
+            <div style="margin-top: 12px; text-align: center">
+              <a-button type="link" @click="goMistakeDetail">
+                在错题本中查看详情 →
+              </a-button>
+            </div>
           </template>
         </template>
 
@@ -156,7 +161,10 @@ import CorrectionForm from '@/components/correction/CorrectionForm.vue'
 import CorrectionComparison from '@/components/correction/CorrectionComparison.vue'
 import SimilarQuestionPanel from '@/components/similar-questions/SimilarQuestionPanel.vue'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import '@/assets/styles/ai-grading-animations.css'
+
+const router = useRouter()
 
 // ===== 页面数据 =====
 const pageLoading = ref(false)
@@ -271,6 +279,13 @@ function onCorrectionSubmitted() {
   message.success('订正已提交，请等待二次批改')
   // 刷新提交列表
   fetchSubmissions()
+}
+
+// 跳转到错题详情
+function goMistakeDetail() {
+  if (gradingData.value?.id) {
+    router.push(`/mistake-book/${gradingData.value.id}`)
+  }
 }
 
 // ===== 工具函数 =====

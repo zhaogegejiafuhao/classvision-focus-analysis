@@ -54,7 +54,6 @@ const routes = [
       { path: '/student/grading', name: 'student-grading', component: () => import('@/views/StudentGradingPage.vue') },
       { path: '/correction', name: 'correction', component: () => import('@/views/CorrectionPage.vue') },
       { path: '/knowledge-analysis', name: 'knowledge-analysis', component: () => import('@/views/KnowledgeAnalysisPage.vue') },
-      { path: '/similar-questions', name: 'similar-questions', component: () => import('@/views/SimilarQuestionsPage.vue') },
       { path: '/answer-sheet', name: 'answer-sheet', component: () => import('@/views/AnswerSheetPage.vue') },
       { path: '/mistake-book', name: 'mistake-book', component: () => import('@/views/MistakeBookPage.vue') },
       { path: '/mistake-book/:id', name: 'mistake-detail', component: () => import('@/views/MistakeDetailPage.vue') },
