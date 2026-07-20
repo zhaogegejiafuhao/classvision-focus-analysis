@@ -17,6 +17,7 @@ env/
 .idea/
 *.swp
 *.swo
+.trae/
 
 # OS
 Thumbs.db
@@ -40,7 +41,6 @@ logs/
 
 # Node
 node_modules/
-frontend/node_modules/
 
 # Build output
 frontend/dist/
@@ -53,13 +53,26 @@ frontend/dist/
 # Uploaded face images
 data/faces/
 
-# InsightFace model files (large)
+# Model files (large)
 models/insightface/
+models/yolov8n.pt
 
 # OJ judger sandbox
-judger/tmp/
-judger/sandbox/
+oj/judger/tmp/
+oj/judger/sandbox/
 
 # Temporary files
 *.tmp
 *.bak
+
+# Test cache
+tests/__pycache__/
+
+# Reference project (not part of ClassVision)
+ZhiReviewPi/
+
+# Runtime error logs
+*.err
+
+# User uploads (runtime data)
+uploads/
