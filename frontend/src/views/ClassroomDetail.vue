@@ -6,6 +6,10 @@
           <div class="page-header-wrap">
             <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟`" style="padding: 0 0 16px 0" />
             <a-space v-if="canEditOrDelete || canManage">
+              <a-button v-if="!classroom.ended_at && canManage" type="primary" @click="$router.push(`/live/${classroomId}`)">
+                <template #icon><VideoCameraOutlined /></template>
+                {{ classroom.started_at ? '进入课堂检测' : '开始课堂' }}
+              </a-button>
               <a-button v-if="!classroom.ended_at && canManage" @click="endClassroom" :loading="endLoading">
                 <template #icon><CheckCircleOutlined /></template>
                 结束课堂
@@ -120,8 +124,9 @@
                     生成时间：{{ new Date(report.created_at).toLocaleString('zh-CN') }}
                   </a-typography-text>
                 </div>
-                <a-empty v-else description="尚未生成报告">
-                  <a-button v-if="canManage" type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
+                <a-empty v-else description="课堂结束后可生成AI分析报告">
+                  <a-button v-if="canManage && classroom.ended_at" type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
+                  <a-typography-text v-else-if="canManage && !classroom.ended_at" type="secondary">课堂进行中，结束后可生成报告</a-typography-text>
                 </a-empty>
               </a-card>
 
@@ -373,7 +378,7 @@ import { message } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import {
   CheckCircleOutlined, EditOutlined, DeleteOutlined,
-  PlusOutlined, ReloadOutlined,
+  PlusOutlined, ReloadOutlined, VideoCameraOutlined,
 } from '@ant-design/icons-vue'
 
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true })

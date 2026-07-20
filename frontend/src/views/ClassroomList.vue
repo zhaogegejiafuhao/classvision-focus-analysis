@@ -58,7 +58,22 @@
             <a-input v-model:value="form.name" placeholder="例如：高一(3)班 数学" />
           </a-form-item>
           <a-form-item label="授课教师">
-            <a-input v-model:value="form.teacher" placeholder="教师姓名" />
+            <a-select
+              v-if="currentRole === 'admin'"
+              v-model:value="form.teacher_person_id"
+              show-search
+              :filter-option="filterTeacher"
+              placeholder="搜索并选择教师"
+              :loading="teacherFetching"
+              allow-clear
+              style="width: 100%"
+              @change="onTeacherSelect"
+            >
+              <a-select-option v-for="t in teacherList" :key="t.id" :value="t.id">
+                {{ t.name }} ({{ t.username || 'ID:' + t.id }})
+              </a-select-option>
+            </a-select>
+            <a-input v-else v-model:value="form.teacher" placeholder="教师姓名" />
           </a-form-item>
           <a-form-item label="课序号">
             <a-input v-model:value="form.course_code" placeholder="例如：CS101" />
@@ -72,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
@@ -86,10 +101,13 @@ const loading = ref(true)
 const showModal = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
+const teacherList = ref([])
+const teacherFetching = ref(false)
 
 const form = ref({
   name: '',
   teacher: '',
+  teacher_person_id: null,
   course_code: '',
   is_public: true,
 })
@@ -145,8 +163,10 @@ async function loadClassrooms() {
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', teacher: '', course_code: '', is_public: true }
+  form.value = { name: '', teacher: userStore.role === 'teacher' ? (userStore.displayName || '') : '', teacher_person_id: null, course_code: '', is_public: true }
   showModal.value = true
+  // 管理员创建课堂时加载教师列表
+  if (currentRole.value === 'admin') loadTeachers()
 }
 
 function openEdit(record) {
@@ -154,10 +174,37 @@ function openEdit(record) {
   form.value = {
     name: record.name,
     teacher: record.teacher,
+    teacher_person_id: record.teacher_person_id,
     course_code: record.course_code || '',
     is_public: record.is_public !== false,
   }
   showModal.value = true
+}
+
+async function loadTeachers() {
+  teacherFetching.value = true
+  try {
+    const res = await api.get('/persons', { params: { role: 'teacher' } })
+    teacherList.value = res.data || []
+  } catch {
+    teacherList.value = []
+  } finally {
+    teacherFetching.value = false
+  }
+}
+
+function filterTeacher(input, option) {
+  const label = option.children?.[0]?.children?.[0] || ''
+  return label.toLowerCase().includes(input.toLowerCase())
+}
+
+function onTeacherSelect(personId) {
+  if (personId) {
+    const t = teacherList.value.find(p => p.id === personId)
+    if (t) form.value.teacher = t.name
+  } else {
+    form.value.teacher = ''
+  }
 }
 
 async function handleSave() {
@@ -181,6 +228,7 @@ async function handleSave() {
       const res = await api.post('/classrooms', {
         name: form.value.name,
         teacher: form.value.teacher || userStore.displayName,
+        teacher_person_id: form.value.teacher_person_id || undefined,
         course_code: form.value.course_code,
         is_public: form.value.is_public,
       })
