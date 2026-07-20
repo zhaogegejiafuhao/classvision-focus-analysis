@@ -406,6 +406,13 @@ def delete_homework(
     if homework.teacher_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权删除此作业")
     
+    # 级联清理：先删子表数据
+    for sub in homework.submissions:
+        db.query(GradingResult).filter(GradingResult.submission_id == sub.id).delete()
+        db.query(SubmissionAttachment).filter(SubmissionAttachment.submission_id == sub.id).delete()
+    db.query(HomeworkSubmission).filter(HomeworkSubmission.homework_id == homework_id).delete()
+    db.query(HomeworkAttachment).filter(HomeworkAttachment.homework_id == homework_id).delete()
+    db.query(ExtensionRequest).filter(ExtensionRequest.homework_id == homework_id).delete()
     db.delete(homework)
     db.commit()
     return {"success": True}

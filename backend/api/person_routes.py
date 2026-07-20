@@ -11,7 +11,7 @@ from PIL import Image
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, hash_password
-from backend.models.tables import RegisteredPerson, Department, Classroom, Student
+from backend.models.tables import RegisteredPerson, Department, Classroom, Student, ClassroomMember
 from backend.models.schemas import PersonCreate, PersonUpdate, PersonOut, ClassroomWithTeacher
 from cv_engine.face_recognizer import recognizer, embedding_to_json, json_to_embedding
 
@@ -200,11 +200,12 @@ def delete_person(
     else:
         raise HTTPException(403, "无权删除该人员")
 
-    # 检查是否关联了课堂或学生
+    # 检查是否关联了课堂或学生或课堂成员
     classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == person_id).all()
     students = db.query(Student).filter(Student.person_id == person_id).all()
+    memberships = db.query(ClassroomMember).filter(ClassroomMember.person_id == person_id).all()
 
-    if classrooms or students:
+    if classrooms or students or memberships:
         raise HTTPException(400, "该人员已关联课堂或学生，请先解除关联")
 
     db.delete(person)

@@ -367,6 +367,11 @@ def delete_exam(
     if exam.teacher_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权删除此考试")
 
+    # 级联清理：先删子表数据
+    for sub in exam.submissions:
+        db.query(Answer).filter(Answer.submission_id == sub.id).delete()
+    db.query(ExamSubmission).filter(ExamSubmission.exam_id == exam_id).delete()
+    db.query(Question).filter(Question.exam_id == exam_id).delete()
     db.delete(exam)
     db.commit()
     return {"success": True}
@@ -695,6 +700,10 @@ def start_exam(
     
     if exam.status != "published":
         raise HTTPException(400, "考试未发布")
+
+    # 检查考试是否已结束
+    if exam.end_time and datetime.now() > exam.end_time:
+        raise HTTPException(400, "考试已结束")
     
     # 检查是否已开始
     existing = db.query(ExamSubmission).filter(
@@ -731,7 +740,16 @@ def submit_exam(
     
     if not submission:
         raise HTTPException(404, "未开始考试")
-    
+
+    # 检查考试是否已结束
+    if submission.exam.end_time and datetime.now() > submission.exam.end_time:
+        # 自动将超时的提交标记为已提交
+        if submission.status == "in_progress":
+            submission.status = "timeout"
+            submission.submitted_at = datetime.now()
+            db.commit()
+        raise HTTPException(400, "考试已结束，无法提交")
+
     if submission.status != "in_progress":
         raise HTTPException(400, "考试已提交")
     
