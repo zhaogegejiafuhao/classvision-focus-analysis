@@ -510,3 +510,60 @@ class SimilarQuestionRequest(BaseModel):
 class SimilarQuestionResponse(BaseModel):
     """相似题生成响应"""
     questions: list[dict]
+
+
+# --- 错题本 ---
+
+
+class MistakeListItem(BaseModel):
+    """错题本列表项：从 GradingResult 筛选 error_type 非空的记录"""
+    grading_id: int
+    submission_id: int
+    score: float
+    max_score: float
+    error_type: str | None = None
+    error_cause: str | None = None
+    knowledge_points: list[str] = []
+    created_at: datetime
+    homework_id: int | None = None
+    homework_title: str = ""
+
+    model_config = {"from_attributes": True}
+
+
+class MistakeListResponse(BaseModel):
+    """错题本列表分页响应"""
+    total: int
+    page: int
+    page_size: int
+    items: list[MistakeListItem]
+
+
+class MistakeCorrectionRecord(BaseModel):
+    """错题详情中嵌入的订正历史项"""
+    correction_id: int
+    correction_score: float
+    original_score: float
+    improved: bool
+    created_at: datetime
+
+
+class MistakeDetail(BaseModel):
+    """错题详情：聚合原题+批改+订正历史"""
+    grading_id: int
+    submission_id: int
+    homework_id: int | None = None
+    homework_title: str = ""
+    question_text: str = ""
+    standard_answer: str = ""
+    student_answer_ocr: str = ""
+    rubric: dict | None = None
+    grading: dict | None = None
+    score: float
+    max_score: float
+    comment: str = ""
+    error_type: str | None = None
+    error_cause: str | None = None
+    knowledge_points: list[str] = []
+    created_at: datetime
+    correction_records: list[MistakeCorrectionRecord] = []

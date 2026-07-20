@@ -73,11 +73,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import api from '@/api'
 import { useUserStore } from '@/stores/user'
 
+const router = useRouter()
 const userStore = useUserStore()
 const classrooms = ref([])
 const loading = ref(true)
@@ -173,17 +175,25 @@ async function handleSave() {
         is_public: form.value.is_public,
       })
       message.success('课堂已更新')
+      showModal.value = false
+      await loadClassrooms()
     } else {
-      await api.post('/classrooms', {
+      const res = await api.post('/classrooms', {
         name: form.value.name,
         teacher: form.value.teacher || userStore.displayName,
         course_code: form.value.course_code,
         is_public: form.value.is_public,
       })
-      message.success('课堂创建成功')
+      message.success('课堂创建成功，正在进入实时检测...')
+      showModal.value = false
+      // 创建成功后直接跳转到实时检测页面
+      const classroomId = res.data.id
+      if (classroomId) {
+        router.push(`/live/${classroomId}`)
+      } else {
+        await loadClassrooms()
+      }
     }
-    showModal.value = false
-    await loadClassrooms()
   } catch (e) {
     const msg = e.response?.data?.detail || '保存失败'
     message.error(msg)

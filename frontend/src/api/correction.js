@@ -16,3 +16,20 @@ export function getPersonalizedCorrection(studentId, analysisType = 'math') {
     params: { student_id: studentId, analysis_type: analysisType },
   })
 }
+
+/** 错题本列表（学生角色：自动按当前用户过滤；教师/管理员：可指定 student_id） */
+export function listMistakes(params = {}) {
+  return api.get('/correction/list', {
+    params: {
+      student_id: params.studentId,
+      kp: params.kp,
+      page: params.page || 1,
+      page_size: params.pageSize || 20,
+    },
+  })
+}
+
+/** 错题详情：聚合原题+批改+订正历史 */
+export function getMistakeDetail(gradingId) {
+  return api.get(`/correction/${gradingId}`)
+}

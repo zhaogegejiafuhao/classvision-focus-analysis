@@ -7,8 +7,15 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission
-from backend.models.schemas import CorrectionSubmitRequest, CorrectionComparisonOut
+from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework
+from backend.models.schemas import (
+    CorrectionSubmitRequest,
+    CorrectionComparisonOut,
+    MistakeListResponse,
+    MistakeListItem,
+    MistakeDetail,
+    MistakeCorrectionRecord,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/correction", tags=["correction"])
@@ -193,4 +200,167 @@ def get_personalized_correction(
         "tier": dominant_tier,
         "strategy": strategy,
         "weak_points": weak_points,
+    }
+
+
+def _parse_kp_list(raw: str | None) -> list[str]:
+    """安全解析 knowledge_points JSON 字段为 list[str]"""
+    if not raw:
+        return []
+    try:
+        v = json.loads(raw)
+        if isinstance(v, list):
+            return [str(x) for x in v]
+        if isinstance(v, str):
+            return [v]
+    except Exception:
+        pass
+    return []
+
+
+@router.get("/list")
+def list_mistakes(
+    student_id: int | None = None,
+    kp: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """错题本列表：从 GradingResult 筛选 error_type 非空的记录
+
+    - 学生角色：强制只能看自己的错题（student_id 被忽略）
+    - 教师/管理员：可通过 student_id 指定学生，缺省则取自己
+    - kp：知识点关键词，对 knowledge_points JSON 做 LIKE 过滤
+    - 分页：page 从 1 开始，page_size 默认 20
+    """
+    # 角色权限控制
+    if current_user.role == "student":
+        target_student_id = current_user.id
+    else:
+        target_student_id = student_id or current_user.id
+
+    if not target_student_id:
+        raise HTTPException(400, "缺少 student_id 参数")
+
+    # 单次三表 JOIN 查询，避免 N+1
+    query = (
+        db.query(GradingResult, HomeworkSubmission, Homework)
+        .join(HomeworkSubmission, GradingResult.submission_id == HomeworkSubmission.id)
+        .outerjoin(Homework, HomeworkSubmission.homework_id == Homework.id)
+        .filter(
+            GradingResult.error_type.isnot(None),
+            GradingResult.error_type != "none",
+            HomeworkSubmission.student_id == target_student_id,
+        )
+    )
+
+    # 知识点 LIKE 过滤（JSON 字符串内嵌套匹配）
+    if kp:
+        query = query.filter(GradingResult.knowledge_points.like(f'%"{kp}"%'))
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    rows = (
+        query.order_by(GradingResult.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    items: list[dict] = []
+    for grading, submission, homework in rows:
+        items.append(
+            {
+                "grading_id": grading.id,
+                "submission_id": grading.submission_id,
+                "score": grading.score,
+                "max_score": grading.max_score,
+                "error_type": grading.error_type,
+                "error_cause": grading.error_cause,
+                "knowledge_points": _parse_kp_list(grading.knowledge_points),
+                "created_at": grading.created_at,
+                "homework_id": homework.id if homework else None,
+                "homework_title": homework.title if homework else "",
+            }
+        )
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
+    }
+
+
+@router.get("/{grading_id}")
+def get_mistake_detail(
+    grading_id: int,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """错题详情：聚合原题+标准答案+学生作答+批改详情+订正历史"""
+    grading = db.query(GradingResult).filter(GradingResult.id == grading_id).first()
+    if not grading:
+        raise HTTPException(404, "批改记录不存在")
+
+    submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == grading.submission_id).first()
+    if not submission:
+        raise HTTPException(404, "提交记录不存在")
+
+    # 学生只能看自己的错题
+    if current_user.role == "student" and submission.student_id != current_user.id:
+        raise HTTPException(403, "无权访问该错题")
+
+    homework = (
+        db.query(Homework).filter(Homework.id == submission.homework_id).first()
+        if submission.homework_id
+        else None
+    )
+
+    # 订正历史（按时间倒序）
+    correction_records = (
+        db.query(CorrectionRecord)
+        .filter(CorrectionRecord.submission_id == submission.id)
+        .order_by(CorrectionRecord.created_at.desc())
+        .all()
+    )
+
+    # 解析 JSON 字段
+    try:
+        rubric = json.loads(grading.rubric_json) if grading.rubric_json else None
+    except Exception:
+        rubric = None
+    try:
+        grading_data = json.loads(grading.grading_json) if grading.grading_json else None
+    except Exception:
+        grading_data = None
+
+    return {
+        "grading_id": grading.id,
+        "submission_id": grading.submission_id,
+        "homework_id": homework.id if homework else None,
+        "homework_title": homework.title if homework else "",
+        "question_text": homework.title if homework else "",
+        "standard_answer": homework.description if homework else "",
+        "student_answer_ocr": submission.content or "",
+        "rubric": rubric,
+        "grading": grading_data,
+        "score": grading.score,
+        "max_score": grading.max_score,
+        "comment": grading.comment or "",
+        "error_type": grading.error_type,
+        "error_cause": grading.error_cause,
+        "knowledge_points": _parse_kp_list(grading.knowledge_points),
+        "created_at": grading.created_at,
+        "correction_records": [
+            {
+                "correction_id": cr.id,
+                "correction_score": cr.correction_score,
+                "original_score": cr.original_score,
+                "improved": cr.improved,
+                "created_at": cr.created_at,
+            }
+            for cr in correction_records
+        ],
     }

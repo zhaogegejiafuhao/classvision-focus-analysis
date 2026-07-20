@@ -32,6 +32,11 @@
           <span>首页</span>
         </a-menu-item>
 
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="start-class">
+          <template #icon><VideoCameraOutlined /></template>
+          <span>开始课堂</span>
+        </a-menu-item>
+
         <a-menu-item key="/classrooms">
           <template #icon><BookOutlined /></template>
           <span>{{ currentRole === 'student' ? '我的课堂' : '课堂管理' }}</span>
@@ -89,6 +94,10 @@
         <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/similar-questions">
           <template #icon><ThunderboltOutlined /></template>
           <span>相似题推荐</span>
+        </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/mistake-book">
+          <template #icon><ReadOutlined /></template>
+          <span>错题本</span>
         </a-menu-item>
         <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/answer-sheet">
           <template #icon><ScanOutlined /></template>
@@ -171,6 +180,10 @@
           <template #icon><ThunderboltOutlined /></template>
           <span>错题强化</span>
         </a-menu-item>
+        <a-menu-item v-if="currentRole === 'student'" key="/mistake-book">
+          <template #icon><ReadOutlined /></template>
+          <span>错题本</span>
+        </a-menu-item>
         <a-menu-item v-if="currentRole === 'student'" key="/experiments">
           <template #icon><DatabaseOutlined /></template>
           <span>实验报告</span>
@@ -245,6 +258,25 @@
         </router-view>
       </a-layout-content>
     </a-layout>
+
+    <!-- 开始课堂模态框 -->
+    <a-modal
+      v-model:open="showStartClassModal"
+      title="开始新课堂"
+      @ok="handleStartClass"
+      :confirm-loading="startClassLoading"
+      ok-text="开始检测"
+      cancel-text="取消"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="课程名称" required>
+          <a-input v-model:value="startClassForm.name" placeholder="例如：高一(3)班 数学" />
+        </a-form-item>
+        <a-form-item label="课序号">
+          <a-input v-model:value="startClassForm.course_code" placeholder="例如：CS101" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </a-layout>
 </template>
 
@@ -279,6 +311,9 @@ import {
   FileSearchOutlined,
   RadarChartOutlined,
   ThunderboltOutlined,
+  VideoCameraOutlined,
+  ScanOutlined,
+  ReadOutlined,
 } from '@ant-design/icons-vue'
 
 const router = useRouter()
@@ -288,6 +323,50 @@ const userStore = useUserStore()
 const collapsed = ref(false)
 const selectedKeys = ref([route.path])
 let notificationTimer = null
+
+// 开始课堂模态框
+const showStartClassModal = ref(false)
+const startClassLoading = ref(false)
+const startClassForm = ref({
+  name: '',
+  course_code: '',
+})
+
+function openStartClassModal() {
+  startClassForm.value = { name: '', course_code: '' }
+  showStartClassModal.value = true
+}
+
+async function handleStartClass() {
+  if (!startClassForm.value.name) {
+    return
+  }
+  startClassLoading.value = true
+  try {
+    const res = await fetch('/api/classrooms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify({
+        name: startClassForm.value.name,
+        teacher: userStore.displayName,
+        course_code: startClassForm.value.course_code,
+        is_public: true,
+      }),
+    })
+    const data = await res.json()
+    if (data.id) {
+      showStartClassModal.value = false
+      router.push(`/live/${data.id}`)
+    }
+  } catch (e) {
+    console.error('创建课堂失败', e)
+  } finally {
+    startClassLoading.value = false
+  }
+}
 
 function checkScreenWidth() {
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
@@ -377,6 +456,7 @@ const currentPageTitle = computed(() => {
     '/knowledge-analysis': currentRole.value === 'student' ? '我的知识画像' : '知识归因分析',
     '/similar-questions': currentRole.value === 'student' ? '错题强化' : '相似题推荐',
     '/answer-sheet': '答题卡扫描批改',
+    '/mistake-book': '错题本',
   }
   if (titles[route.path]) return titles[route.path]
   if (route.path.startsWith('/oj/') && !route.path.startsWith('/oj/run') && !route.path.startsWith('/oj/submissions')) {
@@ -397,6 +477,10 @@ function navigate(path) {
 }
 
 function onMenuClick({ key }) {
+  if (key === 'start-class') {
+    openStartClassModal()
+    return
+  }
   if (key === '/report' && currentRole.value === 'student') {
     router.push('/my-report')
   } else {

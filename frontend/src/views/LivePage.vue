@@ -5,7 +5,7 @@
         实时检测 — {{ classroomName }}
       </span>
       <a-space>
-        <a-button type="primary" danger @click="endClass" :disabled="!isStreaming">结束课堂</a-button>
+        <a-button type="primary" danger @click="endClass">结束课堂</a-button>
       </a-space>
     </a-layout-header>
     <a-layout-content style="padding: 16px">
@@ -53,7 +53,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import api from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,7 +81,7 @@ const SEND_INTERVAL = 200
 const isStreaming = ref(false)
 
 onMounted(async () => {
-  const res = await axios.get(`/api/classrooms/${classroomId}`)
+  const res = await api.get(`/classrooms/${classroomId}`)
   classroomName.value = res.data.name
 
   chart = echarts.init(chartEl.value)
@@ -199,8 +199,21 @@ function drawLoop() {
 }
 
 async function endClass() {
-  await axios.put(`/api/classrooms/${classroomId}/end`)
-  stopCamera()
-  router.push(`/classrooms/${classroomId}`)
+  try {
+    await api.put(`/classrooms/${classroomId}/end`)
+    stopCamera()
+    // 跳转到课堂详情页
+    router.push(`/classrooms/${classroomId}`)
+  } catch (e) {
+    const detail = e.response?.data?.detail || ''
+    if (detail.includes('已结束')) {
+      // 课堂已结束，直接跳转
+      stopCamera()
+      router.push(`/classrooms/${classroomId}`)
+    } else {
+      console.error('结束课堂失败', e)
+      alert('结束课堂失败: ' + detail || e.message)
+    }
+  }
 }
 </script>

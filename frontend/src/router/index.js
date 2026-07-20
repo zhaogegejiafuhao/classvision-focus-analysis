@@ -56,6 +56,8 @@ const routes = [
       { path: '/knowledge-analysis', name: 'knowledge-analysis', component: () => import('@/views/KnowledgeAnalysisPage.vue') },
       { path: '/similar-questions', name: 'similar-questions', component: () => import('@/views/SimilarQuestionsPage.vue') },
       { path: '/answer-sheet', name: 'answer-sheet', component: () => import('@/views/AnswerSheetPage.vue') },
+      { path: '/mistake-book', name: 'mistake-book', component: () => import('@/views/MistakeBookPage.vue') },
+      { path: '/mistake-book/:id', name: 'mistake-detail', component: () => import('@/views/MistakeDetailPage.vue') },
       { path: '/homework/extensions', name: 'homework-extensions', component: () => import('@/views/HomeworkPage.vue'), meta: { defaultTab: 'extensions' } },
     ]
   },
