@@ -93,12 +93,36 @@
         <a-button type="primary" @click="$router.push('/correction')">
           去订正
         </a-button>
-        <a-tooltip title="阶段2启用：从错题一键生成相似变式题">
-          <a-button type="default" disabled style="margin-left: 12px">
-            生成相似题（即将上线）
-          </a-button>
-        </a-tooltip>
+        <a-button type="default" style="margin-left: 12px" @click="showGenerateModal = true">
+          生成相似题
+        </a-button>
+        <a-button type="default" style="margin-left: 12px" @click="$router.push('/my-similar-questions')">
+          查看相似题
+        </a-button>
       </div>
+
+      <!-- 生成相似题弹窗 -->
+      <a-modal
+        v-model:open="showGenerateModal"
+        title="生成相似变式题"
+        @ok="handleGenerate"
+        :confirm-loading="generating"
+        ok-text="开始生成"
+        cancel-text="取消"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="学生分层">
+            <a-select v-model:value="generateForm.tier" placeholder="选择分层策略">
+              <a-select-option value="优等生">优等生（根源变式）</a-select-option>
+              <a-select-option value="中等生">中等生（同类变式）</a-select-option>
+              <a-select-option value="学困生">学困生（基础铺垫）</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="生成数量">
+            <a-input-number v-model:value="generateForm.count" :min="1" :max="10" style="width: 100%" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
     </a-spin>
   </div>
 </template>
@@ -107,11 +131,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getMistakeDetail } from '@/api/correction'
+import { getMistakeDetail, generateSimilarFromMistake } from '@/api/correction'
 
 const route = useRoute()
 const loading = ref(false)
 const detail = ref({})
+const showGenerateModal = ref(false)
+const generating = ref(false)
+const generateForm = ref({ tier: '中等生', count: 3 })
 
 const scoreClass = computed(() => {
   const { score, max_score } = detail.value
@@ -155,6 +182,21 @@ function formatDate(dt) {
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   } catch {
     return dt
+  }
+}
+
+async function handleGenerate() {
+  const gradingId = route.params.id
+  if (!gradingId) return
+  generating.value = true
+  try {
+    const res = await generateSimilarFromMistake(gradingId, generateForm.value)
+    showGenerateModal.value = false
+    message.success(`已生成 ${res.data.generated} 道相似题`)
+  } catch (e) {
+    message.error('生成相似题失败: ' + (e.response?.data?.detail || e.message))
+  } finally {
+    generating.value = false
   }
 }
 

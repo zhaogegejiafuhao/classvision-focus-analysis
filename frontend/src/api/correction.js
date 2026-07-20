@@ -33,3 +33,11 @@ export function listMistakes(params = {}) {
 export function getMistakeDetail(gradingId) {
   return api.get(`/correction/${gradingId}`)
 }
+
+/** 从错题一键生成相似题并持久化 */
+export function generateSimilarFromMistake(gradingId, data = {}) {
+  return api.post(`/correction/${gradingId}/generate-similar`, {
+    count: data.count || 3,
+    tier: data.tier || '中等生',
+  }, { timeout: 120000 })
+}

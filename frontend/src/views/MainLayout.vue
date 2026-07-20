@@ -457,6 +457,7 @@ const currentPageTitle = computed(() => {
     '/similar-questions': currentRole.value === 'student' ? '错题强化' : '相似题推荐',
     '/answer-sheet': '答题卡扫描批改',
     '/mistake-book': '错题本',
+    '/my-similar-questions': '我的相似题',
   }
   if (titles[route.path]) return titles[route.path]
   if (route.path.startsWith('/oj/') && !route.path.startsWith('/oj/run') && !route.path.startsWith('/oj/submissions')) {

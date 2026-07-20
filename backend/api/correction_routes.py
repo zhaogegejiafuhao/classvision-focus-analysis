@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
-from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework
+from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework, SimilarQuestion
 from backend.models.schemas import (
     CorrectionSubmitRequest,
     CorrectionComparisonOut,
@@ -15,6 +15,7 @@ from backend.models.schemas import (
     MistakeListItem,
     MistakeDetail,
     MistakeCorrectionRecord,
+    GenerateSimilarRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -363,4 +364,81 @@ def get_mistake_detail(
             }
             for cr in correction_records
         ],
+    }
+
+
+@router.post("/{grading_id}/generate-similar")
+async def generate_similar_from_mistake(
+    grading_id: int,
+    data: GenerateSimilarRequest,
+    current_user: RegisteredPerson = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """从错题一键生成相似题并持久化
+
+    取 GradingResult → Homework 题目/标准答案 → knowledge_points →
+    调 similar_question_service 生成 → 批量插入 SimilarQuestion
+    """
+    grading = db.query(GradingResult).filter(GradingResult.id == grading_id).first()
+    if not grading:
+        raise HTTPException(404, "批改记录不存在")
+
+    submission = db.query(HomeworkSubmission).filter(HomeworkSubmission.id == grading.submission_id).first()
+    if not submission:
+        raise HTTPException(404, "提交记录不存在")
+
+    # 学生只能给自己的错题生成
+    if current_user.role == "student" and submission.student_id != current_user.id:
+        raise HTTPException(403, "无权操作该错题")
+
+    # 确定目标学生
+    target_student_id = submission.student_id or current_user.id
+
+    # 取原题信息
+    homework = db.query(Homework).filter(Homework.id == submission.homework_id).first() if submission.homework_id else None
+    question_text = homework.title if homework else ""
+    standard_answer = homework.description if homework else ""
+    knowledge_points = _parse_kp_list(grading.knowledge_points)
+
+    # 调用相似题服务
+    from backend.services.similar_question import similar_question_service
+    generated = await similar_question_service.generate_similar_questions(
+        question=question_text,
+        knowledge_points=knowledge_points,
+        error_type=grading.error_type or "",
+        tier=data.tier,
+        count=data.count,
+        standard_answer=standard_answer,
+    )
+
+    # 持久化
+    persisted_items = []
+    for q in generated:
+        sq = SimilarQuestion(
+            student_id=target_student_id,
+            source_grading_id=grading_id,
+            question_text=q.get("question_text", ""),
+            standard_answer=q.get("standard_answer", ""),
+            rubric_suggestion=json.dumps(q.get("rubric_suggestion", {}), ensure_ascii=False) if q.get("rubric_suggestion") else None,
+            difficulty=q.get("difficulty", "中等"),
+            variant_type=q.get("variant_type", "同类变式"),
+            tier=data.tier,
+            knowledge_point_ids=json.dumps(knowledge_points, ensure_ascii=False) if knowledge_points else None,
+            mastery_status="pending",
+        )
+        db.add(sq)
+        db.flush()  # 获取 id
+        persisted_items.append({
+            "similar_id": sq.id,
+            "question_text": sq.question_text,
+            "variant_type": sq.variant_type,
+        })
+
+    db.commit()
+
+    logger.info(f"[generate-similar] grading_id={grading_id}, generated={len(persisted_items)}")
+
+    return {
+        "generated": len(persisted_items),
+        "items": persisted_items,
     }

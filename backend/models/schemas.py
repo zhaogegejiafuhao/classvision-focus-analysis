@@ -567,3 +567,36 @@ class MistakeDetail(BaseModel):
     knowledge_points: list[str] = []
     created_at: datetime
     correction_records: list[MistakeCorrectionRecord] = []
+
+
+# --- 相似题持久化 ---
+
+
+class GenerateSimilarRequest(BaseModel):
+    """从错题一键生成相似题请求"""
+    count: int = 3
+    tier: str = "中等生"  # 优等生/中等生/学困生，可省略后端自动推断
+
+
+class SimilarQuestionPersisted(BaseModel):
+    """已持久化的相似题"""
+    similar_id: int
+    student_id: int
+    source_grading_id: int | None = None
+    question_text: str
+    standard_answer: str = ""
+    difficulty: str = "中等"
+    variant_type: str = "同类变式"
+    tier: str = "中等生"
+    mastery_status: str = "pending"
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SimilarQuestionListResponse(BaseModel):
+    """相似题列表分页响应"""
+    total: int
+    page: int
+    page_size: int
+    items: list[SimilarQuestionPersisted]

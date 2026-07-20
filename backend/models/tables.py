@@ -764,6 +764,30 @@ class CorrectionRecord(Base):
     submission: Mapped["HomeworkSubmission"] = relationship()
 
 
+class SimilarQuestion(Base):
+    """相似题持久化表——错题一键生成变式题并保存，供学生练习"""
+    __tablename__ = "similar_question"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"))
+    source_grading_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("grading_result.id"), nullable=True)
+    source_correction_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("correction_record.id"), nullable=True)
+    question_text: Mapped[str] = mapped_column(Text)
+    standard_answer: Mapped[str] = mapped_column(Text, default="")
+    rubric_suggestion: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
+    difficulty: Mapped[str] = mapped_column(String(20), default="中等")
+    variant_type: Mapped[str] = mapped_column(String(30), default="同类变式")
+    tier: Mapped[str] = mapped_column(String(20), default="中等生")
+    knowledge_point_ids: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON 数组
+    mastery_status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/passed/failed
+    student_answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    practice_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    practiced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    student: Mapped["RegisteredPerson"] = relationship()
+
+
 class PaperTemplate(Base):
     """试卷模板——教师拖框标注的空白卷区域，用于扫描件按题切分
 
