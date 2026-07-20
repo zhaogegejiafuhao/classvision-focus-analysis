@@ -7,7 +7,7 @@
             <a-page-header :title="classroom.name" :sub-title="`${classroom.teacher} · ${classroom.duration}分钟`" style="padding: 0 0 16px 0" />
             <a-space v-if="canEditOrDelete || canManage">
               <a-button v-if="canManage && classroom.ended_at && !report" @click="genReport()" :loading="genLoading">
-                <template #icon><FileTextOutlined /></template>
+                <template #icon><FileOutlined /></template>
                 生成报告
               </a-button>
               <a-button v-if="!classroom.ended_at && canManage" type="primary" @click="$router.push(`/live/${classroomId}`)">
@@ -378,7 +378,7 @@ import { message } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import {
   CheckCircleOutlined, EditOutlined, DeleteOutlined,
-  PlusOutlined, ReloadOutlined, VideoCameraOutlined, FileTextOutlined,
+  PlusOutlined, ReloadOutlined, VideoCameraOutlined, FileOutlined,
 } from '@ant-design/icons-vue'
 
 const md = new MarkdownIt({ html: false, breaks: true, linkify: true })
