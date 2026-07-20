@@ -100,8 +100,8 @@
               </a-card>
             </a-col>
             <a-col :span="12">
-              <!-- AI 报告 -->
-              <a-card title="AI 课堂分析报告">
+              <!-- AI 报告：课堂未结束且无报告时不显示 -->
+              <a-card v-if="report || classroom.ended_at" title="AI 课堂分析报告">
                 <template #extra>
                   <a-space v-if="report && canManage" size="small">
                     <a-popconfirm title="确定重新生成报告？将覆盖当前内容。" @confirm="genReport(true)">
@@ -124,7 +124,7 @@
                     生成时间：{{ new Date(report.created_at).toLocaleString('zh-CN') }}
                   </a-typography-text>
                 </div>
-                <template v-if="canManage && classroom.ended_at">
+                <template v-else-if="canManage && classroom.ended_at">
                   <a-button type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
                 </template>
               </a-card>
