@@ -124,10 +124,9 @@
                     生成时间：{{ new Date(report.created_at).toLocaleString('zh-CN') }}
                   </a-typography-text>
                 </div>
-                <a-empty v-else description="课堂结束后可生成AI分析报告">
-                  <a-button v-if="canManage && classroom.ended_at" type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
-                  <a-typography-text v-else-if="canManage && !classroom.ended_at" type="secondary">课堂进行中，结束后可生成报告</a-typography-text>
-                </a-empty>
+                <template v-if="canManage && classroom.ended_at">
+                  <a-button type="primary" @click="genReport()" :loading="genLoading">生成报告</a-button>
+                </template>
               </a-card>
 
               <!-- 对话区域 -->

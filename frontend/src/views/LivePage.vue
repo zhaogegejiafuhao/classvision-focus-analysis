@@ -5,7 +5,9 @@
         实时检测 — {{ classroomName }}
       </span>
       <a-space>
-        <a-button type="primary" danger @click="endClass">结束课堂</a-button>
+        <a-popconfirm title="确定结束当前课堂？" @confirm="endClass" ok-text="确定" cancel-text="取消">
+          <a-button type="primary" danger :loading="endLoading">结束课堂</a-button>
+        </a-popconfirm>
       </a-space>
     </a-layout-header>
     <a-layout-content style="padding: 16px">
@@ -79,6 +81,7 @@ let lastSendTime = 0
 const SEND_INTERVAL = 200
 
 const isStreaming = ref(false)
+const endLoading = ref(false)
 
 onMounted(async () => {
   const res = await api.get(`/classrooms/${classroomId}`)
@@ -199,21 +202,24 @@ function drawLoop() {
 }
 
 async function endClass() {
+  endLoading.value = true
   try {
-    await api.put(`/classrooms/${classroomId}/end`)
+    await api.put(`/classrooms/${classroomId}/end`, null, { timeout: 30000 })
     stopCamera()
-    // 跳转到课堂详情页
+    // 结束后自动生成AI报告（后台异步，不阻塞跳转）
+    api.post(`/classrooms/${classroomId}/report`).catch(() => {})
     router.push(`/classrooms/${classroomId}`)
   } catch (e) {
     const detail = e.response?.data?.detail || ''
     if (detail.includes('已结束')) {
-      // 课堂已结束，直接跳转
       stopCamera()
       router.push(`/classrooms/${classroomId}`)
     } else {
       console.error('结束课堂失败', e)
-      alert('结束课堂失败: ' + detail || e.message)
+      alert('结束课堂失败: ' + (detail || e.message))
     }
+  } finally {
+    endLoading.value = false
   }
 }
 </script>
