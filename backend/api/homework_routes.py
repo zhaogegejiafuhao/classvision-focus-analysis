@@ -14,7 +14,7 @@ from backend.core.database import get_db
 from backend.core.security import get_current_user
 from backend.models.tables import (
     Homework, HomeworkAttachment, HomeworkSubmission, SubmissionAttachment,
-    RegisteredPerson, Classroom, Student, Notification, ExtensionRequest
+    RegisteredPerson, Classroom, Student, Notification, ExtensionRequest, GradingResult
 )
 
 router = APIRouter(prefix="/api/homework", tags=["homework"])
@@ -461,6 +461,19 @@ def grade_submission(
     submission.feedback = data.feedback
     submission.status = "graded"
     submission.graded_at = datetime.now()
+
+    # 同步创建 GradingResult 记录，使手动批改的作业也能进入错题本和知识归因
+    grading_record = GradingResult(
+        submission_id=submission_id,
+        score=data.score,
+        max_score=submission.homework.total_score,
+        comment=data.feedback,
+        model_key="manual",
+        grading_method="manual",
+        confirmed=True,
+        confirmed_score=data.score,
+    )
+    db.add(grading_record)
     
     # 发送通知给学生
     notification = Notification(
