@@ -22,6 +22,7 @@
         <a-select v-model:value="filterDifficulty" style="width: 100px" allow-clear placeholder="难度" @change="fetchQuestions">
           <a-select-option v-for="d in 5" :key="d" :value="d">{{ d }}星</a-select-option>
         </a-select>
+        <a-tag v-if="selectedCount > 0" color="blue" style="margin-left: 8px">已选 {{ selectedCount }} 题（用于组卷）</a-tag>
       </a-space>
 
       <a-table :columns="columns" :data-source="questions" row-key="id" :pagination="{ pageSize: 10 }">
@@ -129,7 +130,7 @@ const selectedCount = computed(() => Object.values(selectedIds).filter(Boolean).
 const selectedQuestionIds = computed(() => Object.entries(selectedIds).filter(([, v]) => v).map(([k]) => parseInt(k)))
 
 const columns = [
-  { key: 'selected', title: '选择', width: 60 },
+  { key: 'selected', title: '组卷选题', width: 80 },
   { key: 'type', title: '题型', width: 80 },
   { key: 'content', title: '内容', dataIndex: 'content', ellipsis: true },
   { key: 'category', title: '分类', dataIndex: 'category', width: 100 },

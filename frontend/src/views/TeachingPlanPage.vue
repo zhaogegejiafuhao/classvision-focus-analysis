@@ -19,6 +19,9 @@
                 </a-tag>
               </template>
               <template #description>
+                <div v-if="item.classroom_id">
+                  <strong>关联课堂：</strong>{{ classroomName(item.classroom_id) }}
+                </div>
                 <div v-if="item.objectives"><strong>教学目标：</strong>{{ item.objectives }}</div>
                 <div v-if="item.chapters && item.chapters.length > 0" style="margin-top: 4px">
                   <strong>章节安排：</strong>
@@ -44,6 +47,11 @@
     <a-modal v-model:open="showCreateModal" :title="editingId ? '编辑计划' : '新建计划'" @ok="savePlan" :confirm-loading="submitting" width="600px">
       <a-form :label-col="{ span: 4 }">
         <a-form-item label="标题" required><a-input v-model:value="form.title" /></a-form-item>
+        <a-form-item label="关联课堂">
+          <a-select v-model:value="form.classroom_id" allow-clear placeholder="选择课堂" style="width: 100%">
+            <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="教学目标"><a-textarea v-model:value="form.objectives" :rows="3" /></a-form-item>
         <a-form-item label="章节安排">
           <div v-for="(ch, i) in form.chapters" :key="i" style="margin-bottom: 8px">
@@ -64,20 +72,30 @@ import { message } from 'ant-design-vue'
 import api from '../api'
 
 const plans = ref([])
+const classrooms = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 const showCreateModal = ref(false)
 const editingId = ref(null)
-const form = ref({ title: '', objectives: '', chapters: [], notes: '' })
+const form = ref({ title: '', objectives: '', chapters: [], notes: '', classroom_id: null })
+
+function classroomName(classroomId) {
+  const c = classrooms.value.find(cr => cr.id === classroomId)
+  return c ? c.name : '未关联'
+}
 
 async function fetchPlans() {
   loading.value = true
   try { const res = await api.get('/teaching-plans'); plans.value = res.data } catch { /* ignore */ } finally { loading.value = false }
 }
 
+async function fetchClassrooms() {
+  try { const res = await api.get('/classrooms'); classrooms.value = res.data } catch { /* ignore */ }
+}
+
 function editPlan(item) {
   editingId.value = item.id
-  form.value = { title: item.title, objectives: item.objectives || '', chapters: item.chapters || [], notes: item.notes || '' }
+  form.value = { title: item.title, objectives: item.objectives || '', chapters: item.chapters || [], notes: item.notes || '', classroom_id: item.classroom_id || null }
   showCreateModal.value = true
 }
 
@@ -94,7 +112,7 @@ async function savePlan() {
     }
     showCreateModal.value = false
     editingId.value = null
-    form.value = { title: '', objectives: '', chapters: [], notes: '' }
+    form.value = { title: '', objectives: '', chapters: [], notes: '', classroom_id: null }
     fetchPlans()
   } catch { /* ignore */ } finally { submitting.value = false }
 }
@@ -103,5 +121,5 @@ async function deletePlan(id) {
   try { await api.delete(`/teaching-plans/${id}`); message.success('删除成功'); fetchPlans() } catch { /* ignore */ }
 }
 
-onMounted(fetchPlans)
+onMounted(() => { fetchPlans(); fetchClassrooms() })
 </script>

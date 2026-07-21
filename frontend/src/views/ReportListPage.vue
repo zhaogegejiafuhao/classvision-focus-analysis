@@ -223,7 +223,7 @@ async function toggleExpand(classroomId) {
     } finally {
       detailLoading.value = false
     }
-    const rep = await api.get(`/classrooms/${classroomId}/report`).catch(() => null)
+    const rep = await api.get(`/classrooms/${classroomId}/report`, { _skipGlobalError: true }).catch(() => null)
     if (rep && rep.data) {
       reportData[classroomId] = rep.data.content
     }
