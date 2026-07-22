@@ -59,7 +59,8 @@ def get_alerts(
         else:
             classrooms = []
     else:
-        classrooms = db.query(Classroom).limit(20).all()
+        # admin 看所有课堂
+        classrooms = db.query(Classroom).all()
 
     for classroom in classrooms:
         students = db.query(Student).filter(Student.classroom_id == classroom.id).all()
@@ -85,7 +86,8 @@ def get_alerts(
                     alerts.append({
                         "type": "attendance",
                         "level": "high" if rate < 0.4 else "medium",
-                        "student_id": student.id,
+                        "student_id": student.person_id,  # registered_person.id
+                        "student_record_id": student.id,   # student 表主键
                         "student_name": student.person.name,
                         "classroom_id": classroom.id,
                         "classroom_name": classroom.name,
@@ -107,7 +109,8 @@ def get_alerts(
                 alerts.append({
                     "type": "homework",
                     "level": "high" if unsubmitted >= 5 else "medium",
-                    "student_id": student.id,
+                    "student_id": student.person_id,  # registered_person.id
+                    "student_record_id": student.id,   # student 表主键
                     "student_name": student.person.name,
                     "classroom_id": classroom.id,
                     "classroom_name": classroom.name,
@@ -134,7 +137,8 @@ def get_alerts(
                 alerts.append({
                     "type": "exam",
                     "level": "high" if fail_count >= 3 else "medium",
-                    "student_id": student.id,
+                    "student_id": student.person_id,  # registered_person.id
+                    "student_record_id": student.id,   # student 表主键
                     "student_name": student.person.name,
                     "classroom_id": classroom.id,
                     "classroom_name": classroom.name,

@@ -95,10 +95,11 @@ def create_leave(
 ):
     """学生提交请假申请"""
     # 验证学生属于该课堂
-    student = db.query(Student).filter(Student.person_id == current_user.id).first()
+    student = db.query(Student).filter(
+        Student.person_id == current_user.id,
+        Student.classroom_id == data.classroom_id,
+    ).first()
     if not student:
-        raise HTTPException(403, "仅学生可提交请假")
-    if student.classroom_id != data.classroom_id:
         raise HTTPException(403, "只能为自己参与的课堂请假")
     
     leave = LeaveRequest(
@@ -116,9 +117,9 @@ def create_leave(
     return LeaveOut(
         id=leave.id,
         student_id=leave.student_id,
-        student_name=leave.student.name,
+        student_name=leave.student.name if leave.student else "未知",
         classroom_id=leave.classroom_id,
-        classroom_name=leave.classroom.name,
+        classroom_name=leave.classroom.name if leave.classroom else "未知",
         start_date=leave.start_date,
         end_date=leave.end_date,
         leave_type=leave.leave_type,
@@ -163,7 +164,12 @@ def review_leave(
                     Attendance.checkin_session_id == session.id,
                     Attendance.student_record_id == student.id,
                 ).first()
-                if not existing:
+                if existing:
+                    # 请假通过后，将已有的 absent 状态更新为 leave
+                    if existing.status == "absent":
+                        existing.status = "leave"
+                        existing.note = f"请假：{leave.reason[:50]}"
+                else:
                     att = Attendance(
                         classroom_id=leave.classroom_id,
                         student_id=student.person_id,

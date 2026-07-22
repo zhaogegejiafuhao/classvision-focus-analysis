@@ -171,11 +171,13 @@ def compose_exam(
 
     selected_questions = []
 
-    # 手动指定的题目
+    # 手动指定的题目（校验归属：教师只能选自己的题目，admin 可选所有）
     if data.question_ids:
         for qid in data.question_ids:
             q = db.query(QuestionBank).filter(QuestionBank.id == qid).first()
             if q:
+                if current_user.role == "teacher" and q.teacher_id != current_user.id:
+                    raise HTTPException(403, f"无权使用题目 #{qid}，该题目不属于你")
                 selected_questions.append(q)
 
     # 随机抽题

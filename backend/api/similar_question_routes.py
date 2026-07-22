@@ -272,7 +272,9 @@ def get_similar_question(
 def get_model_router_stats(
     current_user: RegisteredPerson = Depends(get_current_user),
 ):
-    """获取模型路由统计"""
+    """获取模型路由统计 — 仅管理员/教师可查看"""
+    if current_user.role not in ("admin", "teacher"):
+        raise HTTPException(403, "仅管理员/教师可查看模型统计")
     from backend.services.model_router import model_router
     return model_router.get_performance_stats()
 
