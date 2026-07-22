@@ -553,6 +553,17 @@ function renderMarkdown(text) {
   return md.render(text)
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '0B'
+  if (bytes < 1024) return bytes + 'B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB'
+  return (bytes / 1048576).toFixed(1) + 'MB'
+}
+
+function downloadMaterial(record) {
+  window.open(`/api/materials/${record.id}/download`, '_blank')
+}
+
 // ===== 课堂操作 =====
 async function endClassroom() {
   endLoading.value = true
@@ -989,17 +1000,6 @@ onMounted(async () => {
     await loadHeatmap()
     await loadAttendance()
     await loadTeachingData()
-
-function formatFileSize(bytes) {
-  if (!bytes) return '0B'
-  if (bytes < 1024) return bytes + 'B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB'
-  return (bytes / 1048576).toFixed(1) + 'MB'
-}
-
-function downloadMaterial(record) {
-  window.open(`/api/materials/${record.id}/download`, '_blank')
-}
 
     try {
       const reportRes = await api.get(`/classrooms/${classroomId}/report`, { _skipGlobalError: true })

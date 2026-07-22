@@ -141,7 +141,7 @@ function confirmStartExam(record) {
 async function fetchExams() {
   loading.value = true
   try {
-    const res = await api.get('/exams/assigned')
+    const res = await api.get('/exams/assigned', { _skipGlobalError: true })
     exams.value = res.data
   } catch (e) {
     message.error('获取考试列表失败')

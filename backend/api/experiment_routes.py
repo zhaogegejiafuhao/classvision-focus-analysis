@@ -80,10 +80,15 @@ def list_experiments(
     if current_user.role == "teacher":
         query = query.filter(Experiment.teacher_id == current_user.id)
     elif current_user.role == "student":
-        student = db.query(Student).filter(Student.person_id == current_user.id).first()
-        if student:
+        # 学生只能看到自己所在课堂的实验
+        my_classroom_ids = [
+            s.classroom_id for s in
+            db.query(Student.classroom_id).filter(Student.person_id == current_user.id).all()
+            if s.classroom_id
+        ]
+        if my_classroom_ids:
             query = query.filter(
-                (Experiment.classroom_id == student.classroom_id) | (Experiment.classroom_id.is_(None))
+                Experiment.classroom_id.in_(my_classroom_ids) | Experiment.classroom_id.is_(None)
             )
         else:
             return []

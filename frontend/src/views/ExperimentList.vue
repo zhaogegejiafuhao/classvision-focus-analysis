@@ -5,6 +5,19 @@
         <a-button v-if="userStore.role === 'teacher'" type="primary" @click="showCreate = true">创建实验</a-button>
       </template>
 
+      <!-- 课堂筛选 -->
+      <div v-if="classrooms.length" style="margin-bottom: 16px">
+        <a-select
+          v-model:value="selectedClassroomId"
+          placeholder="按课堂筛选"
+          allow-clear
+          style="width: 240px"
+          @change="fetchExps"
+        >
+          <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+        </a-select>
+      </div>
+
       <a-table :columns="columns" :data-source="experiments" row-key="id" :loading="loading" :pagination="{ pageSize: 10 }">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
@@ -66,6 +79,7 @@ const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
 const classrooms = ref([])
+const selectedClassroomId = ref(undefined)
 const form = ref({ title: '', description: '', requirements: '', classroom_id: null, deadline: null, total_score: 100 })
 
 const columns = [
@@ -80,7 +94,9 @@ const columns = [
 async function fetchExps() {
   loading.value = true
   try {
-    const res = await api.get('/experiments')
+    const params = {}
+    if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
+    const res = await api.get('/experiments', { params })
     experiments.value = res.data
   } catch (e) {
     message.error('获取实验列表失败')
@@ -134,6 +150,6 @@ async function del(id) {
 
 onMounted(() => {
   fetchExps()
-  if (userStore.role === 'teacher') fetchClassrooms()
+  fetchClassrooms()  // 教师和学生都需要课堂列表用于筛选
 })
 </script>

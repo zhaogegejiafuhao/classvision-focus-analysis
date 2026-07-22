@@ -160,11 +160,11 @@ async function submitExtension() {
 async function fetchHomeworks() {
   loading.value = true
   try {
-    const res = await api.get('/homework/assigned')
+    const res = await api.get('/homework/assigned', { _skipGlobalError: true })
     // 获取每个作业的提交状态
     homeworks.value = await Promise.all(res.data.map(async hw => {
       try {
-        const subRes = await api.get(`/homework/my-submissions/${hw.id}`)
+        const subRes = await api.get(`/homework/my-submissions/${hw.id}`, { _skipGlobalError: true })
         const myStatus = subRes.data.submitted ? subRes.data.submission.status : null
         const myScore = subRes.data.submitted ? subRes.data.submission.score : null
         return { ...hw, my_status: myStatus, my_score: myScore }

@@ -31,7 +31,20 @@ def list_materials(
     query = db.query(CourseMaterial)
     if current_user.role == "teacher":
         query = query.filter(CourseMaterial.teacher_id == current_user.id)
-    if classroom_id:
+    elif current_user.role == "student":
+        # 学生只能看到自己所在课堂的课件
+        my_classroom_ids = [
+            s.classroom_id for s in
+            db.query(Student.classroom_id).filter(Student.person_id == current_user.id).all()
+            if s.classroom_id
+        ]
+        if classroom_id:
+            if classroom_id not in my_classroom_ids:
+                raise HTTPException(403, "无权访问该课堂的课件")
+            query = query.filter(CourseMaterial.classroom_id == classroom_id)
+        else:
+            query = query.filter(CourseMaterial.classroom_id.in_(my_classroom_ids))
+    if classroom_id and current_user.role != "student":
         query = query.filter(CourseMaterial.classroom_id == classroom_id)
     query = query.order_by(CourseMaterial.created_at.desc())
 
