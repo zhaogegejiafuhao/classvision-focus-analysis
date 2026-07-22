@@ -302,6 +302,19 @@ class Notification(Base):
     classroom: Mapped["Classroom | None"] = relationship()
 
 
+class NotificationReadStatus(Base):
+    """通知已读状态关联表 — 实现用户维度的已读状态，解决全体通知一人标记全员已读的问题"""
+    __tablename__ = "notification_read_status"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    notification_id: Mapped[int] = mapped_column(Integer, ForeignKey("notification.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    read_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    notification: Mapped["Notification"] = relationship()
+    user: Mapped["RegisteredPerson"] = relationship()
+
+
 class Attendance(Base):
     """考勤签到表"""
     __tablename__ = "attendance"
