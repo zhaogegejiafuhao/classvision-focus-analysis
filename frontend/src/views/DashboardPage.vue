@@ -334,7 +334,7 @@ async function handleCreate() {
 onMounted(async () => {
   try {
     const [classRes, dashRes] = await Promise.all([
-      api.get('/classrooms'),
+      api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
       api.get('/dashboard', { _skipGlobalError: true }).catch(() => ({ data: null })),
     ])
     classrooms.value = classRes.data || []
