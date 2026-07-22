@@ -210,7 +210,7 @@ def list_reports(
         raise HTTPException(404, "实验不存在")
     
     # 权限检查：教师只能看自己实验的报告
-    if current_user.role == "teacher" and exp.teacher_id != current_user.id and current_user.role != "admin":
+    if current_user.role == "teacher" and exp.teacher_id != current_user.id:
         raise HTTPException(403, "无权查看此实验报告")
     
     query = db.query(ExperimentReport).filter(ExperimentReport.experiment_id == experiment_id)
