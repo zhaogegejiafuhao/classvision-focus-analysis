@@ -24,6 +24,7 @@ class QuestionCreate(BaseModel):
     options: Optional[list[str]] = None  # 选择题选项
     answer: str
     score: float = 10.0
+    knowledge_points: Optional[list[str]] = None  # 知识点标签
 
 
 class ExamCreate(BaseModel):
@@ -63,6 +64,7 @@ class QuestionOut(BaseModel):
     options: Optional[list[str]]
     score: float
     order: int
+    knowledge_points: Optional[list[str]] = None
 
     class Config:
         from_attributes = True
@@ -208,6 +210,7 @@ def create_exam(
             answer=q.answer,
             score=q.score,
             order=i + 1,
+            knowledge_points=json.dumps(q.knowledge_points) if q.knowledge_points else None,
         )
         db.add(question)
     
@@ -237,6 +240,7 @@ def create_exam(
                 options=json.loads(q.options) if q.options else None,
                 score=q.score,
                 order=q.order,
+                knowledge_points=json.loads(q.knowledge_points) if q.knowledge_points else None,
             ) for q in exam.questions
         ],
     )
@@ -319,6 +323,7 @@ def get_exam(
                 options=json.loads(q.options) if q.options else None,
                 score=q.score,
                 order=q.order,
+                knowledge_points=json.loads(q.knowledge_points) if q.knowledge_points else None,
             ) for q in exam.questions
         ],
     )
@@ -538,6 +543,7 @@ def add_question(
         answer=data.answer,
         score=data.score,
         order=max_order + 1,
+        knowledge_points=json.dumps(data.knowledge_points) if data.knowledge_points else None,
     )
     db.add(question)
     db.commit()
@@ -551,6 +557,7 @@ def add_question(
         "answer": question.answer,
         "score": question.score,
         "order": question.order,
+        "knowledge_points": json.loads(question.knowledge_points) if question.knowledge_points else None,
     }
 
 

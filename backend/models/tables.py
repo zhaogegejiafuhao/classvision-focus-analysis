@@ -435,6 +435,7 @@ class Question(Base):
     answer: Mapped[str] = mapped_column(Text)  # 正确答案
     score: Mapped[float] = mapped_column(Float, default=10.0)
     order: Mapped[int] = mapped_column(Integer, default=1)
+    knowledge_points: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON格式知识点列表
 
     exam: Mapped["Exam"] = relationship(back_populates="questions")
     answers: Mapped[list["Answer"]] = relationship(back_populates="question")
