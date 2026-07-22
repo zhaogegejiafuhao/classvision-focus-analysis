@@ -146,10 +146,12 @@ async function fetchData() {
       myPersonId.value = user.id
     }
 
-    // 获取学生所在课堂
+    // 获取学生所在课堂（/classrooms 对学生角色已过滤为只返回参与的课堂）
     const classRes = await api.get('/classrooms')
-    const myClass = classRes.data.find(c => c.students?.some(s => s.person_id === myPersonId.value))
-    if (!myClass) { loading.value = false; return }
+    const myClassrooms = classRes.data || []
+    if (myClassrooms.length === 0) { loading.value = false; return }
+    // 取第一个课堂作为默认展示，后续可扩展为课堂切换
+    const myClass = myClassrooms[0]
 
     const res = await api.get(`/grades/report/${myClass.id}`, { _skipGlobalError: true })
     report.value = res.data

@@ -6,6 +6,19 @@
       </template>
     </a-page-header>
 
+    <!-- 课堂筛选 -->
+    <div style="margin-bottom: 16px">
+      <a-select
+        v-model:value="selectedClassroomId"
+        placeholder="按课堂筛选"
+        allow-clear
+        style="width: 240px"
+        @change="fetchExams"
+      >
+        <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+      </a-select>
+    </div>
+
     <a-card :loading="loading">
       <a-table :columns="columns" :data-source="exams" row-key="id" :pagination="{ pageSize: 10 }">
         <template #bodyCell="{ column, record }">
@@ -64,6 +77,7 @@ import api from '../api'
 const router = useRouter()
 const exams = ref([])
 const classrooms = ref([])
+const selectedClassroomId = ref(undefined)
 const loading = ref(false)
 const submitting = ref(false)
 const showCreateModal = ref(false)
@@ -88,7 +102,9 @@ const columns = [
 async function fetchExams() {
   loading.value = true
   try {
-    const res = await api.get('/exams')
+    const params = {}
+    if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
+    const res = await api.get('/exams', { params })
     exams.value = res.data
   } catch (e) {
     message.error('获取考试列表失败')

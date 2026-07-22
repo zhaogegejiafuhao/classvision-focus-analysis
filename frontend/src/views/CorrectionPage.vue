@@ -339,14 +339,14 @@ async function handleSubmit() {
   }
 }
 
-// 查看错因归因（跳转到归因页面，待开发）
+// 查看错因归因（跳转到知识归因分析页面）
 function handleViewAttribution() {
-  message.info('错因归因页面开发中，敬请期待')
+  router.push('/knowledge-analysis')
 }
 
-// 推荐相似题（跳转到相似题页面，待开发）
+// 推荐相似题（跳转到相似题管理页面）
 function handleGetSimilarQuestions() {
-  message.info('相似题推荐页面开发中，敬请期待')
+  router.push('/my-similar-questions')
 }
 
 // 重置

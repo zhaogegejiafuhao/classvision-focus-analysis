@@ -8,6 +8,19 @@
       </template>
     </a-page-header>
 
+    <!-- 课堂筛选 -->
+    <div style="margin-bottom: 16px">
+      <a-select
+        v-model:value="selectedClassroomId"
+        placeholder="按课堂筛选"
+        allow-clear
+        style="width: 240px"
+        @change="fetchHomeworks"
+      >
+        <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+      </a-select>
+    </div>
+
     <a-card :loading="loading">
       <a-table :columns="columns" :data-source="homeworks" row-key="id" :pagination="{ pageSize: 10 }">
         <template #bodyCell="{ column, record }">
@@ -69,6 +82,7 @@ import dayjs from 'dayjs'
 const router = useRouter()
 const homeworks = ref([])
 const classrooms = ref([])
+const selectedClassroomId = ref(undefined)
 const loading = ref(false)
 const submitting = ref(false)
 const showCreateModal = ref(false)
@@ -93,7 +107,9 @@ const columns = [
 async function fetchHomeworks() {
   loading.value = true
   try {
-    const res = await api.get('/homework')
+    const params = {}
+    if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
+    const res = await api.get('/homework', { params })
     homeworks.value = res.data
   } catch (e) {
     message.error('获取作业失败')
