@@ -69,8 +69,8 @@
                 <a-table :columns="columns" :data-source="persons" row-key="id" size="small">
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'role'">
-                      <a-tag :color="record.role === 'teacher' ? 'blue' : 'green'">
-                        {{ record.role === 'teacher' ? '老师' : '学生' }}
+                      <a-tag :color="record.role === 'teacher' ? 'blue' : record.role === 'admin' ? 'purple' : 'green'">
+                        {{ record.role === 'teacher' ? '老师' : record.role === 'admin' ? '管理员' : '学生' }}
                       </a-tag>
                     </template>
                     <template v-if="column.key === 'action'">

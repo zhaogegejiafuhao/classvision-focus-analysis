@@ -255,10 +255,21 @@ def _migrate_student_id_to_person_id():
                 conn.commit()
             
             # 第3步：将 student_id 从 Student.id 转换为 Student.person_id (registered_person.id)
+            # 对于没有 person_id 的 Student 记录，保留原 student_id 值（设为0表示无效）
             with engine.connect() as conn:
                 conn.execute(text(
                     f"UPDATE {table_name} SET student_id = "
-                    f"(SELECT person_id FROM student WHERE student.id = {table_name}.student_record_id) "
+                    f"COALESCE("
+                    f"  (SELECT person_id FROM student WHERE student.id = {table_name}.student_record_id), "
+                    f"  0"
+                    f") "
                     f"WHERE student_record_id IS NOT NULL"
+                ))
+                conn.commit()
+            
+            # 处理 student_record_id 为 NULL 的情况（旧数据没有关联 Student 记录）
+            with engine.connect() as conn:
+                conn.execute(text(
+                    f"UPDATE {table_name} SET student_id = 0 WHERE student_id IS NULL"
                 ))
                 conn.commit()

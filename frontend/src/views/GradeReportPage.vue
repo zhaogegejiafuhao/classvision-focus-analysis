@@ -60,6 +60,15 @@
 
     <!-- 班级知识归因总览 -->
     <a-card title="班级知识归因总览" size="small" style="margin-top: 16px">
+      <template #extra>
+        <a-select v-model:value="analysisType" style="width: 120px" size="small" @change="fetchAttribution">
+          <a-select-option value="math">数学</a-select-option>
+          <a-select-option value="chinese">语文</a-select-option>
+          <a-select-option value="english">英语</a-select-option>
+          <a-select-option value="physics">物理</a-select-option>
+          <a-select-option value="chemistry">化学</a-select-option>
+        </a-select>
+      </template>
       <KnowledgeRadarChart v-if="classRadarData" :radar-data="classRadarData" />
       <a-empty v-else description="暂无归因数据" />
     </a-card>
@@ -79,6 +88,7 @@ const saving = ref(false)
 const classroomId = ref(null)
 const classrooms = ref([])
 const classRadarData = ref(null)
+const analysisType = ref('math')
 
 const weights = reactive({ homework_weight: 0.3, exam_weight: 0.4, attendance_weight: 0.1, usual_weight: 0.2 })
 
@@ -137,13 +147,17 @@ async function fetchReport() {
     report.value = reportRes.data
 
     // 获取班级知识归因数据
-    try {
-      const graphRes = await getKnowledgeGraph('math')
-      if (graphRes.data) {
-        classRadarData.value = graphRes.data.radar || graphRes.data
-      }
-    } catch { /* 归因数据获取失败不影响主流程 */ }
+    fetchAttribution()
   } catch { /* ignore */ } finally { loading.value = false }
+}
+
+async function fetchAttribution() {
+  try {
+    const graphRes = await getKnowledgeGraph(analysisType.value)
+    if (graphRes.data) {
+      classRadarData.value = graphRes.data.radar || graphRes.data
+    }
+  } catch { /* 归因数据获取失败不影响主流程 */ }
 }
 
 async function saveConfig() {

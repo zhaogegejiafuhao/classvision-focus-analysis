@@ -144,7 +144,7 @@ def list_exams(
     if current_user.role == "teacher":
         query = query.filter(Exam.teacher_id == current_user.id)
     # admin 可以看到所有考试
-    else:
+    elif current_user.role == "student":
         # 学生查看分配的考试
         student = db.query(Student).filter(Student.person_id == current_user.id).first()
         if student:
