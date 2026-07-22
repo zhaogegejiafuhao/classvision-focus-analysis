@@ -250,15 +250,18 @@ def list_assigned_exams(
 ):
     """获取分配给学生的考试"""
     if current_user.role == "student":
-        student = db.query(Student).filter(Student.person_id == current_user.id).first()
-        if not student:
+        my_classroom_ids = [
+            s.classroom_id for s in
+            db.query(Student.classroom_id).filter(Student.person_id == current_user.id).all()
+            if s.classroom_id
+        ]
+        if not my_classroom_ids:
             return []
-        classroom_id = student.classroom_id
     else:
         return []
     
     exams = db.query(Exam).filter(
-        Exam.classroom_id == classroom_id,
+        Exam.classroom_id.in_(my_classroom_ids),
         Exam.status == "published",
     ).order_by(Exam.created_at.desc()).all()
     

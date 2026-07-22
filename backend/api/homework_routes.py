@@ -218,19 +218,22 @@ def list_assigned_homework(
 ):
     """获取分配给学生的作业"""
     if current_user.role == "student":
-        student = db.query(Student).filter(Student.person_id == current_user.id).first()
-        if not student:
+        my_classroom_ids = [
+            s.classroom_id for s in
+            db.query(Student.classroom_id).filter(Student.person_id == current_user.id).all()
+            if s.classroom_id
+        ]
+        if not my_classroom_ids:
             return []
-        classroom_ids = [student.classroom_id] if student.classroom_id else []
     else:
-        classroom_ids = None
+        my_classroom_ids = None
 
     query = db.query(Homework).options(
         joinedload(Homework.classroom),
         joinedload(Homework.submissions),
     ).filter(Homework.status == "open")
-    if classroom_ids:
-        query = query.filter(or_(Homework.classroom_id.in_(classroom_ids), Homework.classroom_id.is_(None)))
+    if my_classroom_ids:
+        query = query.filter(or_(Homework.classroom_id.in_(my_classroom_ids), Homework.classroom_id.is_(None)))
 
     query = query.order_by(Homework.deadline.asc().nullslast(), Homework.created_at.desc())
 

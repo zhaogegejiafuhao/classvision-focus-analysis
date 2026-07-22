@@ -363,8 +363,11 @@ def get_active_checkin(
     """获取当前课堂进行中的签到"""
     # 权限检查：学生只能查自己参与的课堂
     if current_user.role == "student":
-        student = db.query(Student).filter(Student.person_id == current_user.id).first()
-        if not student or student.classroom_id != classroom_id:
+        is_member = db.query(Student).filter(
+            Student.person_id == current_user.id,
+            Student.classroom_id == classroom_id,
+        ).first() is not None
+        if not is_member:
             raise HTTPException(403, "无权查看该课堂签到")
     
     session = db.query(CheckinSession).filter(
@@ -376,7 +379,10 @@ def get_active_checkin(
         return {"active": False}
     
     # 检查学生是否已签到
-    student = db.query(Student).filter(Student.person_id == current_user.id).first()
+    student = db.query(Student).filter(
+        Student.person_id == current_user.id,
+        Student.classroom_id == classroom_id,
+    ).first()
     if not student:
         return {"active": False, "message": "您不是该课堂的学生"}
     
@@ -407,13 +413,12 @@ def submit_checkin(
     if session.status != "active":
         raise HTTPException(400, "签到已结束")
     
-    # 获取学生信息
-    student = db.query(Student).filter(Student.person_id == current_user.id).first()
+    # 获取学生信息（特定课堂的学生记录）
+    student = db.query(Student).filter(
+        Student.person_id == current_user.id,
+        Student.classroom_id == session.classroom_id,
+    ).first()
     if not student:
-        raise HTTPException(403, "您不是学生")
-    
-    # 检查学生是否属于该课堂
-    if student.classroom_id != session.classroom_id:
         raise HTTPException(403, "您不属于该课堂")
     
     # 加密签到验证
@@ -455,12 +460,15 @@ def get_checkin_history(
     db: Session = Depends(get_db),
 ):
     """获取学生的签到历史"""
-    student = db.query(Student).filter(Student.person_id == current_user.id).first()
-    if not student:
+    my_student_ids = [
+        s[0] for s in
+        db.query(Student.id).filter(Student.person_id == current_user.id).all()
+    ]
+    if not my_student_ids:
         return []
     
     attendances = db.query(Attendance).filter(
-        Attendance.student_id == student.id
+        Attendance.student_id.in_(my_student_ids)
     ).order_by(Attendance.created_at.desc()).all()
     
     result = []
