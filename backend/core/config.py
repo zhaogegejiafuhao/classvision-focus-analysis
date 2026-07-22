@@ -68,12 +68,27 @@ class Settings(BaseSettings):
     GRADING_RUBRIC_CACHE_SIZE: int = 500              # Rubric LRU缓存容量
 
     # JWT 认证配置
-    JWT_SECRET_KEY: str = "focusmind-secret-key-change-in-production-2026"
+    JWT_SECRET_KEY: str = ""  # 必须通过环境变量设置，留空则启动时生成随机密钥
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
+
+    # CORS 配置
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"  # 逗号分隔的允许源
 
     class Config:
         env_file = ".env"
 
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """将逗号分隔的 CORS_ORIGINS 转为列表"""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
 
 settings = Settings()
+
+# JWT 密钥自动生成：若环境变量未设置则生成随机密钥（每次重启后旧 token 失效）
+if not settings.JWT_SECRET_KEY:
+    import secrets
+    settings.JWT_SECRET_KEY = secrets.token_urlsafe(32)
+    import logging
+    logging.getLogger("uvicorn").warning("JWT_SECRET_KEY 未设置，已自动生成随机密钥（重启后旧 token 将失效，请通过环境变量配置固定密钥）")

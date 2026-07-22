@@ -31,6 +31,7 @@ def init_db():
     _migrate_student_id_to_person_id()
     _migrate_question_knowledge_points()
     _migrate_attendance_checkin_session_id()
+    _migrate_add_missing_indexes()
 
 
 def _migrate_person_extra_fields():
@@ -297,3 +298,33 @@ def _migrate_attendance_checkin_session_id():
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE attendance ADD COLUMN checkin_session_id INTEGER REFERENCES checkin_session(id)"))
                 conn.commit()
+
+
+def _migrate_add_missing_indexes():
+    """为频繁查询的列添加数据库索引（SQLite 不支持 CREATE INDEX IF NOT EXISTS 直接用）"""
+    insp = inspect(engine)
+    existing_indexes = {}
+    for table_name in insp.get_table_names():
+        existing_indexes[table_name] = {idx["name"] for idx in insp.get_indexes(table_name)}
+
+    indexes_to_create = [
+        # (索引名, 表名, 列SQL)
+        ("ix_knowledge_analysis_student_id_type", "knowledge_analysis", "student_id, analysis_type"),
+        ("ix_registered_person_role", "registered_person", "role"),
+        ("ix_homework_status", "homework", "status"),
+        ("ix_exam_status", "exam", "status"),
+        ("ix_checkin_session_status", "checkin_session", "status"),
+        ("ix_oj_submission_status", "oj_submission", "status"),
+        ("ix_similar_question_mastery", "similar_question", "mastery_status"),
+    ]
+
+    for idx_name, table_name, columns in indexes_to_create:
+        if table_name not in insp.get_table_names():
+            continue
+        if idx_name not in existing_indexes.get(table_name, set()):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text(f"CREATE INDEX {idx_name} ON {table_name}({columns})"))
+                    conn.commit()
+            except Exception:
+                pass  # 索引可能已存在（并发情况）

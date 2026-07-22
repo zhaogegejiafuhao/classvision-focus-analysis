@@ -52,7 +52,14 @@ _rag_logger.addHandler(_rag_handler)
 
 
 def _create_default_accounts():
-    """启动时创建默认测试账号（如不存在）"""
+    """启动时创建默认测试账号（如不存在）
+    
+    生产环境可设置环境变量 CREATE_DEFAULT_ACCOUNTS=false 禁用此功能。
+    """
+    import os
+    if os.getenv("CREATE_DEFAULT_ACCOUNTS", "true").lower() in ("false", "0", "no"):
+        return
+    
     db = SessionLocal()
     try:
         default_accounts = [
@@ -210,7 +217,7 @@ app = FastAPI(title="ClassVision API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
