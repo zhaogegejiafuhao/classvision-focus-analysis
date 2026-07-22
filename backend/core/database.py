@@ -29,6 +29,8 @@ def init_db():
     _migrate_homework_exam_updated_at()
     _migrate_attachment_file_fields()
     _migrate_student_id_to_person_id()
+    _migrate_question_knowledge_points()
+    _migrate_attendance_checkin_session_id()
 
 
 def _migrate_person_extra_fields():
@@ -272,4 +274,26 @@ def _migrate_student_id_to_person_id():
                 conn.execute(text(
                     f"UPDATE {table_name} SET student_id = 0 WHERE student_id IS NULL"
                 ))
+                conn.commit()
+
+
+def _migrate_question_knowledge_points():
+    """为 question 表添加 knowledge_points 字段（JSON 格式存储知识点列表）"""
+    insp = inspect(engine)
+    if "question" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("question")}
+        if "knowledge_points" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE question ADD COLUMN knowledge_points TEXT"))
+                conn.commit()
+
+
+def _migrate_attendance_checkin_session_id():
+    """为 attendance 表添加 checkin_session_id 字段，关联签到场次"""
+    insp = inspect(engine)
+    if "attendance" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("attendance")}
+        if "checkin_session_id" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE attendance ADD COLUMN checkin_session_id INTEGER REFERENCES checkin_session(id)"))
                 conn.commit()
