@@ -223,8 +223,8 @@ async function loadData() {
   loading.value = true
   try {
     const [classroomRes, personRes, hwRes, examRes] = await Promise.all([
-      api.get('/classrooms'),
-      api.get('/persons'),
+      api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      api.get('/persons', { _skipGlobalError: true }).catch(() => ({ data: [] })),
       api.get('/homework', { _skipGlobalError: true }).catch(() => ({ data: [] })),
       api.get('/exams', { _skipGlobalError: true }).catch(() => ({ data: [] })),
     ])

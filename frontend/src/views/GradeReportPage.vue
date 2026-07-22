@@ -112,7 +112,7 @@ const passRate = computed(() => {
 async function fetchData() {
   loading.value = true
   try {
-    const classRes = await api.get('/classrooms')
+    const classRes = await api.get('/classrooms', { _skipGlobalError: true })
     classrooms.value = classRes.data
     if (classRes.data.length === 0) { loading.value = false; return }
     classroomId.value = classRes.data[0].id
