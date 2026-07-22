@@ -29,7 +29,7 @@ async def analyze_knowledge(
     """知识归因分析（数学/写作）"""
     # 获取该学生所有提交的批改结果
     submission_ids = [
-        s.id for s in db.query(HomeworkSubmission.id)
+        s[0] for s in db.query(HomeworkSubmission.id)
         .filter(HomeworkSubmission.student_id == data.student_id)
         .all()
     ]

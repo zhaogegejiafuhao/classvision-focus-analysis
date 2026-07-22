@@ -234,6 +234,7 @@ const router = useRouter()
 
 const form = reactive({
   submissionId: null,
+  questionId: null,
   correctionText: '',
 })
 
@@ -309,7 +310,7 @@ async function handleSubmit() {
 
   try {
     const correction = {
-      question_id: 'q1',
+      question_id: form.questionId || `q_${form.submissionId}`,
       text: inputMode.value === 'text' ? form.correctionText.trim() : undefined,
       image_base64: inputMode.value === 'image' ? imageBase64.value : undefined,
     }
@@ -359,8 +360,14 @@ function handleReset() {
 // 从错题详情跳转时，自动填充 submission_id 并查询原题
 onMounted(() => {
   const sid = route.query.submission_id
+  const qid = route.query.question_id
   if (sid) {
     form.submissionId = parseInt(sid)
+  }
+  if (qid) {
+    form.questionId = qid
+  }
+  if (sid) {
     loadOriginal()
   }
 })

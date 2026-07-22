@@ -581,7 +581,7 @@ def delete_student(
     if not student:
         raise HTTPException(404, "学生不存在")
     db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).delete()
-    db.query(ExamRiskRecord).filter(AttentionRecord.student_id == student_id).delete()
+    db.query(ExamRiskRecord).filter(ExamRiskRecord.student_id == student_id).delete()
     db.delete(student)
     db.commit()
     return {"message": "学生已删除"}

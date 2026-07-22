@@ -226,7 +226,7 @@ const form = reactive({
   question: '',
   standardAnswer: '',
   totalScore: 10,
-  submissionId: 1,
+  submissionId: null,
 })
 
 const inputData = ref({

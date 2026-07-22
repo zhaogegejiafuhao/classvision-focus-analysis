@@ -270,6 +270,8 @@ def get_grade_trend(
     trend = []
     for sub in homework_subs:
         hw = sub.homework
+        if not hw:
+            continue
         trend.append({
             "type": "homework",
             "title": hw.title,
@@ -280,6 +282,8 @@ def get_grade_trend(
         })
     for sub in exam_subs:
         exam = sub.exam
+        if not exam:
+            continue
         trend.append({
             "type": "exam",
             "title": exam.title,

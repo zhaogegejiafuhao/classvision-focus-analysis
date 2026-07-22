@@ -71,7 +71,9 @@ def register_person(
     # 检查是否已注册（相似度阈值0.6，避免重复注册）
     existing_persons = db.query(RegisteredPerson).all()
     for person in existing_persons:
-        existing_emb = json_to_embedding(person.face_embedding)
+        existing_emb = json_to_embedding(person.face_embedding) if person.face_embedding else None
+        if existing_emb is None:
+            continue
         similarity = recognizer.compute_similarity(embedding, existing_emb)
         if similarity >= 0.6:
             raise HTTPException(400, f"该人脸已注册为 {person.name}，请勿重复注册")
