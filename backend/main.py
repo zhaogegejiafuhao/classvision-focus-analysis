@@ -39,6 +39,7 @@ from backend.api.similar_question_routes import router as similar_question_route
 from backend.api.answer_sheet_routes import router as answer_sheet_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
+from backend.core.config import settings
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
 from backend.models.tables import RegisteredPerson, OjProblem, OjTestCase
 
