@@ -110,7 +110,7 @@ async function searchStudents() {
 async function fetchBehavior(studentId) {
   loading.value = true
   try {
-    const res = await api.get(`/students/${studentId}/behavior`)
+    const res = await api.get(`/students/${studentId}/behavior`, { _skipGlobalError: true })
     behavior.value = res.data
   } catch (e) {
     message.error('获取行为分析失败')

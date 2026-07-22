@@ -160,10 +160,10 @@ async function loadClassrooms() {
     if (isStudent.value) {
       // 学生端：使用学生专属API
       const [classRes, hwRes, examRes, checkinRes] = await Promise.all([
-        api.get('/classrooms').catch(() => ({ data: [] })),
-        api.get('/homework/assigned').catch(() => ({ data: [] })),
-        api.get('/exams/assigned').catch(() => ({ data: [] })),
-        api.get('/checkin/history').catch(() => ({ data: [] })),
+        api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        api.get('/homework/assigned', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        api.get('/exams/assigned', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        api.get('/checkin/history', { _skipGlobalError: true }).catch(() => ({ data: [] })),
       ])
       classrooms.value = classRes.data || []
       homeworks.value = hwRes.data || []
@@ -178,9 +178,9 @@ async function loadClassrooms() {
       // 教师端：使用教师专属API
       const [classRes, hwRes, examRes, checkinRes] = await Promise.all([
         api.get('/classrooms'),
-        api.get('/homework').catch(() => ({ data: [] })),
-        api.get('/exams').catch(() => ({ data: [] })),
-        api.get('/checkin/sessions').catch(() => ({ data: [] })),
+        api.get('/homework', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        api.get('/exams', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        api.get('/checkin/sessions', { _skipGlobalError: true }).catch(() => ({ data: [] })),
       ])
       classrooms.value = classRes.data || []
       homeworks.value = hwRes.data || []

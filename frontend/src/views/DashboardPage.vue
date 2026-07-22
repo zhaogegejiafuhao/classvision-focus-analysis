@@ -335,7 +335,7 @@ onMounted(async () => {
   try {
     const [classRes, dashRes] = await Promise.all([
       api.get('/classrooms'),
-      api.get('/dashboard').catch(() => ({ data: null })),
+      api.get('/dashboard', { _skipGlobalError: true }).catch(() => ({ data: null })),
     ])
     classrooms.value = classRes.data || []
     dashboard.value = dashRes.data

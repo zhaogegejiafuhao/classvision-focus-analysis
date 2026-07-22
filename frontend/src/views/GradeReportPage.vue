@@ -125,8 +125,8 @@ async function fetchReport() {
   loading.value = true
   try {
     const [configRes, reportRes] = await Promise.all([
-      api.get(`/grades/config/${classroomId.value}`).catch(() => ({ data: null })),
-      api.get(`/grades/report/${classroomId.value}`).catch(() => ({ data: {} })),
+      api.get(`/grades/config/${classroomId.value}`, { _skipGlobalError: true }).catch(() => ({ data: null })),
+      api.get(`/grades/report/${classroomId.value}`, { _skipGlobalError: true }).catch(() => ({ data: {} })),
     ])
     if (configRes.data) {
       weights.homework_weight = configRes.data.homework_weight

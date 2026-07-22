@@ -187,7 +187,7 @@ async function goDetail(id) {
   
   // 获取提交状态
   try {
-    const res = await api.get(`/homework/my-submissions/${id}`)
+    const res = await api.get(`/homework/my-submissions/${id}`, { _skipGlobalError: true })
     mySubmission.value = res.data
     if (res.data.submitted) {
       submitContent.value = res.data.submission.content

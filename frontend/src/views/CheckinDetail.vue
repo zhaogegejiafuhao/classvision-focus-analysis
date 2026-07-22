@@ -132,7 +132,7 @@ async function fetchSession() {
 
 async function fetchAttendances() {
   try {
-    const res = await api.get(`/checkin/sessions/${sessionId}/attendances`)
+    const res = await api.get(`/checkin/sessions/${sessionId}/attendances`, { _skipGlobalError: true })
     attendances.value = res.data
   } catch (e) {
     // 忽略

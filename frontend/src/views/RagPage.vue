@@ -517,7 +517,7 @@ function renderMarkdown(text) {
 
 async function loadStatus() {
   try {
-    const res = await api.get('/rag/status')
+    const res = await api.get('/rag/status', { _skipGlobalError: true })
     ragStatus.value = res.data
   } catch {
     ragStatus.value = { total_vectors: 0 }
@@ -526,7 +526,7 @@ async function loadStatus() {
 
 async function loadDocuments() {
   try {
-    const res = await api.get('/rag/documents')
+    const res = await api.get('/rag/documents', { _skipGlobalError: true })
     documents.value = res.data || []
   } catch {
     documents.value = []
@@ -698,7 +698,7 @@ async function previewDoc(docId) {
   previewLoading.value = true
   previewData.value = null
   try {
-    const res = await api.get(`/rag/documents/${docId}/chunks`)
+    const res = await api.get(`/rag/documents/${docId}/chunks`, { _skipGlobalError: true })
     previewData.value = res.data
   } catch (e) {
     message.error('加载失败: ' + (e.response?.data?.detail || e.message))
@@ -753,7 +753,7 @@ function onModeChange(checked) {
 
 async function loadConversations() {
   try {
-    const res = await api.get('/rag/conversations')
+    const res = await api.get('/rag/conversations', { _skipGlobalError: true })
     conversations.value = res.data || []
   } catch {
     conversations.value = []
@@ -772,7 +772,7 @@ async function onConvChange(convId) {
     return
   }
   try {
-    const res = await api.get(`/rag/conversations/${convId}/messages`)
+    const res = await api.get(`/rag/conversations/${convId}/messages`, { _skipGlobalError: true })
     convMessages.value = res.data || []
     await nextTick()
     scrollToBottom()

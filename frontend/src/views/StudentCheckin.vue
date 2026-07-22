@@ -96,7 +96,7 @@ async function fetchActiveCheckin() {
   if (!selectedClassroom.value) return
   checkLoading.value = true
   try {
-    const res = await api.get(`/checkin/active?classroom_id=${selectedClassroom.value}`)
+    const res = await api.get(`/checkin/active?classroom_id=${selectedClassroom.value}`, { _skipGlobalError: true })
     activeCheckin.value = res.data
   } catch (e) {
     activeCheckin.value = { active: false }

@@ -151,7 +151,7 @@ async function fetchData() {
     const myClass = classRes.data.find(c => c.students?.some(s => s.person_id === myPersonId.value))
     if (!myClass) { loading.value = false; return }
 
-    const res = await api.get(`/grades/report/${myClass.id}`)
+    const res = await api.get(`/grades/report/${myClass.id}`, { _skipGlobalError: true })
     report.value = res.data
 
     // 获取知识归因雷达数据
@@ -170,7 +170,7 @@ onMounted(fetchData)
 async function fetchTrend() {
   trendLoading.value = true
   try {
-    const res = await api.get(`/grades/trend/${myPersonId.value}`)
+    const res = await api.get(`/grades/trend/${myPersonId.value}`, { _skipGlobalError: true })
     trend.value = res.data
   } catch (e) {
     message.error('获取趋势失败')

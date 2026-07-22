@@ -12,7 +12,7 @@ export function batchGrade(homeworkId) {
 
 /** 获取批改结果 */
 export function getGradingResult(submissionId) {
-  return api.get(`/grading/result/${submissionId}`)
+  return api.get(`/grading/result/${submissionId}`, { _skipGlobalError: true })
 }
 
 /** 教师确认/修正批改结果 */

@@ -76,12 +76,13 @@ def get_dashboard(
         }
     else:
         # 学生看板
-        student = db.query(Student).filter(Student.person_id == current_user.id).first()
-        my_classrooms = 1 if student and student.classroom_id else 0
+        my_students = db.query(Student).filter(Student.person_id == current_user.id).all()
+        classroom_ids = [s.classroom_id for s in my_students if s.classroom_id]
+        my_classrooms = len(classroom_ids)
         pending_homework = 0
-        if student and student.classroom_id:
+        for cid in classroom_ids:
             open_homeworks = db.query(Homework).filter(
-                Homework.classroom_id == student.classroom_id,
+                Homework.classroom_id == cid,
                 Homework.status == "open",
             ).all()
             for hw in open_homeworks:
@@ -93,9 +94,9 @@ def get_dashboard(
                     pending_homework += 1
 
         my_exams = db.query(ExamSubmission).filter(ExamSubmission.student_id == current_user.id).count()
-        avg_attention = db.query(func.avg(Classroom.avg_attention)).join(
-            Student, Student.classroom_id == Classroom.id
-        ).filter(Student.person_id == current_user.id).scalar() or 0
+        avg_attention = db.query(func.avg(Classroom.avg_attention)).filter(
+            Classroom.id.in_(classroom_ids)
+        ).scalar() or 0
 
         return {
             "role": "student",

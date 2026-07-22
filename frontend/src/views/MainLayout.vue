@@ -384,7 +384,7 @@ async function fetchUnreadCount() {
   try {
     const token = userStore.token || localStorage.getItem('token')
     if (!token) return
-    const { data } = await api.get('/notifications/unread-count')
+    const { data } = await api.get('/notifications/unread-count', { _skipGlobalError: true })
     unreadCount.value = data.unread_count
   } catch (e) {
     // 忽略错误

@@ -207,7 +207,7 @@ async function endClass() {
     await api.put(`/classrooms/${classroomId}/end`, null, { timeout: 30000 })
     stopCamera()
     // 结束后自动生成AI报告（后台异步，不阻塞跳转）
-    api.post(`/classrooms/${classroomId}/report`).catch(() => {})
+    api.post(`/classrooms/${classroomId}/report`, null, { _skipGlobalError: true }).catch(() => {})
     router.push(`/classrooms/${classroomId}`)
   } catch (e) {
     const detail = e.response?.data?.detail || ''

@@ -7,7 +7,7 @@ export function generateSimilarQuestions(data) {
 
 /** 获取模型路由统计 */
 export function getModelRouterStats() {
-  return api.get('/similar-questions/model-router/stats')
+  return api.get('/similar-questions/model-router/stats', { _skipGlobalError: true })
 }
 
 /** 已持久化相似题列表 */
@@ -24,7 +24,7 @@ export function listSimilarQuestions(params = {}) {
 
 /** 获取单条已持久化相似题详情 */
 export function getSimilarQuestionDetail(similarId) {
-  return api.get(`/similar-questions/${similarId}`)
+  return api.get(`/similar-questions/${similarId}`, { _skipGlobalError: true })
 }
 
 /** 提交相似题练习答案 */

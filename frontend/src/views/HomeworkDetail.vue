@@ -135,7 +135,7 @@ async function fetchHomework() {
 
 async function fetchSubmissions() {
   try {
-    const res = await api.get(`/homework/${homeworkId}/submissions`)
+    const res = await api.get(`/homework/${homeworkId}/submissions`, { _skipGlobalError: true })
     submissions.value = res.data.map(s => ({
       ...s,
       submitted_at: formatTime(s.submitted_at),

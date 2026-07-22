@@ -224,7 +224,7 @@ function formatMemory(kb) {
 
 async function checkJudger() {
   try {
-    const res = await api.get('/oj/health')
+    const res = await api.get('/oj/health', { _skipGlobalError: true })
     judgerStatus.value = res.data?.status === 'ok' ? 'online' : 'offline'
   } catch {
     judgerStatus.value = 'offline'

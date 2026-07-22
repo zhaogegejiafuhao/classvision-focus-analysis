@@ -181,7 +181,7 @@ const providerHint = computed(() => {
 
 async function loadLLMConfig() {
   try {
-    const { data } = await api.get('/llm/config')
+    const { data } = await api.get('/llm/config', { _skipGlobalError: true })
     llmConfig.provider = data.provider
     llmConfig.api_key_set = data.api_key_set
     llmConfig.base_url = data.base_url

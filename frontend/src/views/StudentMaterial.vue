@@ -43,7 +43,7 @@ async function fetchMaterials() {
   loading.value = true
   try {
     // 获取学生所在课堂，然后获取该课堂的课件
-    const studentRes = await api.get('/me').catch(() => null)
+    const studentRes = await api.get('/me', { _skipGlobalError: true }).catch(() => null)
     // 简单方式：获取所有课件，后端会根据角色过滤
     const res = await api.get('/materials')
     materials.value = res.data

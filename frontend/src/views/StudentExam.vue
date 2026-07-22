@@ -233,7 +233,7 @@ async function submitExam() {
 
 async function viewResult(id) {
   try {
-    const res = await api.get(`/exams/my-result/${id}`)
+    const res = await api.get(`/exams/my-result/${id}`, { _skipGlobalError: true })
     if (!res.data.submitted) {
       message.info('未找到提交记录')
       return

@@ -113,7 +113,7 @@ async function fetchData() {
   try {
     const [expRes, repRes] = await Promise.all([
       api.get(`/experiments/${expId}`),
-      api.get(`/experiments/${expId}/reports`),
+      api.get(`/experiments/${expId}/reports`, { _skipGlobalError: true }),
     ])
     experiment.value = expRes.data
     reports.value = repRes.data

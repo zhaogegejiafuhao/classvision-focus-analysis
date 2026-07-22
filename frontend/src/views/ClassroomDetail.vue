@@ -459,10 +459,10 @@ async function loadTeachingData() {
   materialLoading.value = true
   try {
     const [hwRes, examRes, checkinRes, matRes] = await Promise.all([
-      api.get('/homework', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
-      api.get('/exams', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
-      api.get('/checkin/sessions', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
-      api.get('/materials', { params: { classroom_id: classroomId } }).catch(() => ({ data: [] })),
+      api.get('/homework', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
+      api.get('/exams', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
+      api.get('/checkin/sessions', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
+      api.get('/materials', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
     ])
     classHomeworks.value = hwRes.data
     classExams.value = examRes.data
@@ -745,7 +745,7 @@ async function loadStudents() {
 
 async function loadChatHistory() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/chat/history`)
+    const res = await api.get(`/classrooms/${classroomId}/chat/history`, { _skipGlobalError: true })
     chatMessages.value = res.data || []
     scrollChatToBottom()
   } catch {
@@ -755,7 +755,7 @@ async function loadChatHistory() {
 
 async function loadAttendance() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/attendance`)
+    const res = await api.get(`/classrooms/${classroomId}/attendance`, { _skipGlobalError: true })
     attendance.value = res.data
   } catch {
     // 忽略
@@ -768,7 +768,7 @@ async function loadExamRisks() {
   try {
     const params = {}
     if (riskFilter.value) params.risk_level = riskFilter.value
-    const res = await api.get(`/classrooms/${classroomId}/exam-risks`, { params })
+    const res = await api.get(`/classrooms/${classroomId}/exam-risks`, { params, _skipGlobalError: true })
     examRisks.value = res.data || []
   } catch {
     examRisks.value = []
@@ -779,7 +779,7 @@ async function loadExamRisks() {
 
 async function loadHeatmap() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/heatmap`)
+    const res = await api.get(`/classrooms/${classroomId}/heatmap`, { _skipGlobalError: true })
     if (res.data.time_labels.length === 0) return
 
     const chart = echarts.init(heatmapEl.value)

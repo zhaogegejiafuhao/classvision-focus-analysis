@@ -161,7 +161,7 @@ function renderChart(classroomId) {
 async function loadData() {
   loading.value = true
   try {
-    const res = await api.get('/me/attention-history')
+    const res = await api.get('/me/attention-history', { _skipGlobalError: true })
     data.value = res.data
   } catch (e) {
     message.error(e.response?.data?.detail || '加载个人报告失败')

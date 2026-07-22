@@ -7,7 +7,7 @@ export function submitCorrection(data) {
 
 /** 获取订正前后对比 */
 export function getCorrectionComparison(correctionId) {
-  return api.get(`/correction/comparison/${correctionId}`)
+  return api.get(`/correction/comparison/${correctionId}`, { _skipGlobalError: true })
 }
 
 /** 获取分层个性化订正任务 */
@@ -31,7 +31,7 @@ export function listMistakes(params = {}) {
 
 /** 错题详情：聚合原题+批改+订正历史 */
 export function getMistakeDetail(gradingId) {
-  return api.get(`/correction/${gradingId}`)
+  return api.get(`/correction/${gradingId}`, { _skipGlobalError: true })
 }
 
 /** 从错题一键生成相似题并持久化 */

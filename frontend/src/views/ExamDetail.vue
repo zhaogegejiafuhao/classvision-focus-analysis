@@ -241,7 +241,7 @@ const qStatColumns = [
 async function fetchStats() {
   statsLoading.value = true
   try {
-    const res = await api.get(`/exams/${examId}/stats`)
+    const res = await api.get(`/exams/${examId}/stats`, { _skipGlobalError: true })
     stats.value = res.data
   } catch (e) {
     message.error('获取统计失败')
@@ -319,7 +319,7 @@ async function fetchExam() {
 
 async function fetchSubmissions() {
   try {
-    const res = await api.get(`/exams/${examId}/submissions`)
+    const res = await api.get(`/exams/${examId}/submissions`, { _skipGlobalError: true })
     submissions.value = res.data.map(s => ({
       ...s,
       submitted_at: s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-',
