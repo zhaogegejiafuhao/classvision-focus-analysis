@@ -28,6 +28,7 @@ def init_db():
     _migrate_classroom_join_fields()
     _migrate_homework_exam_updated_at()
     _migrate_attachment_file_fields()
+    _migrate_student_id_to_person_id()
 
 
 def _migrate_person_extra_fields():
@@ -218,3 +219,46 @@ def _migrate_attachment_file_fields():
                 with engine.connect() as conn:
                     conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN file_size INTEGER DEFAULT 0"))
                     conn.commit()
+
+
+def _migrate_student_id_to_person_id():
+    """统一 student_id 含义：AttentionRecord/ExamRiskRecord/Attendance 的 student_id
+    从引用 student.id 改为引用 registered_person.id，
+    同时添加 student_record_id 字段保留与 Student 记录的关联。
+    
+    迁移步骤：
+    1. 为三张表添加 student_record_id 列
+    2. 将原 student_id 值复制到 student_record_id
+    3. 将原 student_id 值通过 Student.person_id 转换为 person_id
+    """
+    insp = inspect(engine)
+    
+    for table_name in ("attention_record", "exam_risk_record", "attendance"):
+        if table_name not in insp.get_table_names():
+            continue
+        
+        columns = {col["name"] for col in insp.get_columns(table_name)}
+        
+        # 第1步：添加 student_record_id 列
+        if "student_record_id" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text(
+                    f"ALTER TABLE {table_name} ADD COLUMN student_record_id INTEGER REFERENCES student(id)"
+                ))
+                conn.commit()
+            
+            # 第2步：将原 student_id 复制到 student_record_id
+            with engine.connect() as conn:
+                conn.execute(text(
+                    f"UPDATE {table_name} SET student_record_id = student_id"
+                ))
+                conn.commit()
+            
+            # 第3步：将 student_id 从 Student.id 转换为 Student.person_id (registered_person.id)
+            with engine.connect() as conn:
+                conn.execute(text(
+                    f"UPDATE {table_name} SET student_id = "
+                    f"(SELECT person_id FROM student WHERE student.id = {table_name}.student_record_id) "
+                    f"WHERE student_record_id IS NOT NULL"
+                ))
+                conn.commit()

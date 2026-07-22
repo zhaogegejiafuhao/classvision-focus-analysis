@@ -44,6 +44,7 @@ def get_alerts(
             ).first()
             if not cr:
                 raise HTTPException(403, "无权访问该课堂的告警")
+        # admin 可以访问任何课堂的告警
         classrooms = db.query(Classroom).filter(Classroom.id == classroom_id).all()
     elif current_user.role == "teacher":
         classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).all()

@@ -79,6 +79,7 @@ def list_experiments(
     query = db.query(Experiment)
     if current_user.role == "teacher":
         query = query.filter(Experiment.teacher_id == current_user.id)
+    # admin 可以看到所有实验
     elif current_user.role == "student":
         # 学生只能看到自己所在课堂的实验
         my_classroom_ids = [
@@ -160,9 +161,9 @@ def get_experiment(
         raise HTTPException(404, "实验不存在")
     
     # 权限检查
-    if current_user.role == "teacher":
-        if exp.teacher_id != current_user.id and current_user.role != "admin":
-            raise HTTPException(403, "无权查看此实验")
+    if current_user.role == "teacher" and exp.teacher_id != current_user.id:
+        raise HTTPException(403, "无权查看此实验")
+    # admin 可以查看所有实验
     elif current_user.role == "student":
         student = db.query(Student).filter(Student.person_id == current_user.id).first()
         if not student or (exp.classroom_id and student.classroom_id != exp.classroom_id):
@@ -362,10 +363,9 @@ def download_report(
     if not report:
         raise HTTPException(404, "报告不存在")
     
-    # 权限检查：教师只能下载自己实验的报告，学生只能下载自己的报告
-    if current_user.role == "teacher":
-        if report.experiment.teacher_id != current_user.id and current_user.role != "admin":
-            raise HTTPException(403, "无权下载此报告")
+    # 权限检查：教师只能下载自己实验的报告，管理员可下载所有
+    if current_user.role == "teacher" and report.experiment.teacher_id != current_user.id:
+        raise HTTPException(403, "无权下载此报告")
     elif current_user.role == "student":
         if report.student_id != current_user.id:
             raise HTTPException(403, "无权下载此报告")

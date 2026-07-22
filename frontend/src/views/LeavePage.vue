@@ -21,8 +21,8 @@
             {{ typeText(record.leave_type) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button v-if="userStore.role === 'teacher' && record.status === 'pending'" type="link" size="small" @click="review(record, 'approved')">通过</a-button>
-            <a-button v-if="userStore.role === 'teacher' && record.status === 'pending'" type="link" size="small" danger @click="review(record, 'rejected')">拒绝</a-button>
+            <a-button v-if="userStore.role !== 'student' && record.status === 'pending'" type="link" size="small" @click="review(record, 'approved')">通过</a-button>
+            <a-button v-if="userStore.role !== 'student' && record.status === 'pending'" type="link" size="small" danger @click="review(record, 'rejected')">拒绝</a-button>
           </template>
         </template>
       </a-table>

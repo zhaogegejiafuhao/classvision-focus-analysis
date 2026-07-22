@@ -58,6 +58,7 @@ def list_leaves(
         teacher_classroom_ids = db.query(Classroom.id).filter(Classroom.teacher_person_id == current_user.id).all()
         cids = [c[0] for c in teacher_classroom_ids]
         query = query.filter(LeaveRequest.classroom_id.in_(cids))
+    # admin 可以看到所有请假
     elif current_user.role == "student":
         query = query.filter(LeaveRequest.student_id == current_user.id)
     if status:

@@ -152,6 +152,7 @@ def list_sessions(
     
     if current_user.role == "teacher":
         query = query.filter(CheckinSession.teacher_id == current_user.id)
+    # admin 可以看到所有签到
     
     if classroom_id:
         query = query.filter(CheckinSession.classroom_id == classroom_id)

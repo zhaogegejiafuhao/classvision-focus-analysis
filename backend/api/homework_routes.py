@@ -127,7 +127,10 @@ def list_homework(
     query = db.query(Homework).options(
         joinedload(Homework.classroom),
         joinedload(Homework.submissions),
-    ).filter(Homework.teacher_id == current_user.id)
+    )
+    if current_user.role == "teacher":
+        query = query.filter(Homework.teacher_id == current_user.id)
+    # admin 可以看到所有作业
     if classroom_id:
         query = query.filter(Homework.classroom_id == classroom_id)
     query = query.order_by(Homework.created_at.desc())
@@ -266,6 +269,7 @@ def list_extension_requests(
         query = query.filter(ExtensionRequest.homework_id.in_(hw_ids))
     elif current_user.role == "student":
         query = query.filter(ExtensionRequest.student_id == current_user.id)
+    # admin 可以看到所有延期申请
     if status:
         query = query.filter(ExtensionRequest.status == status)
     query = query.order_by(ExtensionRequest.created_at.desc())

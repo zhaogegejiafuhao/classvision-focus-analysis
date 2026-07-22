@@ -63,8 +63,9 @@ def list_questions(
     """获取题库列表"""
     query = db.query(QuestionBank)
 
-    if current_user.role in ("teacher",):
+    if current_user.role == "teacher":
         query = query.filter(QuestionBank.teacher_id == current_user.id)
+    # admin 可以看到所有题库题目
 
     if type:
         query = query.filter(QuestionBank.type == type)
@@ -153,6 +154,7 @@ def list_categories(
     query = db.query(QuestionBank.category).filter(QuestionBank.category.isnot(None))
     if current_user.role == "teacher":
         query = query.filter(QuestionBank.teacher_id == current_user.id)
+    # admin 可以看到所有分类
     categories = set(row[0] for row in query.distinct().all())
     return sorted(categories)
 
@@ -182,6 +184,7 @@ def compose_exam(
         pool = db.query(QuestionBank)
         if current_user.role == "teacher":
             pool = pool.filter(QuestionBank.teacher_id == current_user.id)
+        # admin 可以从全部题库抽题
         if cfg.get("category"):
             pool = pool.filter(QuestionBank.category == cfg["category"])
         if cfg.get("type"):

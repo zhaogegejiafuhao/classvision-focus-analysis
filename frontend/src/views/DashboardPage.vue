@@ -28,7 +28,7 @@
 
         <!-- 统计看板 -->
         <div v-if="dashboard" class="dashboard-cards">
-          <template v-if="dashboard.role === 'teacher'">
+          <template v-if="dashboard.role === 'teacher' || dashboard.role === 'admin'">
             <div class="dash-card">
               <span class="dash-value">{{ dashboard.total_classrooms }}</span>
               <span class="dash-label">总课堂</span>

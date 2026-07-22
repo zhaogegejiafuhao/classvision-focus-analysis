@@ -87,6 +87,9 @@ def list_similar_questions(
             target_student_id = student_id
         else:
             target_student_id = None  # 稍后用课堂过滤
+    elif current_user.role == "admin":
+        # 管理员可以指定 student_id，也可以不指定（看全部）
+        target_student_id = student_id
     else:
         target_student_id = student_id or current_user.id
 

@@ -2,7 +2,7 @@
   <div class="experiment-page">
     <a-card title="实验报告管理">
       <template #extra>
-        <a-button v-if="userStore.role === 'teacher'" type="primary" @click="showCreate = true">创建实验</a-button>
+        <a-button v-if="userStore.role !== 'student'" type="primary" @click="showCreate = true">创建实验</a-button>
       </template>
 
       <!-- 课堂筛选 -->
@@ -31,7 +31,7 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
-            <a-button v-if="userStore.role === 'teacher'" type="link" size="small" danger @click="del(record.id)">删除</a-button>
+            <a-button v-if="userStore.role !== 'student'" type="link" size="small" danger @click="del(record.id)">删除</a-button>
           </template>
         </template>
       </a-table>

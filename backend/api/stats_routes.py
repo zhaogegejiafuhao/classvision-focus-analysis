@@ -45,7 +45,31 @@ def get_dashboard(
     """首页看板统计"""
     today = datetime.now().date()
 
-    if current_user.role in ("teacher", "admin"):
+    if current_user.role == "admin":
+        # 管理员看板：查看全平台数据
+        total_classrooms = db.query(Classroom).count()
+        total_students = db.query(Student).count()
+        today_classrooms = db.query(Classroom).filter(
+            func.date(Classroom.started_at) == today,
+        ).count()
+        pending_homework = db.query(HomeworkSubmission).filter(
+            HomeworkSubmission.status == "submitted",
+        ).count()
+        pending_exam = db.query(ExamSubmission).filter(
+            ExamSubmission.status == "submitted",
+        ).count()
+        avg_attention = db.query(func.avg(Classroom.avg_attention)).scalar() or 0
+
+        return {
+            "role": "admin",
+            "total_classrooms": total_classrooms,
+            "total_students": total_students,
+            "today_classrooms": today_classrooms,
+            "pending_homework": pending_homework,
+            "pending_exam": pending_exam,
+            "avg_attention": round(avg_attention, 1),
+        }
+    elif current_user.role == "teacher":
         # 教师看板
         total_classrooms = db.query(Classroom).filter(Classroom.teacher_person_id == current_user.id).count()
         total_students = db.query(Student).join(Classroom, Student.classroom_id == Classroom.id).filter(Classroom.teacher_person_id == current_user.id).count()

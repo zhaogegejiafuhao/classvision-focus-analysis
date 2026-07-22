@@ -21,7 +21,7 @@
             </a-card>
           </a-col>
           <a-col :span="12">
-            <a-card v-if="userStore.role === 'teacher'" title="学生提交" size="small">
+            <a-card v-if="userStore.role !== 'student'" title="学生提交" size="small">
               <a-table :columns="reportColumns" :data-source="reports" row-key="id" size="small" :pagination="{ pageSize: 10 }">
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'status'">

@@ -64,6 +64,7 @@ def list_plans(
             cr = db.query(Classroom).filter(Classroom.id == classroom_id, Classroom.teacher_person_id == current_user.id).first()
             if not cr:
                 raise HTTPException(403, "无权访问该课堂的教学计划")
+        # admin 可以访问任何课堂的教学计划
         query = query.filter(TeachingPlan.classroom_id == classroom_id)
     query = query.order_by(TeachingPlan.updated_at.desc())
 
