@@ -7,6 +7,19 @@
       </template>
     </a-page-header>
 
+    <!-- 课堂筛选 -->
+    <div v-if="classrooms.length" style="margin-bottom: 16px">
+      <a-select
+        v-model:value="selectedClassroomId"
+        placeholder="按课堂筛选"
+        allow-clear
+        style="width: 240px"
+        @change="fetchData"
+      >
+        <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+      </a-select>
+    </div>
+
     <a-spin :spinning="loading">
       <a-empty v-if="alerts.length === 0 && !loading" description="暂无预警，一切正常" />
       <a-list v-else :data-source="alerts" :pagination="{ pageSize: 10 }">
@@ -38,11 +51,25 @@ import api from '../api'
 
 const report = ref({})
 const loading = ref(false)
+const classrooms = ref([])
+const selectedClassroomId = ref(undefined)
 const alerts = computed(() => report.value.alerts || [])
 
 async function fetchData() {
   loading.value = true
-  try { const res = await api.get('/alerts'); report.value = res.data } catch { /* ignore */ } finally { loading.value = false }
+  try {
+    const params = {}
+    if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
+    const res = await api.get('/alerts', { params })
+    report.value = res.data
+  } catch { /* ignore */ } finally { loading.value = false }
+}
+
+async function fetchClassrooms() {
+  try {
+    const res = await api.get('/classrooms')
+    classrooms.value = res.data || []
+  } catch { /* ignore */ }
 }
 
 function typeColor(type) {
@@ -52,5 +79,8 @@ function typeText(type) {
   return { attendance: '出勤', homework: '作业', exam: '考试' }[type] || type
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await fetchClassrooms()
+  await fetchData()
+})
 </script>

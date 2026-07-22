@@ -11,6 +11,9 @@
           enter-button
           @search="searchStudents"
         />
+        <a-select v-if="classrooms.length" v-model:value="selectedClassroomId" placeholder="按课堂筛选" allow-clear style="width: 200px" @change="filterStudentsByClassroom">
+          <a-select-option v-for="c in classrooms" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+        </a-select>
         <a-select v-if="studentOptions.length" v-model:value="selectedStudentId" style="width: 200px" placeholder="选择学生" @change="fetchBehavior">
           <a-select-option v-for="s in studentOptions" :key="s.id" :value="s.id">{{ s.name }}</a-select-option>
         </a-select>
@@ -93,15 +96,19 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const searchStudent = ref('')
 const studentOptions = ref([])
+const allStudentOptions = ref([])  // 缓存全部搜索结果
 const selectedStudentId = ref(null)
+const selectedClassroomId = ref(undefined)
+const classrooms = ref([])
 const behavior = ref(null)
 const loading = ref(false)
 
 async function searchStudents() {
   if (!searchStudent.value) return
   try {
-    const res = await api.get('/persons', { params: { keyword: searchStudent.value } })
-    studentOptions.value = res.data
+    const res = await api.get('/persons', { params: { keyword: searchStudent.value, role: 'student' } })
+    allStudentOptions.value = res.data || []
+    studentOptions.value = allStudentOptions.value
   } catch (e) {
     message.error('搜索失败')
   }
@@ -119,7 +126,35 @@ async function fetchBehavior(studentId) {
   }
 }
 
-onMounted(() => {
+// 按课堂筛选学生
+async function filterStudentsByClassroom() {
+  if (!selectedClassroomId.value) {
+    studentOptions.value = allStudentOptions.value
+    return
+  }
+  try {
+    const res = await api.get(`/classrooms/${selectedClassroomId.value}/students`, { _skipGlobalError: true })
+    const classStudentIds = new Set((res.data || []).map(s => s.person_id).filter(Boolean))
+    studentOptions.value = allStudentOptions.value.filter(s => classStudentIds.has(s.id))
+    // 如果过滤后只有一个学生，自动选中
+    if (studentOptions.value.length === 1) {
+      selectedStudentId.value = studentOptions.value[0].id
+      fetchBehavior(studentOptions.value[0].id)
+    }
+  } catch {
+    studentOptions.value = allStudentOptions.value
+  }
+}
+
+onMounted(async () => {
+  // 教师端加载课堂列表
+  if (userStore.role === 'teacher' || userStore.role === 'admin') {
+    try {
+      const res = await api.get('/classrooms')
+      classrooms.value = res.data || []
+    } catch { /* ignore */ }
+  }
+  // 学生端直接加载自己的行为数据
   if (userStore.role === 'student') {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
     if (user.id) fetchBehavior(user.id)
