@@ -329,7 +329,8 @@ class OjSubmissionOut(BaseModel):
 # --- 考试风险记录 ---
 class ExamRiskOut(BaseModel):
     id: int
-    student_id: int
+    student_id: int  # registered_person.id
+    student_record_id: int | None = None  # student 表主键（课堂注册记录）
     student_name: str = ""
     risk_level: str
     gaze_deviation_duration: float = 0

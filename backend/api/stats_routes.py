@@ -241,7 +241,8 @@ def get_attendance(
         if s.person_id:
             person = db.query(RegisteredPerson).filter(RegisteredPerson.id == s.person_id).first()
             identified.append({
-                "student_id": s.id,
+                "student_record_id": s.id,  # student 表主键（课堂注册记录）
+                "student_id": s.person_id,   # registered_person.id
                 "track_id": s.track_id,
                 "name": s.name or person.name if person else f"学生{s.track_id}",
                 "person_id": s.person_id,
@@ -249,7 +250,8 @@ def get_attendance(
             })
         else:
             unidentified.append({
-                "student_id": s.id,
+                "student_record_id": s.id,  # student 表主键（课堂注册记录）
+                "student_id": s.person_id or 0,   # registered_person.id（可能为空）
                 "track_id": s.track_id,
                 "name": s.name or f"学生{s.track_id}",
                 "avg_attention": _get_student_avg_attention(s.id, db),
@@ -500,7 +502,8 @@ def get_exam_risks(
                 student_cache[cache_key] = p.name if p else "未知"
         result.append(ExamRiskOut(
             id=r.id,
-            student_id=r.student_record_id or r.student_id,
+            student_id=r.student_id,  # registered_person.id
+            student_record_id=r.student_record_id,  # student 表主键
             student_name=student_cache[cache_key],
             risk_level=r.risk_level,
             gaze_deviation_duration=r.gaze_deviation_duration,

@@ -274,13 +274,13 @@
             <a-table :data-source="attendance.identified" :columns="[
               { title: '姓名', dataIndex: 'name' },
               { title: '平均注意力', dataIndex: 'avg_attention' },
-            ]" row-key="student_id" size="small" />
+            ]" row-key="student_record_id" size="small" />
           </a-tab-pane>
           <a-tab-pane key="unidentified" tab="未识别">
             <a-table :data-source="attendance.unidentified" :columns="[
               { title: '跟踪ID', dataIndex: 'track_id' },
               { title: '平均注意力', dataIndex: 'avg_attention' },
-            ]" row-key="student_id" size="small" />
+            ]" row-key="student_record_id" size="small" />
           </a-tab-pane>
           <a-tab-pane key="absent" tab="缺席（已注册）">
             <a-table :data-source="attendance.absent" :columns="[
