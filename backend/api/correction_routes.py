@@ -2,12 +2,13 @@
 import json
 import logging
 import base64
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_owner_or_admin
-from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework, SimilarQuestion
+from backend.models.tables import RegisteredPerson, GradingResult, CorrectionRecord, HomeworkSubmission, Homework, SimilarQuestion, ExamSubmission, Exam, Answer, Question
 from backend.models.schemas import (
     CorrectionSubmitRequest,
     CorrectionComparisonOut,
@@ -260,7 +261,7 @@ def list_mistakes(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """错题本列表：从 GradingResult 筛选 error_type 非空的记录
+    """错题本列表：从 GradingResult + 考试 Answer 筛选错题
 
     - 学生角色：强制只能看自己的错题（student_id 被忽略）
     - 教师/管理员：可通过 student_id 指定学生，缺省则取自己
@@ -276,8 +277,10 @@ def list_mistakes(
     if not target_student_id:
         raise HTTPException(400, "缺少 student_id 参数")
 
-    # 单次三表 JOIN 查询，避免 N+1
-    query = (
+    items: list[dict] = []
+
+    # ---- 1. 作业错题：从 GradingResult 筛选 error_type 非空的记录 ----
+    hw_query = (
         db.query(GradingResult, HomeworkSubmission, Homework)
         .join(HomeworkSubmission, GradingResult.submission_id == HomeworkSubmission.id)
         .outerjoin(Homework, HomeworkSubmission.homework_id == Homework.id)
@@ -287,22 +290,10 @@ def list_mistakes(
             HomeworkSubmission.student_id == target_student_id,
         )
     )
-
-    # 知识点 LIKE 过滤（JSON 字符串内嵌套匹配）
     if kp:
-        query = query.filter(GradingResult.knowledge_points.like(f'%"{kp}"%'))
+        hw_query = hw_query.filter(GradingResult.knowledge_points.like(f'%"{kp}"%'))
 
-    total = query.count()
-    offset = (page - 1) * page_size
-    rows = (
-        query.order_by(GradingResult.created_at.desc())
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    items: list[dict] = []
-    for grading, submission, homework in rows:
+    for grading, submission, homework in hw_query.all():
         items.append(
             {
                 "grading_id": grading.id,
@@ -315,14 +306,57 @@ def list_mistakes(
                 "created_at": grading.created_at,
                 "homework_id": homework.id if homework else None,
                 "homework_title": homework.title if homework else "",
+                "source": "homework",
             }
         )
+
+    # ---- 2. 考试错题：从 Answer 筛选 is_correct=False 的记录 ----
+    exam_wrong_answers = (
+        db.query(Answer, ExamSubmission, Exam, Question)
+        .join(ExamSubmission, Answer.submission_id == ExamSubmission.id)
+        .join(Exam, ExamSubmission.exam_id == Exam.id)
+        .join(Question, Answer.question_id == Question.id)
+        .filter(
+            ExamSubmission.student_id == target_student_id,
+            Answer.is_correct == False,  # noqa: E712
+        )
+        .all()
+    )
+    for answer, exam_sub, exam, question in exam_wrong_answers:
+        items.append(
+            {
+                "grading_id": None,
+                "submission_id": exam_sub.id,
+                "score": answer.score or 0,
+                "max_score": question.score,
+                "error_type": "exam_wrong",
+                "error_cause": None,
+                "knowledge_points": _parse_kp_list(question.knowledge_points) if hasattr(question, 'knowledge_points') and question.knowledge_points else [],
+                "created_at": exam_sub.submitted_at or exam_sub.created_at,
+                "homework_id": None,
+                "homework_title": "",
+                "source": "exam",
+                "exam_id": exam.id,
+                "exam_title": exam.title,
+                "question_id": question.id,
+                "question_content": question.content[:100] if question.content else "",
+                "student_answer": answer.content[:200] if answer.content else "",
+                "correct_answer": question.answer[:200] if question.answer else "",
+            }
+        )
+
+    # 按时间倒序排序
+    items.sort(key=lambda x: x["created_at"] or datetime.min, reverse=True)
+
+    total = len(items)
+    offset = (page - 1) * page_size
+    paged_items = items[offset: offset + page_size]
 
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": items,
+        "items": paged_items,
     }
 
 

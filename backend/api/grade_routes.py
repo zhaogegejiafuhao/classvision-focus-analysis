@@ -10,6 +10,7 @@ from backend.core.security import get_current_user, assert_owner_or_admin
 from backend.models.tables import (
     GradeConfig, Classroom, Student, RegisteredPerson,
     Homework, HomeworkSubmission, Exam, ExamSubmission, Attendance, CheckinSession,
+    UsualScore,
 )
 
 router = APIRouter(prefix="/api/grades", tags=["grades"])
@@ -174,12 +175,19 @@ def get_grade_report(
                     present_count += 1
         attendance_rate = (present_count / total_sessions * 100) if total_sessions > 0 else 100
 
+        # 平时分：从 UsualScore 表读取，默认 80
+        usual = db.query(UsualScore).filter(
+            UsualScore.classroom_id == classroom_id,
+            UsualScore.person_id == person.id,
+        ).first()
+        usual_score = usual.score if usual else 80.0
+
         # 综合成绩
         total_grade = (
             hw_avg * config.homework_weight
             + exam_avg * config.exam_weight
             + attendance_rate * config.attendance_weight
-            + 80 * config.usual_weight  # 平时分默认80
+            + usual_score * config.usual_weight
         )
 
         result.append({
@@ -189,7 +197,7 @@ def get_grade_report(
             "homework_avg": round(hw_avg, 1),
             "exam_avg": round(exam_avg, 1),
             "attendance_rate": round(attendance_rate, 1),
-            "usual_score": 80,  # 默认平时分
+            "usual_score": usual_score,
             "total_grade": round(total_grade, 1),
         })
 
@@ -214,7 +222,7 @@ def update_usual_score(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """更新学生平时分（简化实现：存储在内存，实际应持久化）"""
+    """更新学生平时分"""
     if current_user.role not in ("teacher", "admin"):
         raise HTTPException(403, "只有教师可以修改平时分")
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
@@ -223,7 +231,19 @@ def update_usual_score(
     assert_owner_or_admin(classroom.teacher_person_id, current_user)
     if score < 0 or score > 100:
         raise HTTPException(400, "平时分应在0-100之间")
-    # 实际项目中应存储到数据库，这里简化返回
+
+    # 持久化到 UsualScore 表
+    usual = db.query(UsualScore).filter(
+        UsualScore.classroom_id == classroom_id,
+        UsualScore.person_id == person_id,
+    ).first()
+    if usual:
+        usual.score = score
+    else:
+        usual = UsualScore(classroom_id=classroom_id, person_id=person_id, score=score)
+        db.add(usual)
+    db.commit()
+
     return {"success": True, "person_id": person_id, "usual_score": score}
 
 

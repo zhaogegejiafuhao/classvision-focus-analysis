@@ -525,6 +525,21 @@ class GradeConfig(Base):
     classroom: Mapped["Classroom"] = relationship()
 
 
+class UsualScore(Base):
+    """学生平时分（教师手动设置）"""
+    __tablename__ = "usual_score"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
+    person_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    score: Mapped[float] = mapped_column(Float, default=80.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        {"sqlite_autoincrement": True},
+    )
+
+
 class AnswerRegradeHistory(Base):
     """答题重批改历史记录（大题 LLM 重批改 + 人工补录统一审计）
 

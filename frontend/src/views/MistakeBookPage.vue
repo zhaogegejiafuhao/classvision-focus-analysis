@@ -34,18 +34,27 @@
         :data-source="items"
         :loading="loading"
         :pagination="pagination"
-        row-key="grading_id"
+        row-key="_rowKey"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'score'">
+          <template v-if="column.key === 'source'">
+            <a-tag :color="record.source === 'exam' ? 'orange' : 'blue'">
+              {{ record.source === 'exam' ? '考试' : '作业' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'source_title'">
+            <span v-if="record.source === 'exam'">{{ record.exam_title || '-' }}</span>
+            <span v-else>{{ record.homework_title || '-' }}</span>
+          </template>
+          <template v-else-if="column.key === 'score'">
             <span :class="scoreClass(record.score, record.max_score)">
               {{ record.score }}/{{ record.max_score }}
             </span>
           </template>
           <template v-else-if="column.key === 'error_type'">
             <a-tag v-if="record.error_type" :color="errorTagColor(record.error_type)">
-              {{ record.error_type }}
+              {{ record.error_type === 'exam_wrong' ? '考试答错' : record.error_type }}
             </a-tag>
             <span v-else class="text-muted">-</span>
           </template>
@@ -57,16 +66,17 @@
               +{{ record.knowledge_points.length - 3 }}
             </span>
           </template>
-          <template v-else-if="column.key === 'homework_title'">
-            {{ record.homework_title || '-' }}
-          </template>
           <template v-else-if="column.key === 'created_at'">
             {{ formatDate(record.created_at) }}
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="goDetail(record.grading_id)">
+            <a-button v-if="record.source === 'homework' && record.grading_id" type="link" size="small" @click="goDetail(record.grading_id)">
               查看详情
             </a-button>
+            <a-button v-else-if="record.source === 'exam'" type="link" size="small" @click="goExamDetail(record.exam_id)">
+              查看考试
+            </a-button>
+            <span v-else class="text-muted">-</span>
           </template>
         </template>
       </a-table>
@@ -98,7 +108,8 @@ const pagination = reactive({
 })
 
 const columns = [
-  { title: '题目来源', dataIndex: 'homework_title', key: 'homework_title', ellipsis: true },
+  { title: '来源', key: 'source', width: 80 },
+  { title: '题目来源', key: 'source_title', ellipsis: true },
   { title: '得分', key: 'score', width: 100 },
   { title: '错因', key: 'error_type', width: 120 },
   { title: '知识点', key: 'knowledge_points', width: 240 },
@@ -114,7 +125,10 @@ async function loadData() {
       page: pagination.current,
       pageSize: pagination.pageSize,
     })
-    items.value = res.data.items || []
+    items.value = (res.data.items || []).map((item, idx) => ({
+      ...item,
+      _rowKey: item.source === 'exam' ? `exam-${item.exam_id}-${item.question_id}-${idx}` : `hw-${item.grading_id}`,
+    }))
     pagination.total = res.data.total || 0
   } catch (e) {
     message.error('加载错题列表失败')
@@ -137,6 +151,10 @@ function handleTableChange(pag) {
 
 function goDetail(gradingId) {
   router.push(`/mistake-book/${gradingId}`)
+}
+
+function goExamDetail(examId) {
+  router.push(`/exams/${examId}`)
 }
 
 function scoreClass(score, maxScore) {
