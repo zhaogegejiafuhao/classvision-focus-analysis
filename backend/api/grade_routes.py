@@ -191,7 +191,8 @@ def get_grade_report(
         )
 
         result.append({
-            "student_id": student.id,
+            "student_record_id": student.id,  # student 表主键（课堂注册记录）
+            "student_id": person.id,  # registered_person.id，与统一规范一致
             "person_id": person.id,
             "name": person.name,
             "homework_avg": round(hw_avg, 1),

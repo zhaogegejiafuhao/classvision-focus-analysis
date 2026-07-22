@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.core.config import settings, Settings
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, assert_teacher_or_admin
 from backend.services.llm_client import get_llm, LLMError, PROVIDER_BASE_URLS
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
@@ -66,7 +66,8 @@ def get_llm_config(current_user=Depends(get_current_user)):
 
 @router.put("/config", response_model=LLMConfigResponse)
 def update_llm_config(req: LLMConfigRequest, current_user=Depends(get_current_user)):
-    """更新 LLM 配置（写入 .env 文件）"""
+    """更新 LLM 配置（写入 .env 文件）— 仅管理员/教师可操作"""
+    assert_teacher_or_admin(current_user)
     env_path = ".env"
     
     # 读取现有 .env
@@ -124,7 +125,8 @@ def update_llm_config(req: LLMConfigRequest, current_user=Depends(get_current_us
 
 @router.post("/test", response_model=LLMTestResponse)
 def test_llm_connection(current_user=Depends(get_current_user)):
-    """测试 LLM 连接"""
+    """测试 LLM 连接 — 仅管理员/教师可操作"""
+    assert_teacher_or_admin(current_user)
     try:
         llm = get_llm()
         model = llm.get_model()

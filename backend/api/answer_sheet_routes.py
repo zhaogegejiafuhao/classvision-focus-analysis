@@ -276,10 +276,12 @@ def update_region(
     if not region:
         raise HTTPException(404, f"区域 {region_id} 不存在")
     template = db.query(PaperTemplate).filter(PaperTemplate.id == region.template_id).first()
-    if template:
-        exam = db.query(Exam).filter(Exam.id == template.exam_id).first()
-        if exam:
-            assert_owner_or_admin(exam.teacher_id, current_user)
+    if not template:
+        raise HTTPException(404, "区域关联的模板不存在")
+    exam = db.query(Exam).filter(Exam.id == template.exam_id).first()
+    if not exam:
+        raise HTTPException(404, "区域关联的考试不存在")
+    assert_owner_or_admin(exam.teacher_id, current_user)
 
     success = paper_template_service.update_region(db, region_id, bbox, region_type)
     if not success:

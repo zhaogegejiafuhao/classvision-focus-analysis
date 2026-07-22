@@ -77,7 +77,8 @@ async def upload_material(
         raise HTTPException(403, "只有教师可以上传课件")
 
     # 检查文件扩展名
-    ext = os.path.splitext(file.filename)[1].lower()
+    filename = file.filename or "unnamed"
+    ext = os.path.splitext(filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"不支持的文件类型: {ext}")
 

@@ -27,6 +27,10 @@ async def analyze_knowledge(
     db: Session = Depends(get_db),
 ):
     """知识归因分析（数学/写作）"""
+    # 权限校验：学生只能分析自己，教师/管理员可分析任意学生
+    if current_user.role == "student" and current_user.id != data.student_id:
+        raise HTTPException(403, "无权分析他人数据")
+
     # 获取该学生所有提交的批改结果
     submission_ids = [
         s[0] for s in db.query(HomeworkSubmission.id)
@@ -253,7 +257,8 @@ def get_my_student_info(
     for s in my_students:
         classroom = db.query(Classroom).filter(Classroom.id == s.classroom_id).first()
         student_list.append({
-            "student_id": s.id,
+            "student_id": s.person_id,  # registered_person.id，与归因分析 API 一致
+            "student_record_id": s.id,  # student 表主键（课堂注册记录）
             "student_name": s.name or current_user.name,
             "classroom_id": s.classroom_id,
             "classroom_name": classroom.name if classroom else "",
@@ -287,7 +292,12 @@ def list_students_for_analysis(
         "classroom_id": classroom_id,
         "classroom_name": classroom.name if classroom else "",
         "students": [
-            {"student_id": s.id, "name": s.name or f"学生#{s.id}", "classroom_id": s.classroom_id}
+            {
+                "student_id": s.person_id,  # registered_person.id，与归因分析 API 一致
+                "student_record_id": s.id,  # student 表主键（课堂注册记录）
+                "name": s.name or f"学生#{s.id}",
+                "classroom_id": s.classroom_id,
+            }
             for s in students
         ],
     }

@@ -369,7 +369,9 @@ def rebuild_index(
     """从数据库重建索引：补充 document_id 元数据 + 清理已删除向量。
 
     旧索引（无 document_id）需执行一次本接口，后续删除才能生效。
+    仅管理员/教师可操作。
     """
+    assert_teacher_or_admin(current_user)
     service = get_rag_service()
     result = service.rebuild_index(db)
     return result
@@ -488,7 +490,8 @@ def index_history_data(
     current_user: RegisteredPerson = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """索引历史课堂数据（报告和对话）"""
+    """索引历史课堂数据（报告和对话）— 仅管理员/教师可操作"""
+    assert_teacher_or_admin(current_user)
     # 获取所有报告
     reports = db.query(Report).all()
     report_contents = [r.content for r in reports if r.content]
