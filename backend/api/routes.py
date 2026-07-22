@@ -159,7 +159,8 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
             pose = face.get("pose", {})
             fatigue = face.get("fatigue", {})
             record = AttentionRecord(
-                student_id=student.id,
+                student_id=student.person_id or 0,
+                student_record_id=student.id,
                 classroom_id=classroom_id,
                 attention_score=face["attention_score"],
                 pitch=pose.get("pitch", 0),
@@ -177,7 +178,8 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
             if exam_mode and "exam_risk" in face:
                 risk = face["exam_risk"]
                 risk_record = ExamRiskRecord(
-                    student_id=student.id,
+                    student_id=student.person_id or 0,
+                    student_record_id=student.id,
                     classroom_id=classroom_id,
                     risk_level=risk["risk_level"],
                     gaze_deviation_duration=risk["gaze_deviation_duration"],

@@ -262,12 +262,13 @@ def close_session(
     for student in students:
         existing = db.query(Attendance).filter(
             Attendance.checkin_session_id == session.id,
-            Attendance.student_id == student.id,
+            Attendance.student_record_id == student.id,
         ).first()
         if not existing:
             attendance = Attendance(
                 classroom_id=session.classroom_id,
-                student_id=student.id,
+                student_id=student.person_id,
+                student_record_id=student.id,
                 checkin_session_id=session.id,
                 status="absent",
                 note="未签到",
@@ -301,7 +302,7 @@ def get_attendances(
     attendances = db.query(Attendance).filter(Attendance.checkin_session_id == session_id).all()
     result = []
     for att in attendances:
-        student_name = att.student.person.name if att.student and att.student.person else f"学生{att.student_id}"
+        student_name = att.student.name if att.student else f"学生{att.student_id}"
         result.append(AttendanceOut(
             id=att.id,
             student_id=att.student_id,
@@ -334,7 +335,7 @@ def export_attendance(
     writer = csv.writer(output)
     writer.writerow(["学生ID", "姓名", "状态", "签到时间", "备注"])
     for att in attendances:
-        student_name = att.student.person.name if att.student and att.student.person else f"学生{att.student_id}"
+        student_name = att.student.name if att.student else f"学生{att.student_id}"
         status_text = "已签到" if att.status == "present" else "缺勤"
         writer.writerow([
             att.student_id,
@@ -388,7 +389,7 @@ def get_active_checkin(
     
     attendance = db.query(Attendance).filter(
         Attendance.checkin_session_id == session.id,
-        Attendance.student_id == student.id,
+        Attendance.student_record_id == student.id,
     ).first()
     
     return {
@@ -429,7 +430,7 @@ def submit_checkin(
     # 检查是否已签到
     existing = db.query(Attendance).filter(
         Attendance.checkin_session_id == session.id,
-        Attendance.student_id == student.id,
+        Attendance.student_record_id == student.id,
     ).first()
     
     if existing and existing.status == "present":
@@ -442,7 +443,8 @@ def submit_checkin(
     else:
         attendance = Attendance(
             classroom_id=session.classroom_id,
-            student_id=student.id,
+            student_id=student.person_id,
+            student_record_id=student.id,
             checkin_session_id=session.id,
             status="present",
             checkin_time=datetime.now(),
@@ -468,7 +470,7 @@ def get_checkin_history(
         return []
     
     attendances = db.query(Attendance).filter(
-        Attendance.student_id.in_(my_student_ids)
+        Attendance.student_record_id.in_(my_student_ids)
     ).order_by(Attendance.created_at.desc()).all()
     
     result = []

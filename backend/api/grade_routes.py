@@ -168,7 +168,7 @@ def get_grade_report(
             for session in checkin_sessions:
                 att = db.query(Attendance).filter(
                     Attendance.checkin_session_id == session.id,
-                    Attendance.student_id == student.id,
+                    Attendance.student_record_id == student.id,
                     Attendance.status == "present",
                 ).first()
                 if att:

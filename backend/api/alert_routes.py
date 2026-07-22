@@ -74,7 +74,7 @@ def get_alerts(
                 for s in sessions:
                     att = db.query(Attendance).filter(
                         Attendance.checkin_session_id == s.id,
-                        Attendance.student_id == student.id,
+                        Attendance.student_record_id == student.id,
                         Attendance.status == "present",
                     ).first()
                     if att:

@@ -56,8 +56,8 @@ class Student(Base):
     person_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True, index=True)
 
     classroom: Mapped["Classroom"] = relationship(back_populates="students")
-    records: Mapped[list["AttentionRecord"]] = relationship(back_populates="student")
-    exam_risk_records: Mapped[list["ExamRiskRecord"]] = relationship(back_populates="student")
+    records: Mapped[list["AttentionRecord"]] = relationship(back_populates="student_record", foreign_keys="AttentionRecord.student_record_id")
+    exam_risk_records: Mapped[list["ExamRiskRecord"]] = relationship(back_populates="student_record", foreign_keys="ExamRiskRecord.student_record_id")
     person: Mapped["RegisteredPerson | None"] = relationship(back_populates="students")
 
 
@@ -65,7 +65,8 @@ class AttentionRecord(Base):
     __tablename__ = "attention_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    student_record_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("student.id"), nullable=True, index=True)
     classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     attention_score: Mapped[float] = mapped_column(Float)
@@ -79,7 +80,8 @@ class AttentionRecord(Base):
     pose_score: Mapped[float] = mapped_column(Float, default=0)
     fatigue_score: Mapped[float] = mapped_column(Float, default=0)
 
-    student: Mapped["Student"] = relationship(back_populates="records")
+    student: Mapped["RegisteredPerson"] = relationship(back_populates="attention_records")
+    student_record: Mapped["Student | None"] = relationship()
     classroom: Mapped["Classroom"] = relationship(back_populates="records")
 
 
@@ -87,7 +89,8 @@ class ExamRiskRecord(Base):
     __tablename__ = "exam_risk_record"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    student_record_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("student.id"), nullable=True, index=True)
     classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     risk_level: Mapped[str] = mapped_column(String(10))
@@ -97,7 +100,8 @@ class ExamRiskRecord(Base):
     cheating_object_nearby: Mapped[bool] = mapped_column(Boolean, default=False)
     attention_score: Mapped[float] = mapped_column(Float, default=0)
 
-    student: Mapped["Student"] = relationship(back_populates="exam_risk_records")
+    student: Mapped["RegisteredPerson"] = relationship(back_populates="exam_risk_records_as_person")
+    student_record: Mapped["Student | None"] = relationship()
     classroom: Mapped["Classroom"] = relationship(back_populates="exam_risk_records")
 
 
@@ -145,6 +149,8 @@ class RegisteredPerson(Base):
     students: Mapped[list["Student"]] = relationship(back_populates="person")
     classrooms_as_teacher: Mapped[list["Classroom"]] = relationship(back_populates="teacher_person")
     classroom_memberships: Mapped[list["ClassroomMember"]] = relationship(back_populates="person")
+    attention_records: Mapped[list["AttentionRecord"]] = relationship(back_populates="student")
+    exam_risk_records_as_person: Mapped[list["ExamRiskRecord"]] = relationship(back_populates="student")
     department: Mapped["Department | None"] = relationship(back_populates="members")
 
 
@@ -302,7 +308,8 @@ class Attendance(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
-    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
+    student_record_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("student.id"), nullable=True, index=True)
     checkin_session_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("checkin_session.id"), nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="present")  # present/absent/late/leave
     checkin_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -311,7 +318,8 @@ class Attendance(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     classroom: Mapped["Classroom"] = relationship()
-    student: Mapped["Student"] = relationship()
+    student: Mapped["RegisteredPerson"] = relationship()
+    student_record: Mapped["Student | None"] = relationship()
     checkin_session: Mapped["CheckinSession | None"] = relationship(back_populates="attendances")
 
 

@@ -154,7 +154,7 @@ def get_heatmap(
 
     # 获取所有学生
     students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
-    student_map = {s.id: s.name or f"学生{s.track_id}" for s in students}
+    student_map = {s.id: (s.person_id, s.name or f"学生{s.track_id}") for s in students}
 
     # 获取所有时间点（按分钟分组）
     time_rows = (
@@ -170,14 +170,14 @@ def get_heatmap(
 
     # 构建热力图数据矩阵
     heatmap_data = []
-    for student_id, student_name in student_map.items():
+    for student_record_id, (person_id, student_name) in student_map.items():
         row_data = []
         for time_label in time_labels:
             avg_att = (
                 db.query(func.avg(AttentionRecord.attention_score))
                 .filter(
                     AttentionRecord.classroom_id == classroom_id,
-                    AttentionRecord.student_id == student_id,
+                    AttentionRecord.student_record_id == student_record_id,
                     func.strftime("%H:%M", AttentionRecord.timestamp) == time_label,
                 )
                 .scalar() or 0
@@ -250,10 +250,10 @@ def get_attendance(
     }
 
 
-def _get_student_avg_attention(student_id: int, db: Session) -> float:
+def _get_student_avg_attention(student_record_id: int, db: Session) -> float:
     """获取学生的平均注意力"""
     avg = db.query(func.avg(AttentionRecord.attention_score)).filter(
-        AttentionRecord.student_id == student_id
+        AttentionRecord.student_record_id == student_record_id
     ).scalar()
     return round(avg or 0, 1)
 
@@ -277,7 +277,7 @@ def get_students(
 
     result = []
     for s in students:
-        records = db.query(AttentionRecord).filter(AttentionRecord.student_id == s.id).all()
+        records = db.query(AttentionRecord).filter(AttentionRecord.student_record_id == s.id).all()
         avg_att = sum(r.attention_score for r in records) / len(records) if records else 0
         head_down = 1 if any(abs(r.pitch) > 15 for r in records) else 0
         blinks = records[-1].blink_count if records else 0
@@ -286,7 +286,7 @@ def get_students(
         if classroom and classroom.exam_mode:
             latest_risk = (
                 db.query(ExamRiskRecord)
-                .filter(ExamRiskRecord.student_id == s.id)
+                .filter(ExamRiskRecord.student_record_id == s.id)
                 .order_by(ExamRiskRecord.timestamp.desc())
                 .first()
             )
@@ -325,21 +325,21 @@ def create_report(
     student_ids = set(r.student_id for r in records)
     head_down_count = sum(
         1 for sid in student_ids
-        if any(abs(r.pitch) > 15 for r in records if r.student_id == sid)
+        if any(abs(r.pitch) > 15 for r in records if r.student_record_id == sid)
     )
     head_turn_count = sum(
         1 for sid in student_ids
-        if any(abs(r.yaw) > 20 for r in records if r.student_id == sid)
+        if any(abs(r.yaw) > 20 for r in records if r.student_record_id == sid)
     )
     fatigue_count = sum(
         1 for sid in student_ids
-        if any(r.is_blinking for r in records if r.student_id == sid)
+        if any(r.is_blinking for r in records if r.student_record_id == sid)
     )
 
     # 计算每个学生的平均注意力
     student_avg = {}
     for sid in student_ids:
-        s_records = [r for r in records if r.student_id == sid]
+        s_records = [r for r in records if r.student_record_id == sid]
         if s_records:
             student_avg[sid] = sum(r.attention_score for r in s_records) / len(s_records)
 
@@ -539,7 +539,7 @@ def update_student(
     db.commit()
     db.refresh(student)
 
-    records = db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).all()
+    records = db.query(AttentionRecord).filter(AttentionRecord.student_record_id == student_id).all()
     avg_att = sum(r.attention_score for r in records) / len(records) if records else 0
     head_down = 1 if any(abs(r.pitch) > 15 for r in records) else 0
     blinks = records[-1].blink_count if records else 0
@@ -549,7 +549,7 @@ def update_student(
     if classroom and classroom.exam_mode:
         latest_risk = (
             db.query(ExamRiskRecord)
-            .filter(ExamRiskRecord.student_id == student_id)
+            .filter(ExamRiskRecord.student_record_id == student_id)
             .order_by(ExamRiskRecord.timestamp.desc())
             .first()
         )
@@ -580,8 +580,8 @@ def delete_student(
     ).first()
     if not student:
         raise HTTPException(404, "学生不存在")
-    db.query(AttentionRecord).filter(AttentionRecord.student_id == student_id).delete()
-    db.query(ExamRiskRecord).filter(ExamRiskRecord.student_id == student_id).delete()
+    db.query(AttentionRecord).filter(AttentionRecord.student_record_id == student_id).delete()
+    db.query(ExamRiskRecord).filter(ExamRiskRecord.student_record_id == student_id).delete()
     db.delete(student)
     db.commit()
     return {"message": "学生已删除"}
@@ -612,7 +612,7 @@ def get_my_attention_history(
 
     classroom_data = []
     for s in my_students:
-        records = db.query(AttentionRecord).filter(AttentionRecord.student_id == s.id).all()
+        records = db.query(AttentionRecord).filter(AttentionRecord.student_record_id == s.id).all()
         if not records:
             continue
         avg_att = sum(r.attention_score for r in records) / len(records)
@@ -629,7 +629,7 @@ def get_my_attention_history(
                 func.strftime("%H:%M", AttentionRecord.timestamp).label("minute"),
                 func.avg(AttentionRecord.attention_score).label("avg_att"),
             )
-            .filter(AttentionRecord.student_id == s.id)
+            .filter(AttentionRecord.student_record_id == s.id)
             .group_by("minute")
             .order_by("minute")
             .all()
@@ -697,7 +697,7 @@ def get_student_behavior(
     # 考勤行为
     if student:
         attendances = db.query(Attendance).filter(
-            Attendance.student_id == student.id
+            Attendance.student_record_id == student.id
         ).all()
     else:
         attendances = []
@@ -711,7 +711,7 @@ def get_student_behavior(
     # 注意力行为
     if student:
         attention_records = db.query(AttentionRecord).filter(
-            AttentionRecord.student_id == student.id
+            AttentionRecord.student_record_id == student.id
         ).all()
     else:
         attention_records = []

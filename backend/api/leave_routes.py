@@ -160,12 +160,13 @@ def review_leave(
             for session in sessions:
                 existing = db.query(Attendance).filter(
                     Attendance.checkin_session_id == session.id,
-                    Attendance.student_id == student.id,
+                    Attendance.student_record_id == student.id,
                 ).first()
                 if not existing:
                     att = Attendance(
                         classroom_id=leave.classroom_id,
-                        student_id=student.id,
+                        student_id=student.person_id,
+                        student_record_id=student.id,
                         checkin_session_id=session.id,
                         status="leave",
                         note=f"请假：{leave.reason[:50]}",
