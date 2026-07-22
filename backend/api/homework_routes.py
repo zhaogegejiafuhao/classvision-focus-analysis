@@ -642,10 +642,14 @@ async def upload_homework_attachment(
     if homework.teacher_id != current_user.id and current_user.role != "admin":
         raise HTTPException(403, "无权上传附件")
 
-    file_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1]
-    save_path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
+    # 文件大小限制 (50MB)
     content = await file.read()
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "文件过大，最大50MB")
+
+    file_id = str(uuid.uuid4())
+    safe_ext = os.path.splitext(os.path.basename(file.filename or "unnamed"))[1]
+    save_path = os.path.join(UPLOAD_DIR, f"{file_id}{safe_ext}")
     with open(save_path, "wb") as f:
         f.write(content)
 
@@ -691,10 +695,14 @@ async def upload_submission_attachment(
     if submission.student_id != current_user.id:
         raise HTTPException(403, "无权上传")
 
-    file_id = str(uuid.uuid4())
-    ext = os.path.splitext(file.filename)[1]
-    save_path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
+    # 文件大小限制 (50MB)
     content = await file.read()
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "文件过大，最大50MB")
+
+    file_id = str(uuid.uuid4())
+    safe_ext = os.path.splitext(os.path.basename(file.filename or "unnamed"))[1]
+    save_path = os.path.join(UPLOAD_DIR, f"{file_id}{safe_ext}")
     with open(save_path, "wb") as f:
         f.write(content)
 

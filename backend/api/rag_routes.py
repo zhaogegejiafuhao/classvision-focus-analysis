@@ -2,6 +2,7 @@
 
 import os
 import json
+import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -128,10 +129,14 @@ async def upload_knowledge(
     if ext not in allowed_types:
         raise HTTPException(400, f"不支持的文件类型: {ext}")
 
-    # 保存文件
+    # 保存文件（使用安全的文件名，防止路径遍历）
     save_dir = settings.RAG_KNOWLEDGE_DIR
     os.makedirs(save_dir, exist_ok=True)
-    file_path = os.path.join(save_dir, file.filename)
+    # 仅取文件名部分，移除路径分隔符
+    safe_filename = os.path.basename(file.filename or "unnamed")
+    file_id = str(uuid.uuid4())
+    ext = os.path.splitext(safe_filename)[1].lower()
+    file_path = os.path.join(save_dir, f"{file_id}{ext}")
 
     with open(file_path, 'wb') as f:
         content = await file.read()

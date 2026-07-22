@@ -1,9 +1,17 @@
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from backend.core.config import settings
 
 engine = create_engine(settings.DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
+
+# 启用 SQLite 外键约束（默认关闭，导致所有 ForeignKey 声明形同虚设）
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 

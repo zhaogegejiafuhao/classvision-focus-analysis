@@ -189,9 +189,17 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
                     attention_score=face["attention_score"],
                 )
                 db.add(risk_record)
-        db.commit()
+        try:
+            db.commit()
+        except Exception as commit_err:
+            logger.error(f"提交记录异常: {commit_err}")
+            db.rollback()
     except Exception as e:
         logger.error(f"保存记录异常: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
     finally:
         db.close()
 
@@ -205,10 +213,12 @@ async def video_stream(
     frame_seq = 0
     loop = asyncio.get_event_loop()
 
-    db = SessionLocal()
-    classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
-    exam_mode = classroom.exam_mode if classroom else False
-    db.close()
+    try:
+        db = SessionLocal()
+        classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
+        exam_mode = classroom.exam_mode if classroom else False
+    finally:
+        db.close()
 
     try:
         while True:
