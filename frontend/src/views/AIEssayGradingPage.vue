@@ -180,13 +180,31 @@
 
           <!-- 操作按钮 -->
           <a-space>
-            <a-button type="primary" @click="handleConfirm">
+            <a-button type="primary" @click="handleConfirm" :loading="confirmLoading">
               确认评分
             </a-button>
-            <a-button @click="handleAdjust">
-              调整分数
+            <a-button @click="showAdjust = !showAdjust">
+              {{ showAdjust ? '收起' : '调整分数' }}
             </a-button>
           </a-space>
+
+          <!-- 调整分数区域 -->
+          <div v-if="showAdjust" style="margin-top: 12px">
+            <a-space>
+              <a-input-number
+                v-model:value="adjustedScore"
+                :min="0"
+                :max="100"
+                :step="1"
+                style="width: 120px"
+                placeholder="调整分数"
+              />
+              <a-button type="primary" size="small" :loading="confirmLoading" @click="handleAdjust">
+                提交调整
+              </a-button>
+              <a-button size="small" @click="showAdjust = false">取消</a-button>
+            </a-space>
+          </div>
         </div>
       </a-col>
     </a-row>
@@ -220,6 +238,11 @@ const inputData = reactive({
   imageBase64: '',
   textContent: '',
 })
+
+// ---- 操作状态 ----
+const showAdjust = ref(false)
+const adjustedScore = ref(null)
+const confirmLoading = ref(false)
 
 // ---- 作文四维配置 ----
 const essayDimensions = [
@@ -371,17 +394,37 @@ async function handleConfirm() {
     return
   }
 
+  confirmLoading.value = true
   try {
     await confirmGrading(result.value.id)
     message.success('评分已确认')
   } catch (e) {
     message.error('确认失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    confirmLoading.value = false
   }
 }
 
 // ---- 调整分数 ----
-function handleAdjust() {
-  message.info('分数调整功能开发中，可手动修改后重新提交')
+async function handleAdjust() {
+  if (!result.value?.id) {
+    message.warning('无批改结果可调整')
+    return
+  }
+  if (adjustedScore.value === null || adjustedScore.value === undefined) {
+    message.warning('请输入调整后的分数')
+    return
+  }
+  confirmLoading.value = true
+  try {
+    await confirmGrading(result.value.id, adjustedScore.value)
+    message.success(`分数已调整为 ${adjustedScore.value} 分`)
+    showAdjust.value = false
+  } catch (e) {
+    message.error('调整失败：' + (e?.response?.data?.detail || e?.message || '未知错误'))
+  } finally {
+    confirmLoading.value = false
+  }
 }
 </script>
 
