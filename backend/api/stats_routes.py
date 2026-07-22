@@ -346,23 +346,23 @@ def create_report(
 
     records = db.query(AttentionRecord).filter(AttentionRecord.classroom_id == classroom_id).all()
 
-    student_ids = set(r.student_id for r in records)
+    student_record_ids = set(r.student_record_id for r in records if r.student_record_id is not None)
     head_down_count = sum(
-        1 for sid in student_ids
+        1 for sid in student_record_ids
         if any(abs(r.pitch) > 15 for r in records if r.student_record_id == sid)
     )
     head_turn_count = sum(
-        1 for sid in student_ids
+        1 for sid in student_record_ids
         if any(abs(r.yaw) > 20 for r in records if r.student_record_id == sid)
     )
     fatigue_count = sum(
-        1 for sid in student_ids
+        1 for sid in student_record_ids
         if any(r.is_blinking for r in records if r.student_record_id == sid)
     )
 
     # 计算每个学生的平均注意力
     student_avg = {}
-    for sid in student_ids:
+    for sid in student_record_ids:
         s_records = [r for r in records if r.student_record_id == sid]
         if s_records:
             student_avg[sid] = sum(r.attention_score for r in s_records) / len(s_records)
@@ -489,13 +489,19 @@ def get_exam_risks(
     student_cache = {}
     result = []
     for r in records:
-        if r.student_id not in student_cache:
-            s = db.query(Student).filter(Student.id == r.student_id).first()
-            student_cache[r.student_id] = s.name or f"学生{s.track_id}" if s else "未知"
+        # student_id 现在是 registered_person.id，student_record_id 是 Student.id
+        cache_key = r.student_record_id or r.student_id
+        if cache_key not in student_cache:
+            if r.student_record_id:
+                s = db.query(Student).filter(Student.id == r.student_record_id).first()
+                student_cache[cache_key] = s.name or f"学生{s.track_id}" if s else "未知"
+            else:
+                p = db.query(RegisteredPerson).filter(RegisteredPerson.id == r.student_id).first()
+                student_cache[cache_key] = p.name if p else "未知"
         result.append(ExamRiskOut(
             id=r.id,
-            student_id=r.student_id,
-            student_name=student_cache[r.student_id],
+            student_id=r.student_record_id or r.student_id,
+            student_name=student_cache[cache_key],
             risk_level=r.risk_level,
             gaze_deviation_duration=r.gaze_deviation_duration,
             head_down_duration=r.head_down_duration,
@@ -702,6 +708,8 @@ def get_student_behavior(
         raise HTTPException(403, "无权查看他人数据")
 
     student = db.query(Student).filter(Student.person_id == student_id).first()
+    my_student_records = db.query(Student).filter(Student.person_id == student_id).all()
+    my_student_ids = [s.id for s in my_student_records]
 
     # 作业行为
     homework_subs = db.query(HomeworkSubmission).filter(
@@ -718,10 +726,10 @@ def get_student_behavior(
     exam_total = len(exam_subs)
     exam_avg = sum(s.score or 0 for s in exam_subs if s.score) / max(1, sum(1 for s in exam_subs if s.score))
 
-    # 考勤行为
-    if student:
+    # 考勤行为（所有课堂的考勤记录）
+    if my_student_ids:
         attendances = db.query(Attendance).filter(
-            Attendance.student_record_id == student.id
+            Attendance.student_record_id.in_(my_student_ids)
         ).all()
     else:
         attendances = []
@@ -732,10 +740,10 @@ def get_student_behavior(
     leave_count = sum(1 for a in attendances if a.status == "leave")
     attendance_rate = present_count / max(1, attendance_total) * 100
 
-    # 注意力行为
-    if student:
+    # 注意力行为（所有课堂的注意力记录）
+    if my_student_ids:
         attention_records = db.query(AttentionRecord).filter(
-            AttentionRecord.student_record_id == student.id
+            AttentionRecord.student_record_id.in_(my_student_ids)
         ).all()
     else:
         attention_records = []
