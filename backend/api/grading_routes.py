@@ -118,6 +118,8 @@ async def batch_grade(
     db: Session = Depends(get_db),
 ):
     """批量批改作业的所有提交"""
+    if current_user.role not in ("teacher", "admin"):
+        raise HTTPException(403, "只有教师可以批量批改")
     from backend.models.tables import Homework
     homework = db.query(Homework).filter(Homework.id == homework_id).first()
     if not homework:
