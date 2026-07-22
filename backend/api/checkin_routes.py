@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
+from sqlalchemy import and_, func as sa_func
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user
@@ -166,7 +166,7 @@ def list_sessions(
     classroom_ids = list(set(s.classroom_id for s in sessions))
     student_counts = {cid: db.query(Student).filter(Student.classroom_id == cid).count() for cid in classroom_ids}
     checked_counts = dict(
-        db.query(Attendance.checkin_session_id, db.func.count(Attendance.id))
+        db.query(Attendance.checkin_session_id, sa_func.count(Attendance.id))
         .filter(Attendance.checkin_session_id.in_(session_ids), Attendance.status == "present")
         .group_by(Attendance.checkin_session_id).all()
     ) if session_ids else {}
