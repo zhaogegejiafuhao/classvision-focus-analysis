@@ -13,6 +13,16 @@ from backend.models.tables import TeachingPlan, RegisteredPerson, Classroom, Cla
 router = APIRouter(prefix="/api/teaching-plans", tags=["teaching-plans"])
 
 
+def _safe_json_loads(text: str | None):
+    """安全解析 JSON 字符串，避免脏数据导致 500"""
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 class PlanCreate(BaseModel):
     title: str
     classroom_id: Optional[int] = None
@@ -75,8 +85,8 @@ def list_plans(
             "title": p.title,
             "classroom_id": p.classroom_id,
             "objectives": p.objectives,
-            "chapters": json.loads(p.chapters) if p.chapters else None,
-            "schedule": json.loads(p.schedule) if p.schedule else None,
+            "chapters": _safe_json_loads(p.chapters),
+            "schedule": _safe_json_loads(p.schedule),
             "notes": p.notes,
             "status": p.status,
             "created_at": p.created_at.isoformat() if p.created_at else None,

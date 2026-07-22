@@ -152,6 +152,17 @@ def list_sessions(
     
     if current_user.role == "teacher":
         query = query.filter(CheckinSession.teacher_id == current_user.id)
+    elif current_user.role == "student":
+        # 学生只能看到自己所在课堂的签到会话
+        my_classroom_ids = [
+            s.classroom_id for s in
+            db.query(Student).filter(Student.person_id == current_user.id).all()
+            if s.classroom_id
+        ]
+        if my_classroom_ids:
+            query = query.filter(CheckinSession.classroom_id.in_(my_classroom_ids))
+        else:
+            return []
     # admin 可以看到所有签到
     
     if classroom_id:
@@ -186,7 +197,7 @@ def list_sessions(
             teacher_id=session.teacher_id,
             teacher_name=teacher_name,
             type=session.type,
-            code=session.code,
+            code=session.code if current_user.role != "student" else None,  # 学生不可见签到码
             status=session.status,
             start_time=session.start_time,
             end_time=session.end_time,

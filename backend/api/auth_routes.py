@@ -1,5 +1,7 @@
 """认证 API 路由（登录、获取当前用户）"""
-from fastapi import APIRouter, Depends, HTTPException
+import time
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -9,6 +11,24 @@ from backend.models.tables import RegisteredPerson
 from backend.models.schemas import LoginRequest, LoginResponse, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# ===== 简单内存限流 =====
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_register_attempts: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_WINDOW = 300  # 5 分钟
+RATE_LIMIT_MAX_LOGIN = 10  # 每IP 5分钟最多10次登录
+RATE_LIMIT_MAX_REGISTER = 5  # 每IP 5分钟最多5次注册
+
+
+def _check_rate_limit(attempts_dict: dict, key: str, max_attempts: int):
+    """检查请求频率限制"""
+    now = time.time()
+    attempts = attempts_dict[key]
+    # 清理过期记录
+    attempts_dict[key] = [t for t in attempts if now - t < RATE_LIMIT_WINDOW]
+    if len(attempts_dict[key]) >= max_attempts:
+        raise HTTPException(429, "请求过于频繁，请稍后再试")
+    attempts_dict[key].append(now)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -24,8 +44,10 @@ class RegisterRequest(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     """用户名/密码登录，返回 JWT token"""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_login_attempts, client_ip, RATE_LIMIT_MAX_LOGIN)
     user = db.query(RegisteredPerson).filter(RegisteredPerson.username == req.username).first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
@@ -34,8 +56,10 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=LoginResponse)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+def register(req: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """用户自主注册（默认学生角色）"""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(_register_attempts, client_ip, RATE_LIMIT_MAX_REGISTER)
     if len(req.password) < 6:
         raise HTTPException(400, "密码至少6位")
     if req.role not in ("student", "teacher"):

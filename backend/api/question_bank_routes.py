@@ -14,6 +14,16 @@ from backend.models.tables import QuestionBank, Exam, Question, RegisteredPerson
 router = APIRouter(prefix="/api/question-bank", tags=["question-bank"])
 
 
+def _safe_json_loads(text: str | None):
+    """安全解析 JSON 字符串，避免脏数据导致 500"""
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 class QuestionBankCreate(BaseModel):
     type: str  # single/multi/judge/fill/essay
     content: str
@@ -83,7 +93,7 @@ def list_questions(
             id=q.id,
             type=q.type,
             content=q.content,
-            options=json.loads(q.options) if q.options else None,
+            options=_safe_json_loads(q.options),
             answer=q.answer,
             score=q.score,
             category=q.category,
@@ -121,7 +131,7 @@ def create_question(
 
     return QuestionBankOut(
         id=q.id, type=q.type, content=q.content,
-        options=json.loads(q.options) if q.options else None,
+        options=_safe_json_loads(q.options),
         answer=q.answer, score=q.score, category=q.category,
         tags=q.tags, difficulty=q.difficulty,
         created_at=q.created_at.isoformat() if q.created_at else None,
