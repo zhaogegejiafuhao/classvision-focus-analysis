@@ -5,11 +5,14 @@ from backend.core.config import settings
 
 engine = create_engine(settings.DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 
-# 启用 SQLite 外键约束（默认关闭，导致所有 ForeignKey 声明形同虚设）
+# 启用 SQLite WAL 模式 + 外键约束 + 合理的 busy_timeout（解决并发写入锁冲突）
 @event.listens_for(engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA journal_mode=WAL")          # WAL 模式：读写不互斥
+    cursor.execute("PRAGMA busy_timeout=5000")          # 写冲突时等5秒而非立即报错
+    cursor.execute("PRAGMA synchronous=NORMAL")         # 平衡安全性与性能
     cursor.close()
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

@@ -2,7 +2,9 @@ import asyncio
 import json
 import base64
 import logging
+import threading
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
@@ -22,6 +24,10 @@ router = APIRouter()
 tracker = FaceTracker()
 _analyzers: dict[int, AttentionAnalyzer] = {}
 _models_ready = False
+
+# 专用线程池：帧处理与 DB 保存分离，避免 _save_records 阻塞帧处理
+_frame_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="cv-frame")
+_save_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cv-save")
 
 
 def _warmup_models():
@@ -60,10 +66,11 @@ def _get_analyzer(classroom_id: int, exam_mode: bool) -> AttentionAnalyzer:
 # 已注册人脸库缓存（每60秒刷新一次）
 _registered_persons_cache: list[tuple[int, str, np.ndarray]] = []
 _cache_last_refresh: datetime = datetime.min
+_cache_lock = threading.Lock()
 
 
 def _refresh_registered_persons_cache(db: Session):
-    """刷新已注册人脸库缓存"""
+    """刷新已注册人脸库缓存（线程安全）"""
     global _registered_persons_cache, _cache_last_refresh
     now = datetime.now()
     if now - _cache_last_refresh < timedelta(seconds=60):
@@ -71,20 +78,24 @@ def _refresh_registered_persons_cache(db: Session):
 
     try:
         persons = db.query(RegisteredPerson).filter(RegisteredPerson.role == "student").all()
-        _registered_persons_cache = [
+        new_cache = [
             (p.id, p.name, json_to_embedding(p.face_embedding))
             for p in persons
             if p.face_embedding  # 只缓存有 embedding 的已注册人员
         ]
-        _cache_last_refresh = now
-        logger.info(f"已注册人脸库缓存刷新，共 {len(_registered_persons_cache)} 人")
+        with _cache_lock:
+            _registered_persons_cache = new_cache
+            _cache_last_refresh = now
+        logger.info(f"已注册人脸库缓存刷新，共 {len(new_cache)} 人")
     except Exception as e:
         logger.error(f"刷新人脸库缓存失败: {e}")
 
 
 def _match_face_identity(frame: np.ndarray, bbox: list[int]) -> tuple[int, str] | None:
     """在人脸库中匹配身份"""
-    if len(_registered_persons_cache) == 0:
+    with _cache_lock:
+        cache = list(_registered_persons_cache)
+    if len(cache) == 0:
         return None
 
     try:
@@ -92,7 +103,7 @@ def _match_face_identity(frame: np.ndarray, bbox: list[int]) -> tuple[int, str] 
         if embedding is None:
             return None
 
-        return recognizer.match_face(embedding, _registered_persons_cache, threshold=0.5)
+        return recognizer.match_face(embedding, cache, threshold=0.5)
     except Exception as e:
         logger.error(f"人脸匹配失败: {e}")
         return None
@@ -110,7 +121,9 @@ def _process_frame(frame, classroom_id: int, exam_mode: bool):
         results["exam_mode"] = exam_mode
 
         # 尝试人脸身份匹配（仅对新学生）
-        if len(_registered_persons_cache) > 0:
+        with _cache_lock:
+            has_cache = len(_registered_persons_cache) > 0
+        if has_cache:
             for face in results.get("faces", []):
                 bbox = face.get("bbox")
                 if bbox:
@@ -125,6 +138,7 @@ def _process_frame(frame, classroom_id: int, exam_mode: bool):
 
 
 def _save_records(classroom_id: int, faces: list, exam_mode: bool):
+    """保存注意力记录到数据库（在专用线程中执行，不阻塞帧处理）"""
     db: Session = SessionLocal()
     try:
         now = datetime.now()
@@ -155,7 +169,7 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
                         classroom_id=classroom_id,
                         track_id=track_id,
                         person_id=matched_person_id,
-                        name=matched_person_name,  # 如果匹配到，设置姓名
+                        name=matched_person_name,
                     )
                     db.add(student)
                     db.commit()
@@ -198,11 +212,21 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
                     attention_score=face["attention_score"],
                 )
                 db.add(risk_record)
-        try:
-            db.commit()
-        except Exception as commit_err:
-            logger.error(f"提交记录异常: {commit_err}")
-            db.rollback()
+
+        # 重试机制：SQLite 锁冲突时重试
+        for attempt in range(3):
+            try:
+                db.commit()
+                break
+            except Exception as commit_err:
+                if attempt < 2:
+                    logger.warning(f"提交记录重试 {attempt+1}/3: {commit_err}")
+                    db.rollback()
+                    import time
+                    time.sleep(0.1 * (attempt + 1))  # 退避等待
+                else:
+                    logger.error(f"提交记录失败(3次重试后): {commit_err}")
+                    db.rollback()
     except Exception as e:
         logger.error(f"保存记录异常: {e}")
         try:
@@ -229,6 +253,9 @@ async def video_stream(
     finally:
         db.close()
 
+    # 追踪上一次保存的 frame_seq，用于 fire-and-forget 保存
+    _last_saved_seq = 0
+
     try:
         while True:
             data = await ws.receive_text()
@@ -240,8 +267,9 @@ async def video_stream(
             if frame is None:
                 continue
 
+            # 帧处理使用专用线程池，与 DB 保存分离
             results = await loop.run_in_executor(
-                None, _process_frame, frame, classroom_id, exam_mode
+                _frame_executor, _process_frame, frame, classroom_id, exam_mode
             )
             results["classroom_id"] = classroom_id
             results["frame_seq"] = frame_seq
@@ -249,9 +277,13 @@ async def video_stream(
 
             await ws.send_json(results)
 
+            # 每30帧保存一次记录 — 使用 fire-and-forget 模式
+            # 不 await，让保存操作在专用线程中异步进行，不阻塞帧处理
             if frame_seq % 30 == 0 and results["faces"]:
-                await loop.run_in_executor(
-                    None, _save_records, classroom_id, results["faces"], exam_mode
+                # 复制 faces 数据，避免后续帧覆盖
+                faces_snapshot = json.loads(json.dumps(results["faces"]))
+                loop.run_in_executor(
+                    _save_executor, _save_records, classroom_id, faces_snapshot, exam_mode
                 )
     except WebSocketDisconnect:
         _analyzers.pop(classroom_id, None)
