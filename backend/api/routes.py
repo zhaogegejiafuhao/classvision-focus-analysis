@@ -39,6 +39,12 @@ def _warmup_models():
         analyzer.landmarker  # 触发 FaceLandmarker 模型加载
         logger.info("FaceLandmarker 预热完成")
 
+        logger.info("正在预热 InsightFace (face_recognizer)...")
+        recognizer.app  # 触发 InsightFace 模型加载
+        # 用虚拟帧触发一次完整提取流程
+        recognizer.extract_embedding(dummy)
+        logger.info("InsightFace 预热完成")
+
         _models_ready = True
     except Exception as e:
         logger.warning(f"模型预热异常（不影响运行）: {e}")
@@ -68,6 +74,7 @@ def _refresh_registered_persons_cache(db: Session):
         _registered_persons_cache = [
             (p.id, p.name, json_to_embedding(p.face_embedding))
             for p in persons
+            if p.face_embedding  # 只缓存有 embedding 的已注册人员
         ]
         _cache_last_refresh = now
         logger.info(f"已注册人脸库缓存刷新，共 {len(_registered_persons_cache)} 人")
@@ -158,8 +165,10 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
 
             pose = face.get("pose", {})
             fatigue = face.get("fatigue", {})
+            # student_id: person_id (FK to registered_person) — nullable when not matched
+            person_id_for_fk = student.person_id if student.person_id else None
             record = AttentionRecord(
-                student_id=student.person_id or 0,
+                student_id=person_id_for_fk,
                 student_record_id=student.id,
                 classroom_id=classroom_id,
                 attention_score=face["attention_score"],
@@ -178,7 +187,7 @@ def _save_records(classroom_id: int, faces: list, exam_mode: bool):
             if exam_mode and "exam_risk" in face:
                 risk = face["exam_risk"]
                 risk_record = ExamRiskRecord(
-                    student_id=student.person_id or 0,
+                    student_id=person_id_for_fk,
                     student_record_id=student.id,
                     classroom_id=classroom_id,
                     risk_level=risk["risk_level"],

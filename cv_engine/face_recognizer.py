@@ -155,8 +155,10 @@ def embedding_to_json(embedding: np.ndarray) -> str:
     return json.dumps(embedding.tolist())
 
 
-def json_to_embedding(json_str: str) -> np.ndarray:
-    """从JSON字符串恢复特征向量"""
+def json_to_embedding(json_str: str | None) -> np.ndarray:
+    """从JSON字符串恢复特征向量，None 或空字符串返回空数组"""
+    if not json_str:
+        return np.array([], dtype=np.float32)
     return np.array(json.loads(json_str), dtype=np.float32)
 
 
