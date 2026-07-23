@@ -72,7 +72,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
-import api from '@/api'
+import { listOjSubmissions } from '@/api/oj'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -152,7 +152,7 @@ async function loadSubmissions() {
   try {
     const params = { page: currentPage.value, page_size: pageSize.value }
     if (filterStatus.value) params.status = filterStatus.value
-    const res = await api.get('/oj/submissions', { params })
+    const res = await listOjSubmissions(params)
     submissions.value = res.data.items || []
     total.value = res.data.total || 0
   } catch (e) {

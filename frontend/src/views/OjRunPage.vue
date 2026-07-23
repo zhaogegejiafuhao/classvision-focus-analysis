@@ -102,7 +102,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import api from '@/api'
+import { getOjHealth, runCode as ojRunCode } from '@/api/oj'
 import { message, Empty } from 'ant-design-vue'
 import { CaretRightOutlined, CodeOutlined } from '@ant-design/icons-vue'
 
@@ -224,7 +224,7 @@ function formatMemory(kb) {
 
 async function checkJudger() {
   try {
-    const res = await api.get('/oj/health', { _skipGlobalError: true })
+    const res = await getOjHealth()
     judgerStatus.value = res.data?.status === 'ok' ? 'online' : 'offline'
   } catch {
     judgerStatus.value = 'offline'
@@ -239,7 +239,7 @@ async function runCode() {
   running.value = true
   runResult.value = null
   try {
-    const res = await api.post('/oj/run', {
+    const res = await ojRunCode({
       language: language.value,
       source: code.value,
       input: stdin.value,

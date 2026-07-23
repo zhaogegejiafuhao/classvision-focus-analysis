@@ -64,7 +64,8 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
+import { listCheckinSessions, createCheckinSession, closeCheckinSession } from '@/api/checkin'
+import { listClassrooms } from '@/api/classroom'
 
 const router = useRouter()
 const sessions = ref([])
@@ -90,7 +91,7 @@ const columns = [
 async function fetchSessions() {
   loading.value = true
   try {
-    const res = await api.get('/checkin/sessions')
+    const res = await listCheckinSessions()
     sessions.value = res.data.map(s => ({
       ...s,
       start_time: new Date(s.start_time).toLocaleString('zh-CN'),
@@ -104,7 +105,7 @@ async function fetchSessions() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
   } catch (e) {
     // 忽略
@@ -118,7 +119,7 @@ async function createSession() {
   }
   submitting.value = true
   try {
-    const res = await api.post('/checkin/sessions', {
+    const res = await createCheckinSession({
       classroom_id: form.value.classroom_id,
       type: form.value.type,
     })
@@ -141,7 +142,7 @@ async function createSession() {
 
 async function closeSession(id) {
   try {
-    await api.post(`/checkin/sessions/${id}/close`)
+    await closeCheckinSession(id)
     message.success('签到已结束')
     fetchSessions()
   } catch (e) {

@@ -36,7 +36,7 @@
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button type="link" size="small" @click="downloadFile(record)">下载</a-button>
-              <a-popconfirm title="确定删除？" @confirm="deleteMaterial(record.id)">
+              <a-popconfirm title="确定删除？" @confirm="handleDeleteMaterial(record.id)">
                 <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
             </a-space>
@@ -77,7 +77,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { listMaterials, uploadMaterial, deleteMaterial } from '@/api/material'
+import { listClassrooms } from '@/api/classroom'
 
 const materials = ref([])
 const classrooms = ref([])
@@ -102,7 +103,7 @@ async function fetchMaterials() {
   try {
     const params = {}
     if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
-    const res = await api.get('/materials', { params })
+    const res = await listMaterials(params)
     // 附加课堂名称
     const classMap = {}
     for (const c of classrooms.value) classMap[c.id] = c.name
@@ -115,7 +116,7 @@ async function fetchMaterials() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
   } catch { /* ignore */ }
 }
@@ -148,7 +149,7 @@ async function confirmUpload() {
     formData.append('title', uploadForm.value.title)
     if (uploadForm.value.classroom_id) formData.append('classroom_id', uploadForm.value.classroom_id)
     if (uploadForm.value.description) formData.append('description', uploadForm.value.description)
-    await api.post('/materials/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+ const res = await uploadMaterial(formData)
     message.success('上传成功')
     uploadModalOpen.value = false
     fetchMaterials()
@@ -159,8 +160,8 @@ function downloadFile(record) {
   window.open(`/api/materials/${record.id}/download`, '_blank')
 }
 
-async function deleteMaterial(id) {
-  try { await api.delete(`/materials/${id}`); message.success('删除成功'); fetchMaterials() } catch { /* ignore */ }
+async function handleDeleteMaterial(id) {
+  try { await deleteMaterial(id); message.success('删除成功'); fetchMaterials() } catch { /* ignore */ }
 }
 
 function formatSize(bytes) {

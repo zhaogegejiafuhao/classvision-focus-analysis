@@ -38,7 +38,7 @@
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button type="link" size="small" @click="goDetail(record.id)">查看</a-button>
-              <a-popconfirm title="确定删除？" @confirm="deleteHomework(record.id)">
+              <a-popconfirm title="确定删除？" @confirm="handleDeleteHomework(record.id)">
                 <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
             </a-space>
@@ -48,7 +48,7 @@
     </a-card>
 
     <!-- 创建作业弹窗 -->
-    <a-modal v-model:open="showCreateModal" title="创建作业" @ok="createHomework" :confirm-loading="submitting" width="600px">
+    <a-modal v-model:open="showCreateModal" title="创建作业" @ok="handleCreateHomework" :confirm-loading="submitting" width="600px">
       <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 18 }">
         <a-form-item label="标题" required>
           <a-input v-model:value="form.title" placeholder="作业标题" />
@@ -76,8 +76,9 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
 import dayjs from 'dayjs'
+import { listHomework, createHomework, deleteHomework } from '@/api/homework'
+import { listClassrooms } from '@/api/classroom'
 
 const router = useRouter()
 const homeworks = ref([])
@@ -109,7 +110,7 @@ async function fetchHomeworks() {
   try {
     const params = {}
     if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
-    const res = await api.get('/homework', { params })
+    const res = await listHomework(params)
     homeworks.value = res.data
   } catch (e) {
     message.error('获取作业失败')
@@ -120,14 +121,14 @@ async function fetchHomeworks() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
   } catch (e) {
     // 忽略
   }
 }
 
-async function createHomework() {
+async function handleCreateHomework() {
   if (!form.value.title.trim()) {
     message.error('请输入标题')
     return
@@ -141,7 +142,7 @@ async function createHomework() {
       deadline: form.value.deadline ? form.value.deadline.toISOString() : null,
       total_score: form.value.total_score,
     }
-    await api.post('/homework', payload)
+    await createHomework(payload)
     message.success('创建成功')
     showCreateModal.value = false
     resetForm()
@@ -153,9 +154,9 @@ async function createHomework() {
   }
 }
 
-async function deleteHomework(id) {
+async function handleDeleteHomework(id) {
   try {
-    await api.delete(`/homework/${id}`)
+    await deleteHomework(id)
     message.success('删除成功')
     fetchHomeworks()
   } catch (e) {

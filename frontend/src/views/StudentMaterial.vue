@@ -47,7 +47,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { listMaterials } from '@/api/material'
 
 const materials = ref([])
 const classrooms = ref([])
@@ -62,7 +62,7 @@ async function fetchMaterials() {
     if (selectedClassroomId.value) {
       params.classroom_id = selectedClassroomId.value
     }
-    const res = await api.get('/materials', { params })
+    const res = await listMaterials(params)
     // 附加课堂名称
     const classMap = {}
     for (const c of classrooms.value) classMap[c.id] = c.name
@@ -75,7 +75,7 @@ async function fetchMaterials() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
     // 如果只有一个课堂，自动选中
     if (classrooms.value.length === 1) {

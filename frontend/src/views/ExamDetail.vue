@@ -7,10 +7,10 @@
       <template #extra>
         <a-space>
           <a-button @click="exportPaper">导出试卷</a-button>
-          <a-popconfirm v-if="exam?.status === 'draft'" title="确定发布考试？" @confirm="publishExam">
+          <a-popconfirm v-if="exam?.status === 'draft'" title="确定发布考试？" @confirm="handlePublishExam">
             <a-button type="primary">发布考试</a-button>
           </a-popconfirm>
-          <a-popconfirm v-if="exam?.status === 'published'" title="确定关闭考试？学生将无法继续提交。" @confirm="closeExam">
+          <a-popconfirm v-if="exam?.status === 'published'" title="确定关闭考试？学生将无法继续提交。" @confirm="handleCloseExam">
             <a-button danger>关闭考试</a-button>
           </a-popconfirm>
           <a-button v-if="exam?.status !== 'draft'" @click="exportCSV">导出成绩</a-button>
@@ -192,7 +192,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '../api'
+import { getExam, getExamStats, getExamSubmission, listExamSubmissions, addExamQuestion, gradeExamAnswers, publishExam, closeExam, exportExam } from '@/api/exam'
 
 const route = useRoute()
 const router = useRouter()
@@ -241,7 +241,7 @@ const qStatColumns = [
 async function fetchStats() {
   statsLoading.value = true
   try {
-    const res = await api.get(`/exams/${examId}/stats`, { _skipGlobalError: true })
+    const res = await getExamStats(examId)
     stats.value = res.data
   } catch (e) {
     message.error('获取统计失败')
@@ -259,7 +259,7 @@ async function openGradeDetail(record) {
   gradeDetailVisible.value = true
   gradeDetailLoading.value = true
   try {
-    const res = await api.get(`/exams/submissions/${record.id}`)
+    const res = await getExamSubmission(record.id)
     gradeDetail.value = res.data
     // 初始化简答题评分
     Object.keys(essayScores).forEach(k => delete essayScores[k])
@@ -291,7 +291,7 @@ async function submitEssayGrades() {
         })
       }
     }
-    await api.post(`/exams/submissions/${gradeDetail.value.id}/grade-answers`, payload)
+    await gradeExamAnswers(gradeDetail.value.id, payload)
     message.success('批改成功')
     gradeDetailVisible.value = false
     fetchSubmissions()
@@ -305,7 +305,7 @@ async function submitEssayGrades() {
 async function fetchExam() {
   loading.value = true
   try {
-    const res = await api.get(`/exams/${examId}`)
+    const res = await getExam(examId)
     exam.value = res.data
     if (res.data.status !== 'draft') {
       fetchSubmissions()
@@ -319,7 +319,7 @@ async function fetchExam() {
 
 async function fetchSubmissions() {
   try {
-    const res = await api.get(`/exams/${examId}/submissions`, { _skipGlobalError: true })
+    const res = await listExamSubmissions(examId)
     submissions.value = res.data.map(s => ({
       ...s,
       submitted_at: s.submitted_at ? new Date(s.submitted_at).toLocaleString('zh-CN') : '-',
@@ -349,7 +349,7 @@ async function addQuestion() {
       score: questionForm.value.score,
     }
     
-    await api.post(`/exams/${examId}/questions`, payload)
+    await addExamQuestion(examId, payload)
     message.success('题目添加成功')
     
     // 重置表单
@@ -370,9 +370,9 @@ async function addQuestion() {
   }
 }
 
-async function publishExam() {
+async function handlePublishExam() {
   try {
-    await api.post(`/exams/${examId}/publish`)
+    await publishExam(examId)
     message.success('考试已发布')
     fetchExam()
   } catch (e) {
@@ -384,9 +384,9 @@ function exportPaper() {
   window.open(`/api/exams/${examId}/paper-export`, '_blank')
 }
 
-async function closeExam() {
+async function handleCloseExam() {
   try {
-    await api.post(`/exams/${examId}/close`)
+    await closeExam(examId)
     message.success('考试已关闭')
     fetchExam()
   } catch (e) {
@@ -396,7 +396,7 @@ async function closeExam() {
 
 async function exportCSV() {
   try {
-    const res = await api.get(`/exams/${examId}/export`, { responseType: 'blob' })
+    const res = await exportExam(examId)
     const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url

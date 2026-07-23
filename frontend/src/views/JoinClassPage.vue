@@ -87,7 +87,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { listPublicClassrooms, listMyClassrooms, joinClassroomById, joinClassroomByCode } from '@/api/classroom'
 
 const router = useRouter()
 
@@ -119,7 +119,7 @@ const myColumns = [
 async function fetchPublicClassrooms() {
   publicLoading.value = true
   try {
-    const res = await api.get('/classrooms/public', { params: { search: searchText.value } })
+    const res = await listPublicClassrooms({ search: searchText.value })
     publicClassrooms.value = res.data.map(c => ({ ...c, _joining: false }))
   } catch { /* ignore */ } finally {
     publicLoading.value = false
@@ -129,7 +129,7 @@ async function fetchPublicClassrooms() {
 async function fetchMyClassrooms() {
   myLoading.value = true
   try {
-    const res = await api.get('/classrooms/my')
+    const res = await listMyClassrooms()
     myClassrooms.value = res.data
   } catch { /* ignore */ } finally {
     myLoading.value = false
@@ -139,7 +139,7 @@ async function fetchMyClassrooms() {
 async function joinClassroom(record) {
   record._joining = true
   try {
-    await api.post(`/classrooms/join/${record.id}`)
+    await joinClassroomById(record.id)
     message.success(`已成功加入「${record.name}」`)
     fetchMyClassrooms()
   } catch (e) {
@@ -157,7 +157,7 @@ async function joinByCode() {
   }
   codeJoining.value = true
   try {
-    const res = await api.post('/classrooms/join', { invite_code: inviteCode.value.trim() })
+    const res = await joinClassroomByCode({ invite_code: inviteCode.value.trim() })
     message.success(`已成功加入「${res.data.name}」`)
     inviteCode.value = ''
     fetchMyClassrooms()

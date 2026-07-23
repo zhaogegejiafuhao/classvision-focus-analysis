@@ -78,7 +78,7 @@
         <div v-if="!mySubmission.submitted || (mySubmission.submitted && mySubmission.submission.status === 'submitted')" style="margin-top: 16px">
           <a-divider>提交作业</a-divider>
           <a-textarea v-model:value="submitContent" placeholder="输入作业内容..." :rows="6" />
-          <a-button type="primary" @click="submitHomework" :loading="submitting" style="margin-top: 8px" :disabled="isDeadlinePassed(currentHomework.deadline)">
+          <a-button type="primary" @click="handleSubmitHomework" :loading="submitting" style="margin-top: 8px" :disabled="isDeadlinePassed(currentHomework.deadline)">
             {{ mySubmission.submitted ? '重新提交' : '提交作业' }}
           </a-button>
           <span v-if="isDeadlinePassed(currentHomework.deadline)" style="margin-left: 8px; color: #ff4d4f">已过截止时间</span>
@@ -103,8 +103,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
 import dayjs from 'dayjs'
+import { listAssignedHomework, getMySubmission, submitHomework, createExtension } from '@/api/homework'
 import { getGradingResult } from '@/api/grading'
 import CorrectionForm from '@/components/correction/CorrectionForm.vue'
 import CorrectionComparison from '@/components/correction/CorrectionComparison.vue'
@@ -143,7 +143,7 @@ async function submitExtension() {
   }
   extSubmitting.value = true
   try {
-    await api.post('/homework/extensions', {
+    await createExtension({
       homework_id: extForm.value.homework_id,
       reason: extForm.value.reason,
       requested_deadline: extForm.value.requested_deadline.toISOString(),
@@ -160,11 +160,11 @@ async function submitExtension() {
 async function fetchHomeworks() {
   loading.value = true
   try {
-    const res = await api.get('/homework/assigned', { _skipGlobalError: true })
+    const res = await listAssignedHomework()
     // 获取每个作业的提交状态
     homeworks.value = await Promise.all(res.data.map(async hw => {
       try {
-        const subRes = await api.get(`/homework/my-submissions/${hw.id}`, { _skipGlobalError: true })
+        const subRes = await getMySubmission(hw.id)
         const myStatus = subRes.data.submitted ? subRes.data.submission.status : null
         const myScore = subRes.data.submitted ? subRes.data.submission.score : null
         return { ...hw, my_status: myStatus, my_score: myScore }
@@ -184,10 +184,10 @@ async function goDetail(id) {
   if (!hw) return
   currentHomework.value = hw
   submitContent.value = ''
-  
+
   // 获取提交状态
   try {
-    const res = await api.get(`/homework/my-submissions/${id}`, { _skipGlobalError: true })
+    const res = await getMySubmission(id)
     mySubmission.value = res.data
     if (res.data.submitted) {
       submitContent.value = res.data.submission.content
@@ -202,18 +202,18 @@ async function goDetail(id) {
   } catch {
     mySubmission.value = { submitted: false }
   }
-  
+
   showDetailModal.value = true
 }
 
-async function submitHomework() {
+async function handleSubmitHomework() {
   if (!submitContent.value.trim()) {
     message.error('请输入作业内容')
     return
   }
   submitting.value = true
   try {
-    await api.post(`/homework/${currentHomework.value.id}/submit`, {
+    await submitHomework(currentHomework.value.id, {
       content: submitContent.value,
     })
     message.success('提交成功')

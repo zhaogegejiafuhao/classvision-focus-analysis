@@ -16,7 +16,7 @@
                   <template #icon><EditOutlined /></template>
                   编辑
                 </a-button>
-                <a-popconfirm title="确定删除该课堂？所有关联数据（学生、记录、报告等）将一并删除。" @confirm="deleteClassroom(record)">
+                <a-popconfirm title="确定删除该课堂？所有关联数据（学生、记录、报告等）将一并删除。" @confirm="handleDeleteClassroom(record)">
                   <a-button type="link" danger size="small">
                     <template #icon><DeleteOutlined /></template>
                     删除
@@ -91,7 +91,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import api from '@/api'
+import { listClassrooms, createClassroom, updateClassroom, deleteClassroom } from '@/api/classroom'
+import { listPersons } from '@/api/person'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -152,7 +153,7 @@ const columns = computed(() => {
 async function loadClassrooms() {
   loading.value = true
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
   } catch (e) {
     message.error('加载课堂列表失败')
@@ -184,7 +185,7 @@ function openEdit(record) {
 async function loadTeachers() {
   teacherFetching.value = true
   try {
-    const res = await api.get('/persons', { params: { role: 'teacher' } })
+    const res = await listPersons({ role: 'teacher' })
     teacherList.value = res.data || []
   } catch {
     teacherList.value = []
@@ -215,7 +216,7 @@ async function handleSave() {
   saving.value = true
   try {
     if (editingId.value) {
-      await api.put(`/classrooms/${editingId.value}`, {
+      await updateClassroom(editingId.value, {
         name: form.value.name,
         teacher: form.value.teacher,
         course_code: form.value.course_code,
@@ -225,7 +226,7 @@ async function handleSave() {
       showModal.value = false
       await loadClassrooms()
     } else {
-      const res = await api.post('/classrooms', {
+      const res = await createClassroom({
         name: form.value.name,
         teacher: form.value.teacher || userStore.displayName,
         teacher_person_id: form.value.teacher_person_id || undefined,
@@ -250,9 +251,9 @@ async function handleSave() {
   }
 }
 
-async function deleteClassroom(record) {
+async function handleDeleteClassroom(record) {
   try {
-    await api.delete(`/classrooms/${record.id}`)
+    await deleteClassroom(record.id)
     message.success('课堂已删除')
     await loadClassrooms()
   } catch (e) {

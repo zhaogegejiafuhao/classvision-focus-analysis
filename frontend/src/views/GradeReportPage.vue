@@ -78,7 +78,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { getGradeConfig, setGradeConfig, getGradeReport } from '@/api/grade'
+import { listClassrooms } from '@/api/classroom'
 import { getKnowledgeGraph } from '@/api/attribution'
 import KnowledgeRadarChart from '@/components/knowledge-radar/KnowledgeRadarChart.vue'
 
@@ -122,7 +123,7 @@ const passRate = computed(() => {
 async function fetchData() {
   loading.value = true
   try {
-    const classRes = await api.get('/classrooms', { _skipGlobalError: true })
+    const classRes = await listClassrooms({}, { _skipGlobalError: true })
     classrooms.value = classRes.data
     if (classRes.data.length === 0) { loading.value = false; return }
     classroomId.value = classRes.data[0].id
@@ -135,8 +136,8 @@ async function fetchReport() {
   loading.value = true
   try {
     const [configRes, reportRes] = await Promise.all([
-      api.get(`/grades/config/${classroomId.value}`, { _skipGlobalError: true }).catch(() => ({ data: null })),
-      api.get(`/grades/report/${classroomId.value}`, { _skipGlobalError: true }).catch(() => ({ data: {} })),
+      getGradeConfig(classroomId.value).catch(() => ({ data: null })),
+      getGradeReport(classroomId.value).catch(() => ({ data: {} })),
     ])
     if (configRes.data) {
       weights.homework_weight = configRes.data.homework_weight
@@ -164,7 +165,7 @@ async function saveConfig() {
   if (!classroomId.value) return
   saving.value = true
   try {
-    await api.post(`/grades/config/${classroomId.value}`, { ...weights })
+    await setGradeConfig(classroomId.value, { ...weights })
     message.success('权重配置已保存')
     fetchData()
   } catch { /* ignore */ } finally { saving.value = false }

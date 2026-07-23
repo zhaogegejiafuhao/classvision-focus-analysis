@@ -50,7 +50,7 @@
               <a-button v-if="!item.is_read" type="link" size="small" @click="markRead(item.id)">
                 标记已读
               </a-button>
-              <a-popconfirm title="确定删除此通知？" @confirm="deleteNotification(item.id)">
+              <a-popconfirm title="确定删除此通知？" @confirm="handleDeleteNotification(item.id)">
                 <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
             </template>
@@ -65,7 +65,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { listNotifications, readNotification, readAllNotifications, deleteNotification as _deleteNotification } from '@/api/notification'
 
 const notifications = ref([])
 const loading = ref(false)
@@ -79,7 +79,7 @@ const filteredNotifications = computed(() => {
 async function fetchNotifications() {
   loading.value = true
   try {
-    const res = await api.get('/notifications')
+    const res = await listNotifications()
     notifications.value = res.data
   } catch (e) {
     message.error('获取通知失败')
@@ -90,7 +90,7 @@ async function fetchNotifications() {
 
 async function markRead(id) {
   try {
-    await api.post(`/notifications/${id}/read`)
+    await readNotification(id)
     const idx = notifications.value.findIndex(n => n.id === id)
     if (idx >= 0) {
       notifications.value[idx].is_read = true
@@ -102,7 +102,7 @@ async function markRead(id) {
 
 async function markAllRead() {
   try {
-    await api.post('/notifications/read-all')
+    await readAllNotifications()
     notifications.value.forEach(n => n.is_read = true)
     message.success('已全部标记为已读')
   } catch (e) {
@@ -110,9 +110,9 @@ async function markAllRead() {
   }
 }
 
-async function deleteNotification(id) {
+async function handleDeleteNotification(id) {
   try {
-    await api.delete(`/notifications/${id}`)
+    await _deleteNotification(id)
     notifications.value = notifications.value.filter(n => n.id !== id)
     message.success('删除成功')
   } catch (e) {

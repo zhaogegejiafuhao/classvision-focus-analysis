@@ -89,7 +89,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '../api'
+import { getCheckinSession, listCheckinAttendances, closeCheckinSession, exportCheckinSession } from '@/api/checkin'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,7 +117,7 @@ const stats = computed(() => {
 async function fetchSession() {
   loading.value = true
   try {
-    const res = await api.get(`/checkin/sessions/${sessionId}`)
+    const res = await getCheckinSession(sessionId)
     session.value = {
       ...res.data,
       start_time: new Date(res.data.start_time).toLocaleString('zh-CN'),
@@ -132,7 +132,7 @@ async function fetchSession() {
 
 async function fetchAttendances() {
   try {
-    const res = await api.get(`/checkin/sessions/${sessionId}/attendances`, { _skipGlobalError: true })
+    const res = await listCheckinAttendances(sessionId)
     attendances.value = res.data
   } catch (e) {
     // 忽略
@@ -141,7 +141,7 @@ async function fetchAttendances() {
 
 async function closeSession() {
   try {
-    await api.post(`/checkin/sessions/${sessionId}/close`)
+    await closeCheckinSession(sessionId)
     message.success('签到已结束')
     fetchSession()
     fetchAttendances()
@@ -152,7 +152,7 @@ async function closeSession() {
 
 async function exportCSV() {
   try {
-    const res = await api.get(`/checkin/sessions/${sessionId}/export`, { responseType: 'blob' })
+    const res = await exportCheckinSession(sessionId)
     const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
     const link = document.createElement('a')
     link.href = url

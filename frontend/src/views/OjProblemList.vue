@@ -166,7 +166,7 @@ import {
   CodeOutlined, HistoryOutlined, PlusOutlined,
   EditOutlined, DeleteOutlined,
 } from '@ant-design/icons-vue'
-import api from '@/api'
+import { listOjProblems, getOjProblem, createOjProblem, updateOjProblem, deleteOjProblem } from '@/api/oj'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -241,7 +241,7 @@ async function openEdit(record) {
   editingId.value = record.id
   modalOpen.value = true
   try {
-    const res = await api.get(`/oj/problems/${record.id}`)
+    const res = await getOjProblem(record.id)
     const d = res.data
     form.value = {
       title: d.title,
@@ -279,10 +279,10 @@ async function handleSave() {
   const payload = { ...form.value, memory_limit: memoryMB.value * 1024 * 1024 }
   try {
     if (editingId.value) {
-      await api.put(`/oj/problems/${editingId.value}`, payload)
+      await updateOjProblem(editingId.value, payload)
       message.success('题目已更新')
     } else {
-      await api.post('/oj/problems', payload)
+      await createOjProblem(payload)
       message.success('题目已创建')
     }
     modalOpen.value = false
@@ -297,7 +297,7 @@ async function handleSave() {
 
 async function deleteProblem(record) {
   try {
-    await api.delete(`/oj/problems/${record.id}`)
+    await deleteOjProblem(record.id)
     message.success('题目已删除')
     loadProblems()
   } catch (e) {
@@ -309,7 +309,7 @@ async function deleteProblem(record) {
 async function loadProblems() {
   loading.value = true
   try {
-    const res = await api.get('/oj/problems')
+    const res = await listOjProblems()
     problems.value = res.data || []
     if (route.query.edit) {
       const target = problems.value.find(p => p.id === parseInt(route.query.edit))

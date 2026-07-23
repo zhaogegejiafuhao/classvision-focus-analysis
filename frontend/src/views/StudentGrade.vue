@@ -110,7 +110,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { getGradeReport, getGradeTrend } from '@/api/grade'
+import { listClassrooms } from '@/api/classroom'
 import { getRadarData } from '@/api/attribution'
 import KnowledgeRadarChart from '@/components/knowledge-radar/KnowledgeRadarChart.vue'
 import WeakPointList from '@/components/knowledge-radar/WeakPointList.vue'
@@ -147,13 +148,13 @@ async function fetchData() {
     }
 
     // 获取学生所在课堂（/classrooms 对学生角色已过滤为只返回参与的课堂）
-    const classRes = await api.get('/classrooms')
+    const classRes = await listClassrooms()
     const myClassrooms = classRes.data || []
     if (myClassrooms.length === 0) { loading.value = false; return }
     // 取第一个课堂作为默认展示，后续可扩展为课堂切换
     const myClass = myClassrooms[0]
 
-    const res = await api.get(`/grades/report/${myClass.id}`, { _skipGlobalError: true })
+    const res = await getGradeReport(myClass.id)
     report.value = res.data
 
     // 获取知识归因雷达数据
@@ -172,7 +173,7 @@ onMounted(fetchData)
 async function fetchTrend() {
   trendLoading.value = true
   try {
-    const res = await api.get(`/grades/trend/${myPersonId.value}`, { _skipGlobalError: true })
+    const res = await getGradeTrend(myPersonId.value)
     trend.value = res.data
   } catch (e) {
     message.error('获取趋势失败')

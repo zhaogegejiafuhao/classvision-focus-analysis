@@ -123,7 +123,8 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import api from '@/api'
+import { getLlmConfig, updateLlmConfig, testLlm } from '@/api/llm'
+import { changePassword } from '@/api/auth'
 import { message } from 'ant-design-vue'
 
 const router = useRouter()
@@ -181,7 +182,7 @@ const providerHint = computed(() => {
 
 async function loadLLMConfig() {
   try {
-    const { data } = await api.get('/llm/config', { _skipGlobalError: true })
+    const { data } = await getLlmConfig()
     llmConfig.provider = data.provider
     llmConfig.api_key_set = data.api_key_set
     llmConfig.base_url = data.base_url
@@ -216,7 +217,7 @@ async function saveLLMConfig() {
       payload.model = llmConfig.model
       payload.model_fast = llmConfig.model_fast
     }
-    await api.put('/llm/config', payload)
+    await updateLlmConfig(payload)
     message.success('LLM 配置已保存')
     await loadLLMConfig()
   } catch (e) {
@@ -230,7 +231,7 @@ async function testLLMConnection() {
   testingLLM.value = true
   llmTestResult.value = null
   try {
-    const { data } = await api.post('/llm/test')
+    const { data } = await testLlm()
     llmTestResult.value = data
   } catch (e) {
     llmTestResult.value = { success: false, message: e.response?.data?.detail || '测试失败' }
@@ -262,7 +263,7 @@ function validateConfirmPassword(_, value) {
 async function handleChangePassword() {
   changingPassword.value = true
   try {
-    await api.post('/auth/change-password', {
+    await changePassword({
       old_password: passwordForm.oldPassword,
       new_password: passwordForm.newPassword,
     })

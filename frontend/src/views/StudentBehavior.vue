@@ -90,7 +90,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '@/api'
+import { listClassrooms } from '@/api/classroom'
+import { listClassroomStudents, getStudentBehavior } from '@/api/stats'
+import { listPersons } from '@/api/person'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -106,7 +108,7 @@ const loading = ref(false)
 async function searchStudents() {
   if (!searchStudent.value) return
   try {
-    const res = await api.get('/persons', { params: { keyword: searchStudent.value, role: 'student' } })
+    const res = await listPersons({ keyword: searchStudent.value, role: 'student' })
     allStudentOptions.value = res.data || []
     studentOptions.value = allStudentOptions.value
   } catch (e) {
@@ -117,7 +119,7 @@ async function searchStudents() {
 async function fetchBehavior(studentId) {
   loading.value = true
   try {
-    const res = await api.get(`/students/${studentId}/behavior`, { _skipGlobalError: true })
+    const res = await getStudentBehavior(studentId)
     behavior.value = res.data
   } catch (e) {
     message.error('获取行为分析失败')
@@ -133,7 +135,7 @@ async function filterStudentsByClassroom() {
     return
   }
   try {
-    const res = await api.get(`/classrooms/${selectedClassroomId.value}/students`, { _skipGlobalError: true })
+    const res = await listClassroomStudents(selectedClassroomId.value, { _skipGlobalError: true })
     const classStudentIds = new Set((res.data || []).map(s => s.person_id).filter(Boolean))
     studentOptions.value = allStudentOptions.value.filter(s => classStudentIds.has(s.id))
     // 如果过滤后只有一个学生，自动选中
@@ -150,7 +152,7 @@ onMounted(async () => {
   // 教师端加载课堂列表
   if (userStore.role === 'teacher' || userStore.role === 'admin') {
     try {
-      const res = await api.get('/classrooms')
+      const res = await listClassrooms()
       classrooms.value = res.data || []
     } catch { /* ignore */ }
   }

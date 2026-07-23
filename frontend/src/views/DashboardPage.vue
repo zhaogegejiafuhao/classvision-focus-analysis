@@ -163,7 +163,8 @@ import { ref, computed, onMounted, inject, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { message } from 'ant-design-vue'
-import api from '@/api'
+import { createClassroom, listClassrooms } from '@/api/classroom'
+import { getDashboard } from '@/api/stats'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -313,7 +314,7 @@ async function handleCreate() {
   }
   creating.value = true
   try {
-    await api.post('/classrooms', {
+    await createClassroom({
       name: createForm.value.name,
       teacher: createForm.value.teacher,
       course_code: createForm.value.course_code,
@@ -321,7 +322,7 @@ async function handleCreate() {
     })
     message.success('课堂创建成功')
     externalShowCreate.value = false
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
   } catch (e) {
     const msg = e.response?.data?.detail || '创建失败'
@@ -334,8 +335,8 @@ async function handleCreate() {
 onMounted(async () => {
   try {
     const [classRes, dashRes] = await Promise.all([
-      api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/dashboard', { _skipGlobalError: true }).catch(() => ({ data: null })),
+      listClassrooms({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      getDashboard({ _skipGlobalError: true }).catch(() => ({ data: null })),
     ])
     classrooms.value = classRes.data || []
     dashboard.value = dashRes.data

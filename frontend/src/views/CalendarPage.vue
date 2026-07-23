@@ -98,7 +98,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '@/api'
+import { listClassrooms } from '@/api/classroom'
+import { listAssignedHomework, listHomework } from '@/api/homework'
+import { listAssignedExams, listExams } from '@/api/exam'
+import { getCheckinHistory, listCheckinSessions } from '@/api/checkin'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -160,10 +163,10 @@ async function loadClassrooms() {
     if (isStudent.value) {
       // 学生端：使用学生专属API
       const [classRes, hwRes, examRes, checkinRes] = await Promise.all([
-        api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-        api.get('/homework/assigned', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-        api.get('/exams/assigned', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-        api.get('/checkin/history', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        listClassrooms({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        listAssignedHomework().catch(() => ({ data: [] })),
+        listAssignedExams().catch(() => ({ data: [] })),
+        getCheckinHistory({ _skipGlobalError: true }).catch(() => ({ data: [] })),
       ])
       classrooms.value = classRes.data || []
       homeworks.value = hwRes.data || []
@@ -177,10 +180,10 @@ async function loadClassrooms() {
     } else {
       // 教师端：使用教师专属API
       const [classRes, hwRes, examRes, checkinRes] = await Promise.all([
-        api.get('/classrooms'),
-        api.get('/homework', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-        api.get('/exams', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-        api.get('/checkin/sessions', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        listClassrooms(),
+        listHomework({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        listExams({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+        listCheckinSessions({ _skipGlobalError: true }).catch(() => ({ data: [] })),
       ])
       classrooms.value = classRes.data || []
       homeworks.value = hwRes.data || []

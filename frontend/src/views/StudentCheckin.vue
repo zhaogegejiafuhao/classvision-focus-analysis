@@ -62,7 +62,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { getActiveCheckin, submitCheckin, getCheckinHistory } from '@/api/checkin'
+import { listClassrooms } from '@/api/classroom'
 
 const classrooms = ref([])
 const selectedClassroom = ref(null)
@@ -81,7 +82,7 @@ const historyColumns = [
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
     if (res.data.length > 0) {
       selectedClassroom.value = res.data[0].id
@@ -96,7 +97,7 @@ async function fetchActiveCheckin() {
   if (!selectedClassroom.value) return
   checkLoading.value = true
   try {
-    const res = await api.get(`/checkin/active?classroom_id=${selectedClassroom.value}`, { _skipGlobalError: true })
+    const res = await getActiveCheckin({ classroom_id: selectedClassroom.value })
     activeCheckin.value = res.data
   } catch (e) {
     activeCheckin.value = { active: false }
@@ -112,7 +113,7 @@ async function doCheckin() {
   }
   submitting.value = true
   try {
-    await api.post('/checkin/submit', {
+    await submitCheckin({
       session_id: activeCheckin.value.session_id,
       code: checkinCode.value || undefined,
     })
@@ -129,7 +130,7 @@ async function doCheckin() {
 async function fetchHistory() {
   historyLoading.value = true
   try {
-    const res = await api.get('/checkin/history')
+    const res = await getCheckinHistory()
     history.value = res.data
   } catch (e) {
     // 忽略

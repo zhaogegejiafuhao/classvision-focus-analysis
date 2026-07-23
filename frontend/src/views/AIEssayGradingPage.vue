@@ -9,68 +9,17 @@
     <a-row :gutter="24">
       <!-- 左列：批改设置 -->
       <a-col :span="10">
-        <a-card title="批改设置" :bordered="false" class="settings-card">
-          <a-form layout="vertical">
-            <a-form-item label="作文题目" required>
-              <a-textarea
-                v-model:value="form.question"
-                :rows="3"
-                placeholder="输入作文题目..."
-                show-count
-                :maxlength="2000"
-              />
-            </a-form-item>
-
-            <a-form-item label="写作要求">
-              <a-textarea
-                v-model:value="form.standardAnswer"
-                :rows="2"
-                placeholder="输入写作要求（可选）..."
-                show-count
-                :maxlength="1000"
-              />
-            </a-form-item>
-
-            <a-row :gutter="16">
-              <a-col :span="12">
-                <a-form-item label="满分值">
-                  <a-input-number
-                    :value="100"
-                    disabled
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="提交ID">
-                  <a-input-number
-                    v-model:value="form.submissionId"
-                    :min="1"
-                    style="width: 100%"
-                    placeholder="学生提交ID"
-                  />
-                </a-form-item>
-              </a-col>
-            </a-row>
-
-            <a-form-item label="学生作答">
-              <DualInputPanel v-model="inputData" />
-            </a-form-item>
-
-            <a-form-item>
-              <a-button
-                type="primary"
-                block
-                size="large"
-                :loading="gradingStore.isGrading"
-                @click="handleGrade"
-              >
-                <template #icon><ThunderboltOutlined /></template>
-                开始批改
-              </a-button>
-            </a-form-item>
-          </a-form>
-        </a-card>
+        <GradingSetupPanel
+          :form="form"
+          :input-data="inputData"
+          question-label="作文题目"
+          question-placeholder="输入作文题目..."
+          standard-answer-label="写作要求"
+          standard-answer-placeholder="输入写作要求（可选）..."
+          :total-score-editable="false"
+          :loading="gradingStore.isGrading"
+          @grade="handleGrade"
+        />
       </a-col>
 
       <!-- 右列：批改结果 -->
@@ -215,14 +164,12 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue'
 import { useGradingStore } from '@/stores/grading'
 import { aiGrade, confirmGrading } from '@/api/grading'
-import DualInputPanel from '@/components/ai-grading/DualInputPanel.vue'
-import GradingStepReveal from '@/components/ai-grading/GradingStepReveal.vue'
+import GradingSetupPanel from '@/components/ai-grading/GradingSetupPanel.vue'
 import ScoreCounter from '@/components/ai-grading/ScoreCounter.vue'
 import ConfidenceBadge from '@/components/ai-grading/ConfidenceBadge.vue'
 import ErrorCauseTag from '@/components/ai-grading/ErrorCauseTag.vue'
 import * as echarts from 'echarts'
 import { message } from 'ant-design-vue'
-import { ThunderboltOutlined } from '@ant-design/icons-vue'
 import '@/assets/styles/ai-grading-animations.css'
 
 const gradingStore = useGradingStore()

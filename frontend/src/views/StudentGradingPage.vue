@@ -148,7 +148,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import api from '@/api'
+import { listAssignedHomework, getMySubmission } from '@/api/homework'
 import { getGradingResult } from '@/api/grading'
 import { submitCorrection, getCorrectionComparison, getPersonalizedCorrection } from '@/api/correction'
 import { generateSimilarQuestions } from '@/api/similarQuestions'
@@ -213,14 +213,14 @@ async function fetchSubmissions() {
     if (!myPersonId.value) return
 
     // 获取分配给学生的作业列表
-    const hwRes = await api.get('/homework/assigned', { _skipGlobalError: true }).catch(() => ({ data: [] }))
+    const hwRes = await listAssignedHomework().catch(() => ({ data: [] }))
     const homeworks = hwRes.data || []
 
     // 对每个作业获取提交状态
     const allSubmissions = []
     for (const hw of homeworks) {
       try {
-        const subRes = await api.get(`/homework/my-submissions/${hw.id}`, { _skipGlobalError: true }).catch(() => null)
+        const subRes = await getMySubmission(hw.id).catch(() => null)
         if (subRes?.data?.submitted) {
           const sub = subRes.data.submission
           allSubmissions.push({

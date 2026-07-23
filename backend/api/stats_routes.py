@@ -6,35 +6,12 @@ from sqlalchemy.orm import Session
 
 from backend.core.database import get_db
 from backend.core.security import get_current_user, assert_teacher_or_admin, assert_owner_or_admin
+from backend.core.access import assert_classroom_access
 from backend.models.tables import Classroom, Student, AttentionRecord, ExamRiskRecord, Report, RegisteredPerson, Homework, HomeworkSubmission, Exam, ExamSubmission, Attendance, CheckinSession, LeaveRequest
 from backend.models.schemas import StudentOut, StudentCreate, StudentUpdate, TimelinePoint, ReportOut, StudentPersonalReport, StudentClassroomAttention, ExamRiskOut
 from backend.services.ollama_service import generate_report
 
 router = APIRouter(prefix="/api", tags=["stats"])
-
-
-def _assert_classroom_access(classroom: Classroom, current_user: RegisteredPerson, db: Session, teacher_only: bool = False):
-    """校验用户是否有权访问该课堂
-
-    - admin: 始终通过
-    - teacher: 仅自己创建的课堂
-    - student: teacher_only=True 时拒绝；否则需为该课堂成员
-    """
-    if current_user.role == "admin":
-        return
-    if current_user.role == "teacher":
-        if classroom.teacher_person_id != current_user.id:
-            raise HTTPException(403, "无权访问该课堂")
-        return
-    if teacher_only or current_user.role != "student":
-        raise HTTPException(403, "无权访问该课堂")
-    # 学生需为该课堂成员
-    is_member = db.query(Student).filter(
-        Student.classroom_id == classroom.id,
-        Student.person_id == current_user.id,
-    ).first() is not None
-    if not is_member:
-        raise HTTPException(403, "无权访问该课堂")
 
 
 @router.get("/dashboard")
@@ -140,7 +117,7 @@ def get_timeline(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     rows = (
         db.query(
@@ -174,7 +151,7 @@ def get_heatmap(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     # 获取所有学生
     students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
@@ -228,7 +205,7 @@ def get_attendance(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     # 获取课堂中的学生
     students = db.query(Student).filter(Student.classroom_id == classroom_id).all()
@@ -295,7 +272,7 @@ def get_students(
 
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     # 学生只能看到自己的数据
     if current_user.role == "student":
@@ -337,7 +314,7 @@ def create_report(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db, teacher_only=True)
+    assert_classroom_access(classroom, current_user, db, teacher_only=True)
 
     existing = db.query(Report).filter(Report.classroom_id == classroom_id).first()
     if existing and not force:
@@ -447,7 +424,7 @@ def get_report(
         raise HTTPException(404, "报告未生成")
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if classroom:
-        _assert_classroom_access(classroom, current_user, db)
+        assert_classroom_access(classroom, current_user, db)
     return report
 
 
@@ -481,7 +458,7 @@ def get_exam_risks(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db, teacher_only=True)
+    assert_classroom_access(classroom, current_user, db, teacher_only=True)
 
     q = db.query(ExamRiskRecord).filter(ExamRiskRecord.classroom_id == classroom_id)
     if risk_level:
@@ -530,7 +507,7 @@ def create_student(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db, teacher_only=True)
+    assert_classroom_access(classroom, current_user, db, teacher_only=True)
     student = Student(
         classroom_id=classroom_id,
         track_id=data.track_id,
@@ -559,7 +536,7 @@ def update_student(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db, teacher_only=True)
+    assert_classroom_access(classroom, current_user, db, teacher_only=True)
     student = db.query(Student).filter(
         Student.id == student_id, Student.classroom_id == classroom_id,
     ).first()
@@ -607,7 +584,7 @@ def delete_student(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db, teacher_only=True)
+    assert_classroom_access(classroom, current_user, db, teacher_only=True)
     student = db.query(Student).filter(
         Student.id == student_id, Student.classroom_id == classroom_id,
     ).first()

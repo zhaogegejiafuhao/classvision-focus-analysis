@@ -37,7 +37,7 @@
                 </template>
                 <template v-else-if="column.key === 'action'">
                   <a-button type="link" size="small" @click="showGradeModal(record)">批改</a-button>
-                  <a-button type="link" size="small" danger @click="returnSubmission(record)">打回</a-button>
+                  <a-button type="link" size="small" danger @click="handleReturnSubmission(record)">打回</a-button>
                 </template>
               </template>
             </a-table>
@@ -94,7 +94,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '../api'
+import { getHomework, updateHomework, listHomeworkSubmissions, gradeSubmission, returnSubmission } from '@/api/homework'
 import dayjs from 'dayjs'
 
 const route = useRoute()
@@ -124,7 +124,7 @@ const submissionColumns = [
 async function fetchHomework() {
   loading.value = true
   try {
-    const res = await api.get(`/homework/${homeworkId}`)
+    const res = await getHomework(homeworkId)
     homework.value = res.data
   } catch (e) {
     message.error('获取作业失败')
@@ -135,7 +135,7 @@ async function fetchHomework() {
 
 async function fetchSubmissions() {
   try {
-    const res = await api.get(`/homework/${homeworkId}/submissions`, { _skipGlobalError: true })
+    const res = await listHomeworkSubmissions(homeworkId)
     submissions.value = res.data.map(s => ({
       ...s,
       submitted_at: formatTime(s.submitted_at),
@@ -147,7 +147,7 @@ async function fetchSubmissions() {
 
 async function closeHomework() {
   try {
-    await api.put(`/homework/${homeworkId}`, { status: 'closed' })
+    await updateHomework(homeworkId, { status: 'closed' })
     message.success('作业已截止')
     fetchHomework()
   } catch (e) {
@@ -179,7 +179,7 @@ async function submitEdit() {
       deadline: editForm.value.deadline ? editForm.value.deadline.toISOString() : null,
       total_score: editForm.value.total_score,
     }
-    await api.put(`/homework/${homeworkId}`, payload)
+    await updateHomework(homeworkId, payload)
     message.success('作业已更新')
     editModalVisible.value = false
     fetchHomework()
@@ -206,7 +206,7 @@ async function submitGrade() {
   }
   grading.value = true
   try {
-    await api.post(`/homework/submissions/${currentSubmission.value.id}/grade`, {
+    await gradeSubmission(currentSubmission.value.id, {
       score: gradeForm.value.score,
       feedback: gradeForm.value.feedback,
     })
@@ -233,7 +233,7 @@ async function submitGradeAndNext() {
   }
   grading.value = true
   try {
-    await api.post(`/homework/submissions/${currentSubmission.value.id}/grade`, {
+    await gradeSubmission(currentSubmission.value.id, {
       score: gradeForm.value.score,
       feedback: gradeForm.value.feedback,
     })
@@ -275,11 +275,11 @@ function getSubmissionText(status) {
   return { submitted: '待批改', graded: '已批改', returned: '已退回' }[status] || status
 }
 
-async function returnSubmission(record) {
+async function handleReturnSubmission(record) {
   const feedback = window.prompt('请输入打回反馈：', '请重做')
   if (feedback === null) return
   try {
-    await api.post(`/homework/submissions/${record.id}/return`, { feedback })
+    await returnSubmission(record.id, { feedback })
     message.success('已打回，学生可重新提交')
     fetchSubmissions()
   } catch (e) {

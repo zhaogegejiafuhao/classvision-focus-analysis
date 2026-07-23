@@ -102,6 +102,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { register } from '@/api/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -227,7 +228,7 @@ async function handleSubmit() {
     loading.value = true
     errorMsg.value = ''
     try {
-      const res = await api.post('/auth/register', {
+      const res = await register({
         name: form.name,
         username: form.username,
         password: form.password,

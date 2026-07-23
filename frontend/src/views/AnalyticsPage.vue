@@ -131,7 +131,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '@/api'
+import { listPersons } from '@/api/person'
+import { listClassrooms } from '@/api/classroom'
+import { listHomework } from '@/api/homework'
+import { listExams } from '@/api/exam'
 
 const classrooms = ref([])
 const persons = ref([])
@@ -223,10 +226,10 @@ async function loadData() {
   loading.value = true
   try {
     const [classroomRes, personRes, hwRes, examRes] = await Promise.all([
-      api.get('/classrooms', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/persons', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/homework', { _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/exams', { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listClassrooms({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listPersons({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listHomework({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listExams({}, { _skipGlobalError: true }).catch(() => ({ data: [] })),
     ])
     classrooms.value = classroomRes.data || []
     persons.value = personRes.data || []

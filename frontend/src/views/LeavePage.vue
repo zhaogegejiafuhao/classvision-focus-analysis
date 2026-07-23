@@ -61,7 +61,7 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import api from '@/api'
+import { listLeaves, createLeave, reviewLeave } from '@/api/leave'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -105,7 +105,7 @@ async function fetchLeaves() {
   try {
     const params = {}
     if (filterStatus.value) params.status = filterStatus.value
-    const res = await api.get('/leaves', { params })
+    const res = await listLeaves(params)
     leaves.value = res.data
   } catch (e) {
     message.error('获取请假列表失败')
@@ -116,7 +116,7 @@ async function fetchLeaves() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
   } catch (e) {}
 }
@@ -128,7 +128,7 @@ async function submitLeave() {
   }
   submitting.value = true
   try {
-    await api.post('/leaves', {
+    await createLeave({
       classroom_id: form.value.classroom_id,
       leave_type: form.value.leave_type,
       start_date: form.value.start_date.toISOString(),
@@ -150,7 +150,7 @@ async function review(record, status) {
   const feedback = window.prompt(`确认${status === 'approved' ? '通过' : '拒绝'}此请假申请，输入反馈：`, '')
   if (feedback === null) return
   try {
-    await api.post(`/leaves/${record.id}/review`, { status, feedback })
+    await reviewLeave(record.id, { status, feedback })
     message.success('已审批')
     fetchLeaves()
   } catch (e) {

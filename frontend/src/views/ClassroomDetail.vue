@@ -14,7 +14,7 @@
                 <template #icon><VideoCameraOutlined /></template>
                 {{ classroom.started_at ? '进入课堂检测' : '开始课堂' }}
               </a-button>
-              <a-button v-if="!classroom.ended_at && canManage" @click="endClassroom" :loading="endLoading">
+              <a-button v-if="!classroom.ended_at && canManage" @click="handleEndClassroom" :loading="endLoading">
                 <template #icon><CheckCircleOutlined /></template>
                 结束课堂
               </a-button>
@@ -22,7 +22,7 @@
                 <template #icon><EditOutlined /></template>
                 编辑课堂
               </a-button>
-              <a-popconfirm v-if="canEditOrDelete" title="确定删除该课堂？将同时删除所有关联数据（学生、记录、报告等）。" @confirm="deleteClassroom">
+              <a-popconfirm v-if="canEditOrDelete" title="确定删除该课堂？将同时删除所有关联数据（学生、记录、报告等）。" @confirm="handleDeleteClassroom">
                 <a-button danger>
                   <template #icon><DeleteOutlined /></template>
                   删除课堂
@@ -373,7 +373,32 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import * as echarts from 'echarts'
-import api from '@/api'
+import { listPersons } from '@/api/person'
+import { listHomework } from '@/api/homework'
+import { listExams } from '@/api/exam'
+import { listCheckinSessions } from '@/api/checkin'
+import { listMaterials } from '@/api/material'
+import {
+  endClassroom,
+  deleteClassroom,
+  updateClassroom,
+  getClassroom,
+  getChatHistory,
+  exportChat,
+} from '@/api/classroom'
+import {
+  getClassroomTimeline,
+  getClassroomHeatmap,
+  getClassroomAttendance,
+  listClassroomStudents,
+  addClassroomStudent,
+  updateClassroomStudent,
+  removeClassroomStudent,
+  generateClassroomReport,
+  getClassroomReport,
+  deleteClassroomReport,
+  getClassroomExamRisks,
+} from '@/api/stats'
 import { message } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import {
@@ -459,10 +484,10 @@ async function loadTeachingData() {
   materialLoading.value = true
   try {
     const [hwRes, examRes, checkinRes, matRes] = await Promise.all([
-      api.get('/homework', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/exams', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/checkin/sessions', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
-      api.get('/materials', { params: { classroom_id: classroomId }, _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listHomework({ classroom_id: classroomId }, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listExams({ classroom_id: classroomId }, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listCheckinSessions({ classroom_id: classroomId }, { _skipGlobalError: true }).catch(() => ({ data: [] })),
+      listMaterials({ classroom_id: classroomId }, { _skipGlobalError: true }).catch(() => ({ data: [] })),
     ])
     classHomeworks.value = hwRes.data
     classExams.value = examRes.data
@@ -565,10 +590,10 @@ function downloadMaterial(record) {
 }
 
 // ===== 课堂操作 =====
-async function endClassroom() {
+async function handleEndClassroom() {
   endLoading.value = true
   try {
-    await api.put(`/classrooms/${classroomId}/end`)
+    await endClassroom(classroomId)
     message.success('课堂已结束')
     await loadClassroom()
   } catch (e) {
@@ -578,9 +603,9 @@ async function endClassroom() {
   }
 }
 
-async function deleteClassroom() {
+async function handleDeleteClassroom() {
   try {
-    await api.delete(`/classrooms/${classroomId}`)
+    await deleteClassroom(classroomId)
     message.success('课堂已删除')
     router.push('/classrooms')
   } catch (e) {
@@ -606,7 +631,7 @@ function openEditClassroom() {
 async function handleEditClassroom() {
   editClassroomSaving.value = true
   try {
-    await api.put(`/classrooms/${classroomId}`, editClassroomForm.value)
+    await updateClassroom(classroomId, editClassroomForm.value)
     message.success('课堂信息已更新')
     editClassroomOpen.value = false
     await loadClassroom()
@@ -639,7 +664,7 @@ function openAddStudent() {
 
 async function loadAvailablePersons() {
   try {
-    const res = await api.get('/persons', { params: { role: 'student' } })
+    const res = await listPersons({ role: 'student' })
     // 过滤掉已在课堂中的学生
     const existingPersonIds = new Set(students.value.map(s => s.person_id).filter(Boolean))
     availablePersons.value = (res.data || []).filter(p => !existingPersonIds.has(p.id))
@@ -662,7 +687,7 @@ async function handleAddStudent() {
       const person = availablePersons.value.find(p => p.id === addStudentForm.value.person_id)
       if (person && !payload.name) payload.name = person.name
     }
-    await api.post(`/classrooms/${classroomId}/students`, payload)
+    await addClassroomStudent(classroomId, payload)
     message.success('学生已添加')
     addStudentOpen.value = false
     await loadStudents()
@@ -685,7 +710,7 @@ function openEditStudent(record) {
 async function handleEditStudent() {
   editStudentSaving.value = true
   try {
-    await api.put(`/classrooms/${classroomId}/students/${editStudentForm.value.id}`, {
+    await updateClassroomStudent(classroomId, editStudentForm.value.id, {
       name: editStudentForm.value.name,
     })
     message.success('学生信息已更新')
@@ -700,7 +725,7 @@ async function handleEditStudent() {
 
 async function deleteStudent(studentId) {
   try {
-    await api.delete(`/classrooms/${classroomId}/students/${studentId}`)
+    await removeClassroomStudent(classroomId, studentId)
     message.success('学生已删除')
     await loadStudents()
   } catch (e) {
@@ -712,10 +737,7 @@ async function deleteStudent(studentId) {
 async function genReport(force = false) {
   genLoading.value = true
   try {
-    const url = force
-      ? `/classrooms/${classroomId}/report?force=true`
-      : `/classrooms/${classroomId}/report`
-    const res = await api.post(url)
+    const res = await generateClassroomReport(classroomId, { force })
     report.value = res.data
     message.success(force ? '报告已重新生成' : '报告生成成功')
   } catch (e) {
@@ -727,7 +749,7 @@ async function genReport(force = false) {
 
 async function deleteReport() {
   try {
-    await api.delete(`/classrooms/${classroomId}/report`)
+    await deleteClassroomReport(classroomId)
     report.value = null
     message.success('报告已删除')
   } catch (e) {
@@ -738,7 +760,7 @@ async function deleteReport() {
 // ===== 数据加载 =====
 async function loadClassroom() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}`)
+    const res = await getClassroom(classroomId)
     classroom.value = res.data
   } catch (e) {
     message.error('加载课堂信息失败')
@@ -747,7 +769,7 @@ async function loadClassroom() {
 
 async function loadStudents() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/students`)
+    const res = await listClassroomStudents(classroomId)
     students.value = res.data
   } catch (e) {
     message.error('加载学生列表失败')
@@ -756,7 +778,7 @@ async function loadStudents() {
 
 async function loadChatHistory() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/chat/history`, { _skipGlobalError: true })
+    const res = await getChatHistory(classroomId)
     chatMessages.value = res.data || []
     scrollChatToBottom()
   } catch {
@@ -766,7 +788,7 @@ async function loadChatHistory() {
 
 async function loadAttendance() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/attendance`, { _skipGlobalError: true })
+    const res = await getClassroomAttendance(classroomId)
     attendance.value = res.data
   } catch {
     // 忽略
@@ -779,7 +801,7 @@ async function loadExamRisks() {
   try {
     const params = {}
     if (riskFilter.value) params.risk_level = riskFilter.value
-    const res = await api.get(`/classrooms/${classroomId}/exam-risks`, { params, _skipGlobalError: true })
+    const res = await getClassroomExamRisks(classroomId, params)
     examRisks.value = res.data || []
   } catch {
     examRisks.value = []
@@ -790,7 +812,7 @@ async function loadExamRisks() {
 
 async function loadHeatmap() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/heatmap`, { _skipGlobalError: true })
+    const res = await getClassroomHeatmap(classroomId)
     if (res.data.time_labels.length === 0) return
 
     const chart = echarts.init(heatmapEl.value)
@@ -957,9 +979,7 @@ function retryChat(msg) {
 
 async function downloadMarkdown() {
   try {
-    const res = await api.get(`/classrooms/${classroomId}/chat/export`, {
-      responseType: 'blob',
-    })
+    const res = await exportChat(classroomId)
     const blob = new Blob([res.data], { type: 'text/markdown' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -977,9 +997,9 @@ async function downloadMarkdown() {
 onMounted(async () => {
   try {
     const [classRes, studentRes, timelineRes] = await Promise.all([
-      api.get(`/classrooms/${classroomId}`),
-      api.get(`/classrooms/${classroomId}/students`),
-      api.get(`/classrooms/${classroomId}/timeline`),
+      getClassroom(classroomId),
+      listClassroomStudents(classroomId),
+      getClassroomTimeline(classroomId),
     ])
     classroom.value = classRes.data
     students.value = studentRes.data
@@ -1002,7 +1022,7 @@ onMounted(async () => {
     await loadTeachingData()
 
     try {
-      const reportRes = await api.get(`/classrooms/${classroomId}/report`, { _skipGlobalError: true })
+      const reportRes = await getClassroomReport(classroomId)
       report.value = reportRes.data
     } catch { /* 报告未生成，静默忽略 */ }
 

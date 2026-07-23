@@ -145,7 +145,13 @@
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useUserStore } from '@/stores/user'
-import api from '@/api'
+import { listClassrooms } from '@/api/classroom'
+import {
+  listClassroomStudents,
+  getClassroomReport,
+  generateClassroomReport,
+  deleteClassroomReport,
+} from '@/api/stats'
 import { message } from 'ant-design-vue'
 import { DownOutlined, FileTextOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import MarkdownIt from 'markdown-it'
@@ -198,7 +204,7 @@ function renderedReport(id) {
 async function loadData() {
   loading.value = true
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
   } catch (e) {
     message.error('加载课堂数据失败')
@@ -216,14 +222,14 @@ async function toggleExpand(classroomId) {
   if (!detailData[classroomId]) {
     detailLoading.value = true
     try {
-      const res = await api.get(`/classrooms/${classroomId}/students`)
+      const res = await listClassroomStudents(classroomId)
       detailData[classroomId] = res.data || []
     } catch (e) {
       detailData[classroomId] = []
     } finally {
       detailLoading.value = false
     }
-    const rep = await api.get(`/classrooms/${classroomId}/report`, { _skipGlobalError: true }).catch(() => null)
+    const rep = await getClassroomReport(classroomId).catch(() => null)
     if (rep && rep.data) {
       reportData[classroomId] = rep.data.content
     }
@@ -235,10 +241,7 @@ async function generateReport(classroomId, force = false) {
   reportGenerating[classroomId] = true
   reportError[classroomId] = ''
   try {
-    const url = force
-      ? `/classrooms/${classroomId}/report?force=true`
-      : `/classrooms/${classroomId}/report`
-    const res = await api.post(url)
+    const res = await generateClassroomReport(classroomId, { force })
     if (res.data && res.data.content) {
       reportData[classroomId] = res.data.content
       message.success(force ? '报告已重新生成' : '报告生成成功')
@@ -253,7 +256,7 @@ async function generateReport(classroomId, force = false) {
 
 async function deleteReport(classroomId) {
   try {
-    await api.delete(`/classrooms/${classroomId}/report`)
+    await deleteClassroomReport(classroomId)
     delete reportData[classroomId]
     message.success('报告已删除')
   } catch (e) {

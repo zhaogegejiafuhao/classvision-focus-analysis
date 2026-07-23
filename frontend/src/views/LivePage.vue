@@ -55,7 +55,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import api from '@/api'
+import { getClassroom, endClassroom } from '@/api/classroom'
+import { generateClassroomReport } from '@/api/stats'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,7 +85,7 @@ const isStreaming = ref(false)
 const endLoading = ref(false)
 
 onMounted(async () => {
-  const res = await api.get(`/classrooms/${classroomId}`)
+  const res = await getClassroom(classroomId)
   classroomName.value = res.data.name
 
   chart = echarts.init(chartEl.value)
@@ -204,10 +205,10 @@ function drawLoop() {
 async function endClass() {
   endLoading.value = true
   try {
-    await api.put(`/classrooms/${classroomId}/end`, null, { timeout: 30000 })
+    await endClassroom(classroomId)
     stopCamera()
     // 结束后自动生成AI报告（后台异步，不阻塞跳转）
-    api.post(`/classrooms/${classroomId}/report`, null, { _skipGlobalError: true }).catch(() => {})
+    generateClassroomReport(classroomId, { skipGlobalError: true }).catch(() => {})
     router.push(`/classrooms/${classroomId}`)
   } catch (e) {
     const detail = e.response?.data?.detail || ''

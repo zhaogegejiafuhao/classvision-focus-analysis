@@ -127,7 +127,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined, CaretRightOutlined, CheckCircleOutlined, EditOutlined } from '@ant-design/icons-vue'
-import api from '@/api'
+import { getOjProblem, submitOjSolution } from '@/api/oj'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -219,7 +219,7 @@ function handleTab(e) {
 async function loadProblem() {
   loading.value = true
   try {
-    const res = await api.get(`/oj/problems/${route.params.id}`)
+    const res = await getOjProblem(route.params.id)
     problem.value = res.data
     code.value = codeTemplates[language.value] || ''
   } catch (e) {
@@ -238,7 +238,7 @@ async function submitCode() {
   submitting.value = true
   result.value = null
   try {
-    const res = await api.post('/oj/submit', {
+    const res = await submitOjSolution({
       problem_id: parseInt(route.params.id),
       language: language.value,
       source_code: code.value,

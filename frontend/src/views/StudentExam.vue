@@ -60,7 +60,7 @@
           <a-textarea v-else-if="q.type === 'essay'" v-model:value="answers[q.id]" placeholder="请输入答案" :rows="4" />
         </div>
 
-        <a-button type="primary" size="large" block @click="submitExam" :loading="submitting">
+        <a-button type="primary" size="large" block @click="handleSubmitExam" :loading="submitting">
           提交考试
         </a-button>
       </div>
@@ -102,8 +102,8 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import api from '../api'
 import dayjs from 'dayjs'
+import { listAssignedExams, getExam, startExam, submitExam, getMyExamResult } from '@/api/exam'
 
 const exams = ref([])
 const examDetail = ref(null)
@@ -141,7 +141,7 @@ function confirmStartExam(record) {
 async function fetchExams() {
   loading.value = true
   try {
-    const res = await api.get('/exams/assigned', { _skipGlobalError: true })
+    const res = await listAssignedExams()
     exams.value = res.data
   } catch (e) {
     message.error('获取考试列表失败')
@@ -152,8 +152,8 @@ async function fetchExams() {
 
 async function takeExam(id) {
   try {
-    const startRes = await api.post(`/exams/${id}/start`)
-    const detailRes = await api.get(`/exams/${id}`)
+    const startRes = await startExam(id)
+    const detailRes = await getExam(id)
     examDetail.value = detailRes.data
 
     // 尝试从 localStorage 恢复答案
@@ -183,7 +183,7 @@ async function takeExam(id) {
       localStorage.setItem(`exam_answers_${id}`, JSON.stringify({ answers: { ...answers }, multiAnswers: { ...multiAnswers } }))
       if (timeLeft.value <= 0) {
         clearInterval(timer)
-        submitExam()
+        handleSubmitExam()
       }
     }, 1000)
 
@@ -199,10 +199,10 @@ async function takeExam(id) {
   }
 }
 
-async function submitExam() {
+async function handleSubmitExam() {
   submitting.value = true
   if (timer) clearInterval(timer)
-  
+
   try {
     const answerList = []
     for (const q of examDetail.value.questions) {
@@ -214,8 +214,8 @@ async function submitExam() {
       }
       answerList.push({ question_id: q.id, content })
     }
-    
-    const res = await api.post(`/exams/${examDetail.value.id}/submit`, answerList)
+
+    const res = await submitExam(examDetail.value.id, answerList)
     submitResult.value = res.data
     examSubmitted.value = true
     // 清除保存的答案
@@ -233,7 +233,7 @@ async function submitExam() {
 
 async function viewResult(id) {
   try {
-    const res = await api.get(`/exams/my-result/${id}`, { _skipGlobalError: true })
+    const res = await getMyExamResult(id)
     if (!res.data.submitted) {
       message.info('未找到提交记录')
       return

@@ -37,7 +37,7 @@
             <a-checkbox v-model:checked="selectedIds[record.id]" />
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-popconfirm title="确定删除？" @confirm="deleteQuestion(record.id)">
+            <a-popconfirm title="确定删除？" @confirm="handleDeleteQuestion(record.id)">
               <a-button type="link" danger size="small">删除</a-button>
             </a-popconfirm>
           </template>
@@ -107,7 +107,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
+import { listQuestionBank, createQuestionBankItem, deleteQuestionBankItem, getQuestionBankCategories, composeExamFromBank } from '@/api/questionBank'
+import { listClassrooms } from '@/api/classroom'
 
 const router = useRouter()
 const questions = ref([])
@@ -146,24 +147,24 @@ async function fetchQuestions() {
     if (filterType.value) params.type = filterType.value
     if (filterCategory.value) params.category = filterCategory.value
     if (filterDifficulty.value) params.difficulty = filterDifficulty.value
-    const res = await api.get('/question-bank', { params })
+    const res = await listQuestionBank(params)
     questions.value = res.data
   } catch { /* global error handler */ } finally { loading.value = false }
 }
 
 async function fetchCategories() {
-  try { const res = await api.get('/question-bank/categories'); categories.value = res.data } catch { /* ignore */ }
+  try { const res = await getQuestionBankCategories(); categories.value = res.data } catch { /* ignore */ }
 }
 
 async function fetchClassrooms() {
-  try { const res = await api.get('/classrooms'); classrooms.value = res.data } catch { /* ignore */ }
+  try { const res = await listClassrooms(); classrooms.value = res.data } catch { /* ignore */ }
 }
 
 async function createQuestion() {
   if (!form.value.content.trim()) { message.error('请输入题目内容'); return }
   submitting.value = true
   try {
-    await api.post('/question-bank', {
+    await createQuestionBankItem({
       type: form.value.type,
       content: form.value.content,
       options: (form.value.type === 'single' || form.value.type === 'multi') ? form.value.options.filter(o => o.trim()) : null,
@@ -181,8 +182,8 @@ async function createQuestion() {
   } catch { /* global error handler */ } finally { submitting.value = false }
 }
 
-async function deleteQuestion(id) {
-  try { await api.delete(`/question-bank/${id}`); message.success('删除成功'); fetchQuestions() } catch { /* global error handler */ }
+async function handleDeleteQuestion(id) {
+  try { await deleteQuestionBankItem(id); message.success('删除成功'); fetchQuestions() } catch { /* global error handler */ }
 }
 
 async function composeExam() {
@@ -201,7 +202,7 @@ async function composeExam() {
       if (composeForm.value.random_category) payload.random_config.category = composeForm.value.random_category
       if (composeForm.value.random_difficulty) payload.random_config.difficulty = composeForm.value.random_difficulty
     }
-    const res = await api.post('/question-bank/compose-exam', payload)
+    const res = await composeExamFromBank(payload)
     message.success(`组卷成功，共${res.data.question_count}题`)
     showComposeModal.value = false
     router.push(`/exams/${res.data.exam_id}`)

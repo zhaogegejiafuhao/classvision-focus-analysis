@@ -12,7 +12,7 @@ from sqlalchemy import func
 from backend.core.database import get_db
 from backend.core.config import settings
 from backend.core.security import get_current_user
-from backend.api.stats_routes import _assert_classroom_access
+from backend.core.access import assert_classroom_access, visible_doc_ids
 from backend.models.tables import Classroom, ChatMessage, Report, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson
 from backend.models.schemas import ChatRequest, ChatMessageOut
 from backend.services.llm_client import get_llm, LLMError
@@ -124,7 +124,7 @@ def send_chat(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     # 保存用户消息
     user_msg = ChatMessage(
@@ -149,9 +149,9 @@ def send_chat(
     # RAG检索：按当前用户可见性过滤，防止私有文档内容泄露
     rag_context = ""
     try:
-        from backend.api.rag_routes import get_rag_service, _visible_doc_ids
+        from backend.api.rag_routes import get_rag_service
         rag_service = get_rag_service()
-        visible_ids = _visible_doc_ids(db, current_user)
+        visible_ids = visible_doc_ids(db, current_user)
         rag_results = rag_service.retrieve_only(
             data.content, top_k=3, visible_doc_ids=visible_ids, mode=data.mode,
         )
@@ -197,7 +197,7 @@ async def chat_stream(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     # 保存用户消息
     user_msg = ChatMessage(classroom_id=classroom_id, role="user", content=data.content)
@@ -215,9 +215,9 @@ async def chat_stream(
 
     # RAG 检索：只用当前用户输入做检索（避免历史消息污染检索 query）
     try:
-        from backend.api.rag_routes import get_rag_service, _visible_doc_ids
+        from backend.api.rag_routes import get_rag_service
         rag_service = get_rag_service()
-        visible_ids = _visible_doc_ids(db, current_user)
+        visible_ids = visible_doc_ids(db, current_user)
         rag_results = rag_service.retrieve_only(
             data.content, top_k=3, visible_doc_ids=visible_ids, mode=data.mode,
         )
@@ -268,7 +268,7 @@ def get_chat_history(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     return db.query(ChatMessage).filter(
         ChatMessage.classroom_id == classroom_id
@@ -285,7 +285,7 @@ def export_chat_markdown(
     classroom = db.query(Classroom).filter(Classroom.id == classroom_id).first()
     if not classroom:
         raise HTTPException(404, "课堂不存在")
-    _assert_classroom_access(classroom, current_user, db)
+    assert_classroom_access(classroom, current_user, db)
 
     messages = db.query(ChatMessage).filter(
         ChatMessage.classroom_id == classroom_id

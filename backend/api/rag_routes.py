@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core.config import settings
 from backend.core.security import get_current_user, assert_teacher_or_admin
+from backend.core.access import visible_doc_ids, filter_visible_docs
 from backend.models.tables import KnowledgeDocument, KnowledgeChunk, Report, ChatMessage, RegisteredPerson
 from backend.models.schemas import RAGQueryRequest, RAGQueryResponse, KnowledgeDocumentOut
 from rag.knowledge_base import KnowledgeBase, get_knowledge_base
@@ -22,31 +23,6 @@ from rag.conversation_service import ConversationService, is_followup, build_con
 router = APIRouter(prefix="/api/rag", tags=["rag"])
 
 VALID_VISIBILITY = {"public", "staff", "private"}
-
-
-def _filter_visible_docs(query, current_user: RegisteredPerson):
-    """按当前用户角色和可见性过滤文档"""
-    if current_user.role == "admin":
-        return query  # admin 可见所有
-    if current_user.role == "teacher":
-        # 教师：public + staff + 自己的 private
-        return query.filter(
-            ((KnowledgeDocument.visibility == "public") |
-             (KnowledgeDocument.visibility == "staff") |
-             (KnowledgeDocument.uploaded_by == current_user.id))
-        )
-    # student：public + 自己的 private
-    return query.filter(
-        ((KnowledgeDocument.visibility == "public") |
-         (KnowledgeDocument.uploaded_by == current_user.id))
-    )
-
-
-def _visible_doc_ids(db: Session, current_user: RegisteredPerson) -> set[int]:
-    """获取当前用户可见的文档ID集合"""
-    q = db.query(KnowledgeDocument.id)
-    q = _filter_visible_docs(q, current_user)
-    return {row[0] for row in q.all()}
 
 # RAG服务实例（懒加载）
 _rag_service: RAGService | None = None
@@ -79,7 +55,7 @@ def query_knowledge(
     """查询知识库（按用户可见性过滤，生成前过滤防止内容泄露）"""
     try:
         service = get_rag_service()
-        visible_ids = _visible_doc_ids(db, current_user)
+        visible_ids = visible_doc_ids(db, current_user)
         result = service.query(request.question, request.top_k, visible_doc_ids=visible_ids)
         return RAGQueryResponse(
             answer=result['answer'],
@@ -98,7 +74,7 @@ async def query_knowledge_stream(
 ):
     """流式查询知识库：SSE 逐字返回回答，生成前按可见性过滤防止内容泄露"""
     service = get_rag_service()
-    visible_ids = _visible_doc_ids(db, current_user)
+    visible_ids = visible_doc_ids(db, current_user)
 
     def event_stream():
         try:
@@ -278,7 +254,7 @@ def list_documents(
 ):
     """获取当前用户可见的知识文档"""
     q = db.query(KnowledgeDocument)
-    q = _filter_visible_docs(q, current_user)
+    q = filter_visible_docs(q, current_user)
     docs = q.order_by(KnowledgeDocument.created_at.desc()).all()
 
     # 批量获取上传者姓名
@@ -393,7 +369,7 @@ def get_document_chunks(
     if not doc:
         raise HTTPException(404, "文档不存在")
     # 可见性校验：非管理员必须对文档有可见权限
-    visible_ids = _visible_doc_ids(db, current_user)
+    visible_ids = visible_doc_ids(db, current_user)
     if document_id not in visible_ids:
         raise HTTPException(403, "无权访问该文档")
     chunks = db.query(KnowledgeChunk).filter(
@@ -680,7 +656,7 @@ def conversation_query(
     history = build_context_messages(conv)
 
     # 可见文档过滤
-    visible_ids = _visible_doc_ids(db, current_user)
+    visible_ids = visible_doc_ids(db, current_user)
 
     # 调用 RAG 服务（带上下文）
     rag_service = get_rag_service()

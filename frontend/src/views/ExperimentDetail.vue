@@ -79,7 +79,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import api from '@/api'
+import { getExperiment, listExperimentReports, submitExperimentReport, gradeExperimentReport } from '@/api/experiment'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -112,8 +112,8 @@ async function fetchData() {
   loading.value = true
   try {
     const [expRes, repRes] = await Promise.all([
-      api.get(`/experiments/${expId}`),
-      api.get(`/experiments/${expId}/reports`, { _skipGlobalError: true }),
+      getExperiment(expId),
+      listExperimentReports(expId),
     ])
     experiment.value = expRes.data
     reports.value = repRes.data
@@ -133,7 +133,7 @@ async function submitReport() {
     const formData = new FormData()
     formData.append('content', submitForm.value.content)
     if (submitForm.value.file) formData.append('file', submitForm.value.file)
-    await api.post(`/experiments/${expId}/submit`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+    await submitExperimentReport(expId, formData)
     message.success('提交成功')
     showSubmit.value = false
     submitForm.value = { content: '', file: null }
@@ -154,7 +154,7 @@ function showGrade(record) {
 async function gradeReport() {
   grading.value = true
   try {
-    await api.post(`/experiments/reports/${currentReport.value.id}/grade`, gradeForm.value)
+    await gradeExperimentReport(currentReport.value.id, gradeForm.value)
     message.success('批改成功')
     showGradeModal.value = false
     fetchData()

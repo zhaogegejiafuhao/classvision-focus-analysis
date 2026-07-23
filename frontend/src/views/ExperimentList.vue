@@ -69,7 +69,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import api from '@/api'
+import { listExperiments, createExperiment, deleteExperiment } from '@/api/experiment'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -96,7 +96,7 @@ async function fetchExps() {
   try {
     const params = {}
     if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
-    const res = await api.get('/experiments', { params })
+    const res = await listExperiments(params)
     experiments.value = res.data
   } catch (e) {
     message.error('获取实验列表失败')
@@ -107,7 +107,7 @@ async function fetchExps() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
   } catch (e) {}
 }
@@ -120,7 +120,7 @@ async function createExp() {
   if (!form.value.title) { message.warning('请输入标题'); return }
   creating.value = true
   try {
-    await api.post('/experiments', {
+    await createExperiment({
       ...form.value,
       deadline: form.value.deadline ? form.value.deadline.toISOString() : null,
     })
@@ -140,7 +140,7 @@ async function del(id) {
     title: '确认删除此实验？',
     onOk: async () => {
       try {
-        await api.delete(`/experiments/${id}`)
+        await deleteExperiment(id)
         message.success('已删除')
         fetchExps()
       } catch (e) { message.error('删除失败') }

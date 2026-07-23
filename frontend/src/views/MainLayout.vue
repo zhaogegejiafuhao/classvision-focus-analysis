@@ -284,7 +284,8 @@
 import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import api from '@/api'
+import { createClassroom } from '@/api/classroom'
+import { getUnreadCount } from '@/api/notification'
 
 import {
   HomeOutlined,
@@ -344,7 +345,7 @@ async function handleStartClass() {
   }
   startClassLoading.value = true
   try {
-    const res = await api.post('/classrooms', {
+    const res = await createClassroom({
       name: startClassForm.value.name,
       teacher: userStore.displayName,
       course_code: startClassForm.value.course_code,
@@ -384,7 +385,7 @@ async function fetchUnreadCount() {
   try {
     const token = userStore.token || localStorage.getItem('token')
     if (!token) return
-    const { data } = await api.get('/notifications/unread-count', { _skipGlobalError: true })
+    const { data } = await getUnreadCount()
     unreadCount.value = data.unread_count
   } catch (e) {
     // 忽略错误

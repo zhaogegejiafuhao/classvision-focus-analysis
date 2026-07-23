@@ -446,7 +446,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import api from '@/api'
+import { getRagStatus, listRagDocuments, uploadRagDocument, updateRagDocument, deleteRagDocument, rebuildRagIndex, listRagDocumentChunks, previewRagChunk, getRagIndexHistory, listRagConversations, listRagConversationMessages, deleteRagConversation, queryRagConversation } from '@/api/rag'
 import { useUserStore } from '@/stores/user'
 import MarkdownIt from 'markdown-it'
 import { message } from 'ant-design-vue'
@@ -517,7 +517,7 @@ function renderMarkdown(text) {
 
 async function loadStatus() {
   try {
-    const res = await api.get('/rag/status', { _skipGlobalError: true })
+    const res = await getRagStatus()
     ragStatus.value = res.data
   } catch {
     ragStatus.value = { total_vectors: 0 }
@@ -526,7 +526,7 @@ async function loadStatus() {
 
 async function loadDocuments() {
   try {
-    const res = await api.get('/rag/documents', { _skipGlobalError: true })
+    const res = await listRagDocuments()
     documents.value = res.data || []
   } catch {
     documents.value = []
@@ -540,9 +540,7 @@ async function handleUpload(file) {
   formData.append('visibility', uploadVisibility.value)
 
   try {
-    const res = await api.post('/rag/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await uploadRagDocument(formData)
     message.success(`上传成功，已索引 ${res.data.total_chunks} 个文本块（${visLabel(res.data.visibility)}）`)
     await loadDocuments()
     await loadStatus()
@@ -627,7 +625,7 @@ function clearHistory() {
 async function indexHistory() {
   indexLoading.value = true
   try {
-    const res = await api.post('/rag/index/history')
+    const res = await getRagIndexHistory()
     message.success(`已索引 ${res.data.total_chunks} 个历史数据文本块`)
     await loadStatus()
   } catch (e) {
@@ -639,7 +637,7 @@ async function indexHistory() {
 
 async function deleteDoc(docId) {
   try {
-    await api.delete(`/rag/documents/${docId}`)
+    await deleteRagDocument(docId)
     message.success('文档已删除')
     await loadDocuments()
     await loadStatus()
@@ -652,7 +650,7 @@ const rebuildLoading = ref(false)
 async function rebuildIndex() {
   rebuildLoading.value = true
   try {
-    const res = await api.post('/rag/rebuild')
+    const res = await rebuildRagIndex()
     message.success(`重建完成：${res.data.documents} 个文档，${res.data.chunks} 个文本块`)
     await loadDocuments()
     await loadStatus()
@@ -678,7 +676,7 @@ async function runChunkPreview() {
   chunkPreviewLoading.value = true
   chunkPreviewResult.value = null
   try {
-    const res = await api.post('/rag/chunk-preview', {
+    const res = await previewRagChunk({
       text: chunkPreviewText.value,
       strategy: chunkPreviewStrategy.value === 'auto' ? null : chunkPreviewStrategy.value,
     })
@@ -698,7 +696,7 @@ async function previewDoc(docId) {
   previewLoading.value = true
   previewData.value = null
   try {
-    const res = await api.get(`/rag/documents/${docId}/chunks`, { _skipGlobalError: true })
+    const res = await listRagDocumentChunks(docId)
     previewData.value = res.data
   } catch (e) {
     message.error('加载失败: ' + (e.response?.data?.detail || e.message))
@@ -725,7 +723,7 @@ async function handleEditDoc() {
   editDocSaving.value = true
   try {
     const params = { filename: editDocForm.value.filename, visibility: editDocForm.value.visibility }
-    await api.put(`/rag/documents/${editDocForm.value.id}`, null, { params })
+    await updateRagDocument(editDocForm.value.id, params)
     message.success('文档已更新')
     editDocOpen.value = false
     await loadDocuments()
@@ -753,7 +751,7 @@ function onModeChange(checked) {
 
 async function loadConversations() {
   try {
-    const res = await api.get('/rag/conversations', { _skipGlobalError: true })
+    const res = await listRagConversations()
     conversations.value = res.data || []
   } catch {
     conversations.value = []
@@ -772,7 +770,7 @@ async function onConvChange(convId) {
     return
   }
   try {
-    const res = await api.get(`/rag/conversations/${convId}/messages`, { _skipGlobalError: true })
+    const res = await listRagConversationMessages(convId)
     convMessages.value = res.data || []
     await nextTick()
     scrollToBottom()
@@ -784,7 +782,7 @@ async function onConvChange(convId) {
 async function deleteConversation() {
   if (!currentConvId.value) return
   try {
-    await api.delete(`/rag/conversations/${currentConvId.value}`)
+    await deleteRagConversation(currentConvId.value)
     message.success('对话已删除')
     currentConvId.value = null
     convMessages.value = []
@@ -811,7 +809,7 @@ async function queryConversation() {
   scrollToBottom()
 
   try {
-    const res = await api.post('/rag/conversations/query', {
+    const res = await queryRagConversation({
       question: currentQuestion,
       conversation_id: currentConvId.value,
       top_k: 5,

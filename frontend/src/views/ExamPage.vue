@@ -31,10 +31,10 @@
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
-              <a-popconfirm v-if="record.status === 'draft'" title="确定发布考试？" @confirm="publishExam(record.id)">
+              <a-popconfirm v-if="record.status === 'draft'" title="确定发布考试？" @confirm="handlePublishExam(record.id)">
                 <a-button type="link" size="small">发布</a-button>
               </a-popconfirm>
-              <a-popconfirm title="确定删除？" @confirm="deleteExam(record.id)">
+              <a-popconfirm title="确定删除？" @confirm="handleDeleteExam(record.id)">
                 <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
             </a-space>
@@ -44,7 +44,7 @@
     </a-card>
 
     <!-- 创建考试弹窗 -->
-    <a-modal v-model:open="showCreateModal" title="创建考试" @ok="createExam" :confirm-loading="submitting" width="700px">
+    <a-modal v-model:open="showCreateModal" title="创建考试" @ok="handleCreateExam" :confirm-loading="submitting" width="700px">
       <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 18 }">
         <a-form-item label="考试标题" required>
           <a-input v-model:value="form.title" placeholder="考试标题" />
@@ -72,7 +72,8 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import api from '../api'
+import { listExams, createExam, publishExam, deleteExam } from '@/api/exam'
+import { listClassrooms } from '@/api/classroom'
 
 const router = useRouter()
 const exams = ref([])
@@ -104,7 +105,7 @@ async function fetchExams() {
   try {
     const params = {}
     if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
-    const res = await api.get('/exams', { params })
+    const res = await listExams(params)
     exams.value = res.data
   } catch (e) {
     message.error('获取考试列表失败')
@@ -115,21 +116,21 @@ async function fetchExams() {
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data
   } catch (e) {
     // 忽略
   }
 }
 
-async function createExam() {
+async function handleCreateExam() {
   if (!form.value.title.trim()) {
     message.error('请输入考试标题')
     return
   }
   submitting.value = true
   try {
-    await api.post('/exams', {
+    await createExam({
       title: form.value.title,
       description: form.value.description,
       classroom_id: form.value.classroom_id,
@@ -148,9 +149,9 @@ async function createExam() {
   }
 }
 
-async function publishExam(id) {
+async function handlePublishExam(id) {
   try {
-    await api.post(`/exams/${id}/publish`)
+    await publishExam(id)
     message.success('考试已发布')
     fetchExams()
   } catch (e) {
@@ -158,9 +159,9 @@ async function publishExam(id) {
   }
 }
 
-async function deleteExam(id) {
+async function handleDeleteExam(id) {
   try {
-    await api.delete(`/exams/${id}`)
+    await deleteExam(id)
     message.success('删除成功')
     fetchExams()
   } catch (e) {

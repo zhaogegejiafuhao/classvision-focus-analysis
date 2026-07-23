@@ -69,7 +69,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import api from '../api'
+import { listTeachingPlans, createTeachingPlan, updateTeachingPlan, deleteTeachingPlan } from '@/api/teachingPlan'
+import { listClassrooms } from '@/api/classroom'
 
 const plans = ref([])
 const classrooms = ref([])
@@ -86,11 +87,11 @@ function classroomName(classroomId) {
 
 async function fetchPlans() {
   loading.value = true
-  try { const res = await api.get('/teaching-plans'); plans.value = res.data } catch { /* ignore */ } finally { loading.value = false }
+  try { const res = await listTeachingPlans(); plans.value = res.data } catch { /* ignore */ } finally { loading.value = false }
 }
 
 async function fetchClassrooms() {
-  try { const res = await api.get('/classrooms'); classrooms.value = res.data } catch { /* ignore */ }
+  try { const res = await listClassrooms(); classrooms.value = res.data } catch { /* ignore */ }
 }
 
 function editPlan(item) {
@@ -104,10 +105,10 @@ async function savePlan() {
   submitting.value = true
   try {
     if (editingId.value) {
-      await api.put(`/teaching-plans/${editingId.value}`, form.value)
+      await updateTeachingPlan(editingId.value, form.value)
       message.success('更新成功')
     } else {
-      await api.post('/teaching-plans', form.value)
+      await createTeachingPlan(form.value)
       message.success('创建成功')
     }
     showCreateModal.value = false
@@ -118,7 +119,7 @@ async function savePlan() {
 }
 
 async function deletePlan(id) {
-  try { await api.delete(`/teaching-plans/${id}`); message.success('删除成功'); fetchPlans() } catch { /* ignore */ }
+  try { await deleteTeachingPlan(id); message.success('删除成功'); fetchPlans() } catch { /* ignore */ }
 }
 
 onMounted(() => { fetchPlans(); fetchClassrooms() })

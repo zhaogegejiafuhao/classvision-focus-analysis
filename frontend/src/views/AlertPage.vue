@@ -47,7 +47,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import api from '../api'
+import { getAlerts } from '@/api/alert'
+import { listClassrooms } from '@/api/classroom'
 
 const report = ref({})
 const loading = ref(false)
@@ -60,14 +61,14 @@ async function fetchData() {
   try {
     const params = {}
     if (selectedClassroomId.value) params.classroom_id = selectedClassroomId.value
-    const res = await api.get('/alerts', { params })
+    const res = await getAlerts(params)
     report.value = res.data
   } catch { /* ignore */ } finally { loading.value = false }
 }
 
 async function fetchClassrooms() {
   try {
-    const res = await api.get('/classrooms')
+    const res = await listClassrooms()
     classrooms.value = res.data || []
   } catch { /* ignore */ }
 }
