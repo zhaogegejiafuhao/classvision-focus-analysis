@@ -509,6 +509,8 @@ class QuestionBank(Base):
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 分类
     tags: Mapped[str | None] = mapped_column(String(200), nullable=True)  # 逗号分隔标签
     difficulty: Mapped[int] = mapped_column(Integer, default=1)  # 1-5
+    source: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 数据来源（如 TAL-SCQ5K-CN）
+    analysis: Mapped[str | None] = mapped_column(Text, nullable=True)  # 题目解析
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
     teacher: Mapped["RegisteredPerson"] = relationship()
@@ -531,6 +533,24 @@ class CourseMaterial(Base):
 
     teacher: Mapped["RegisteredPerson"] = relationship()
     classroom: Mapped["Classroom | None"] = relationship()
+
+
+class ExamTemplate(Base):
+    """试卷模板——定义组卷结构骨架（题型、数量、分值、知识点分布、难度分布）"""
+    __tablename__ = "exam_template"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100))  # 模板名称
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)  # 模板说明
+    total_score: Mapped[float] = mapped_column(Float, default=100.0)  # 总分
+    duration: Mapped[int] = mapped_column(Integer, default=90)  # 时长(分钟)
+    # 试卷结构 JSON: [{"type":"single","count":10,"score_per":5,"knowledge":["极限","积分"],"difficulty":2}, ...]
+    structure: Mapped[str] = mapped_column(Text)  # JSON
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)  # 系统内置模板
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("registered_person.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    creator: Mapped["RegisteredPerson | None"] = relationship()
 
 
 class GradeConfig(Base):

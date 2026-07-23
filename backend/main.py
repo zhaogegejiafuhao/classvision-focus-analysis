@@ -37,11 +37,12 @@ from backend.api.attribution_routes import router as attribution_router
 from backend.api.correction_routes import router as correction_router
 from backend.api.similar_question_routes import router as similar_question_router
 from backend.api.answer_sheet_routes import router as answer_sheet_router
+from backend.api.exam_compose_routes import template_router, compose_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
 from backend.core.config import settings
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
-from backend.models.tables import RegisteredPerson, OjProblem, OjTestCase
+from backend.models.tables import RegisteredPerson, OjProblem, OjTestCase, ExamTemplate
 
 # 配置 RAG 检索链路日志
 os.makedirs("logs", exist_ok=True)
@@ -103,6 +104,7 @@ async def lifespan(app: FastAPI):
     init_db()
     _create_default_accounts()
     _seed_oj_problems()
+    _seed_builtin_templates()
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _warmup_models)
     await loop.run_in_executor(None, _preload_reranker)
@@ -214,6 +216,104 @@ def _seed_oj_problems():
         db.close()
 
 
+def _seed_builtin_templates():
+    """预置内置试卷模板"""
+    import json
+    db = SessionLocal()
+    try:
+        if db.query(ExamTemplate).filter(ExamTemplate.is_builtin == True).count() > 0:
+            return  # 已有内置模板，不重复创建
+
+        templates = [
+            {
+                "name": "高中数学期中考试",
+                "description": "标准100分制高中数学期中考试，覆盖代数、几何、概率",
+                "total_score": 100,
+                "duration": 90,
+                "structure": [
+                    {"type": "single", "count": 8, "score_per": 5, "knowledge": ["代数", "函数"], "difficulty": 2},
+                    {"type": "single", "count": 4, "score_per": 5, "knowledge": ["几何", "三角"], "difficulty": 3},
+                    {"type": "fill", "count": 4, "score_per": 5, "knowledge": ["数列", "不等式"], "difficulty": 3},
+                    {"type": "essay", "count": 3, "score_per": 10, "knowledge": ["综合"], "difficulty": 4},
+                ],
+            },
+            {
+                "name": "初中数学月考",
+                "description": "初中数学月考，侧重基础计算与应用",
+                "total_score": 100,
+                "duration": 60,
+                "structure": [
+                    {"type": "single", "count": 10, "score_per": 3, "knowledge": ["有理数", "整式", "方程"], "difficulty": 1},
+                    {"type": "judge", "count": 5, "score_per": 2, "knowledge": ["基础概念"], "difficulty": 1},
+                    {"type": "fill", "count": 5, "score_per": 4, "knowledge": ["计算", "应用题"], "difficulty": 2},
+                    {"type": "essay", "count": 3, "score_per": 15, "knowledge": ["证明", "综合"], "difficulty": 3},
+                ],
+            },
+            {
+                "name": "随堂小测验",
+                "description": "15分钟课堂小测验，快速检测学生掌握情况",
+                "total_score": 50,
+                "duration": 15,
+                "structure": [
+                    {"type": "single", "count": 8, "score_per": 4, "knowledge": [], "difficulty": 2},
+                    {"type": "judge", "count": 6, "score_per": 3, "knowledge": [], "difficulty": 1},
+                ],
+            },
+            {
+                "name": "小学数学竞赛模拟",
+                "description": "小学奥数竞赛模拟，强调思维和巧解",
+                "total_score": 100,
+                "duration": 90,
+                "structure": [
+                    {"type": "single", "count": 10, "score_per": 4, "knowledge": ["计算", "数论"], "difficulty": 3},
+                    {"type": "single", "count": 5, "score_per": 6, "knowledge": ["组合", "逻辑推理"], "difficulty": 4},
+                    {"type": "fill", "count": 5, "score_per": 6, "knowledge": ["几何", "应用题"], "difficulty": 3},
+                ],
+            },
+            {
+                "name": "大学高数期末考试",
+                "description": "大学高等数学期末考试，覆盖极限、微积分、级数",
+                "total_score": 100,
+                "duration": 120,
+                "structure": [
+                    {"type": "single", "count": 6, "score_per": 4, "knowledge": ["极限", "连续"], "difficulty": 2},
+                    {"type": "single", "count": 4, "score_per": 5, "knowledge": ["微分", "积分"], "difficulty": 3},
+                    {"type": "fill", "count": 4, "score_per": 5, "knowledge": ["计算", "级数"], "difficulty": 3},
+                    {"type": "essay", "count": 4, "score_per": 10, "knowledge": ["证明", "综合应用"], "difficulty": 4},
+                ],
+            },
+            {
+                "name": "全题型综合测试",
+                "description": "包含所有题型的综合测试模板，适合自定义需求",
+                "total_score": 100,
+                "duration": 90,
+                "structure": [
+                    {"type": "single", "count": 5, "score_per": 4, "knowledge": [], "difficulty": 2},
+                    {"type": "multi", "count": 3, "score_per": 6, "knowledge": [], "difficulty": 3},
+                    {"type": "judge", "count": 5, "score_per": 2, "knowledge": [], "difficulty": 1},
+                    {"type": "fill", "count": 4, "score_per": 5, "knowledge": [], "difficulty": 3},
+                    {"type": "essay", "count": 3, "score_per": 13, "knowledge": [], "difficulty": 4},
+                ],
+            },
+        ]
+
+        for t_data in templates:
+            t = ExamTemplate(
+                name=t_data["name"],
+                description=t_data["description"],
+                total_score=t_data["total_score"],
+                duration=t_data["duration"],
+                structure=json.dumps(t_data["structure"], ensure_ascii=False),
+                is_builtin=True,
+                created_by=None,
+            )
+            db.add(t)
+        db.commit()
+        logging.getLogger("uvicorn").info(f"已创建 {len(templates)} 个内置试卷模板")
+    finally:
+        db.close()
+
+
 app = FastAPI(title="ClassVision API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -250,6 +350,8 @@ app.include_router(attribution_router)
 app.include_router(correction_router)
 app.include_router(similar_question_router)
 app.include_router(answer_sheet_router)
+app.include_router(template_router)
+app.include_router(compose_router)
 
 # 挂载上传目录
 os.makedirs("uploads/materials", exist_ok=True)

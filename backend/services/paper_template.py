@@ -335,5 +335,121 @@ class PaperTemplateService:
         return cv2.warpPerspective(img, matrix, (max_w, max_h))
 
 
+    def auto_generate_template(
+        self,
+        db: Session,
+        exam_id: int,
+        teacher_id: int,
+    ) -> int | None:
+        """自动生成默认答题卡模板
+
+        根据考试题目数量/类型自动推断布局，生成空白卷底图 + 区域标注。
+        如果考试已有模板则跳过。
+
+        Args:
+            db: 数据库会话
+            exam_id: 考试 ID
+            teacher_id: 教师 ID
+
+        Returns:
+            template_id 或 None（已有模板时）
+        """
+        # 检查是否已有模板
+        existing = db.query(PaperTemplate).filter(PaperTemplate.exam_id == exam_id).first()
+        if existing:
+            return None
+
+        # 获取考试题目
+        questions = db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order).all()
+        if not questions:
+            return None
+
+        # 生成默认空白卷底图（A4 300 DPI: 2480×3508 像素）
+        page_w, page_h = 2480, 3508
+        blank_img = np.ones((page_h, page_w, 3), dtype=np.uint8) * 255  # 白底
+
+        # 标题区域
+        y_offset = 120
+        cv2.putText(blank_img, "ClassVision Answer Sheet", (100, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0), 2)
+        cv2.putText(blank_img, f"Exam ID: {exam_id}", (100, y_offset + 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (100, 100, 100), 1)
+
+        # 学生信息区域
+        info_y = y_offset + 120
+        cv2.rectangle(blank_img, (80, info_y), (page_w - 80, info_y + 100), (200, 200, 200), 2)
+        cv2.putText(blank_img, "Name: ____________    Student ID: ____________", (120, info_y + 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 1)
+
+        y_offset = info_y + 160
+
+        # 计算每道题的区域
+        margin_x = 100
+        col_w = (page_w - 2 * margin_x) // 2  # 双列布局
+        regions = []
+        col = 0  # 当前列 (0=左, 1=右)
+        row_y = y_offset
+
+        for i, q in enumerate(questions):
+            q_type = q.type
+            region_type = "bubble" if q_type in ("single", "multi", "judge") else \
+                         "fill" if q_type == "fill" else "essay"
+
+            # 根据题型决定区域高度
+            if region_type == "bubble":
+                h = 120
+            elif region_type == "fill":
+                h = 150
+            else:  # essay
+                h = 400
+
+            # 翻页检查
+            if row_y + h > page_h - 200:
+                # 简单处理：切换到右列或换页（这里仅单页简化）
+                break
+
+            x = margin_x + col * col_w
+            bbox = {"x": x, "y": row_y, "w": col_w - 40, "h": h}
+
+            # 在底图上画框和标签
+            cv2.rectangle(blank_img, (x, row_y), (x + col_w - 40, row_y + h), (0, 0, 0), 1)
+            label = f"Q{i+1}({q_type}, {int(q.score)}pts)"
+            cv2.putText(blank_img, label, (x + 10, row_y + 25),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 200), 1)
+
+            # 对于选择题，画选项气泡
+            if region_type == "bubble":
+                options = ["A", "B", "C", "D"]
+                for j, opt in enumerate(options):
+                    cx = x + 60 + j * 80
+                    cy = row_y + 70
+                    cv2.circle(blank_img, (cx, cy), 20, (0, 0, 0), 1)
+                    cv2.putText(blank_img, opt, (cx - 6, cy + 6),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+
+            regions.append({
+                "question_id": q.id,
+                "region_type": region_type,
+                "bbox": bbox,
+                "order": i + 1,
+            })
+
+            row_y += h + 30
+
+        # 保存底图
+        _, encoded = cv2.imencode(".png", blank_img)
+        img_bytes = encoded.tobytes()
+
+        # 调用已有的 create_template
+        return self.create_template(
+            db=db,
+            exam_id=exam_id,
+            teacher_id=teacher_id,
+            blank_image_bytes=img_bytes,
+            filename=f"auto_template_{exam_id}.png",
+            regions=regions,
+        )
+
+
 # 模块级单例
 paper_template_service = PaperTemplateService()

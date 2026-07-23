@@ -79,3 +79,13 @@ export function getExamSubmission(submissionId) {
 export function exportExam(examId) {
   return api.get(`/exams/${examId}/export`, { responseType: 'blob' })
 }
+
+/** 生成考试报告（班级维度：均分、及格率、每题正确率、AI 分析） */
+export function generateExamReport(examId) {
+  return api.post(`/exams/${examId}/report`)
+}
+
+/** 学生个人考试报告（分数、错题、薄弱知识点、与班级对比） */
+export function getStudentExamReport(examId) {
+  return api.get(`/exams/${examId}/student-report`)
+}
