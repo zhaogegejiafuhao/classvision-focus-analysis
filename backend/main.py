@@ -37,7 +37,7 @@ from backend.api.attribution_routes import router as attribution_router
 from backend.api.correction_routes import router as correction_router
 from backend.api.similar_question_routes import router as similar_question_router
 from backend.api.answer_sheet_routes import router as answer_sheet_router
-from backend.api.exam_compose_routes import template_router, compose_router
+from backend.api.exam_compose_routes import template_router, compose_router, review_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
 from backend.core.config import settings
@@ -105,9 +105,11 @@ async def lifespan(app: FastAPI):
     _create_default_accounts()
     _seed_oj_problems()
     _seed_builtin_templates()
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _warmup_models)
-    await loop.run_in_executor(None, _preload_reranker)
+    # 模型预热改为后台线程，不阻塞服务器启动
+    import threading
+    threading.Thread(target=_warmup_models, daemon=True, name="model-warmup").start()
+    # RAG reranker 也改为后台线程
+    threading.Thread(target=_preload_reranker, daemon=True, name="reranker-preload").start()
     yield
 
 
@@ -352,13 +354,19 @@ app.include_router(similar_question_router)
 app.include_router(answer_sheet_router)
 app.include_router(template_router)
 app.include_router(compose_router)
+app.include_router(review_router)
 
 # 挂载上传目录
 os.makedirs("uploads/materials", exist_ok=True)
 os.makedirs("uploads/experiments", exist_ok=True)
 os.makedirs("uploads/answer_sheets", exist_ok=True)
 os.makedirs("uploads/paper_templates", exist_ok=True)
+os.makedirs("uploads/exam_answers", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# 挂载违规抓拍图片目录
+os.makedirs("backend/static/cheating_proofs", exist_ok=True)
+app.mount("/static", StaticFiles(directory="backend/static"), name="static")
 
 
 @app.get("/api/health")

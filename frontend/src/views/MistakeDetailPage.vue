@@ -14,10 +14,10 @@
         </template>
         <a-descriptions :column="1" bordered size="small">
           <a-descriptions-item label="题目">
-            {{ detail.question_text || '-' }}
+            <LatexText :content="detail.question_text || '-'" />
           </a-descriptions-item>
           <a-descriptions-item label="标准答案">
-            <div class="answer-text">{{ detail.standard_answer || '暂无' }}</div>
+            <div class="answer-text"><LatexText :content="detail.standard_answer || '暂无'" /></div>
           </a-descriptions-item>
         </a-descriptions>
       </a-card>
@@ -47,11 +47,11 @@
 
         <!-- 学生答案 -->
         <a-divider orientation="left">学生答案</a-divider>
-        <div class="answer-text">{{ detail.student_answer_ocr || '暂无学生作答内容' }}</div>
+        <div class="answer-text"><LatexText :content="detail.student_answer_ocr || '暂无学生作答内容'" /></div>
 
         <!-- 批改评语 -->
         <a-divider orientation="left">批改评语</a-divider>
-        <div class="answer-text">{{ detail.comment || '暂无评语' }}</div>
+        <div class="answer-text"><LatexText :content="detail.comment || '暂无评语'" /></div>
 
         <!-- 评分细则（折叠） -->
         <a-collapse v-if="detail.rubric || detail.grading" ghost style="margin-top: 12px">
@@ -132,6 +132,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getMistakeDetail, generateSimilarFromMistake } from '@/api/correction'
+import LatexText from '@/components/LatexText.vue'
 
 const route = useRoute()
 const router = useRouter()

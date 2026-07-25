@@ -3,6 +3,9 @@
     <a-page-header :title="exam?.title || '考试详情'" @back="() => $router.push('/exams')">
       <template #subTitle>
         <a-tag v-if="exam" :color="getStatusColor(exam.status)">{{ getStatusText(exam.status) }}</a-tag>
+        <a-tag v-if="exam" :color="exam.exam_type === 'paper' ? '#722ed1' : '#1890ff'">
+          {{ exam.exam_type === 'paper' ? '📝 笔试' : '💻 机试' }}
+        </a-tag>
       </template>
       <template #extra>
         <a-space>
@@ -13,6 +16,10 @@
           <a-popconfirm v-if="exam?.status === 'published'" title="确定关闭考试？学生将无法继续提交。" @confirm="handleCloseExam">
             <a-button danger>关闭考试</a-button>
           </a-popconfirm>
+          <a-button v-if="exam?.status !== 'draft' && hasSubjectiveQuestions" type="primary" @click="goToReview" ghost>
+            <template #icon><RobotOutlined /></template>
+            AI 审核
+          </a-button>
           <a-button v-if="exam?.status !== 'draft'" @click="exportCSV">导出成绩</a-button>
         </a-space>
       </template>
@@ -23,11 +30,16 @@
         <!-- 左侧：考试信息 -->
         <a-col :span="8">
           <a-card title="考试信息" size="small">
-            <p><strong>考试时长：</strong>{{ exam?.duration }}分钟</p>
-            <p><strong>总分：</strong>{{ exam?.total_score }}分</p>
-            <p><strong>题目数：</strong>{{ exam?.question_count }}题</p>
-            <p><strong>课堂：</strong>{{ exam?.classroom_name || '未指定' }}</p>
-          </a-card>
+	            <p><strong>考试类型：</strong>
+	              <a-tag :color="exam?.exam_type === 'paper' ? '#722ed1' : '#1890ff'">
+	                {{ exam?.exam_type === 'paper' ? '📝 笔试' : '💻 机试' }}
+	              </a-tag>
+	            </p>
+	            <p><strong>考试时长：</strong>{{ exam?.duration }}分钟</p>
+	            <p><strong>总分：</strong>{{ exam?.total_score }}分</p>
+	            <p><strong>题目数：</strong>{{ exam?.question_count }}题</p>
+	            <p><strong>课堂：</strong>{{ exam?.classroom_name || '未指定' }}</p>
+	          </a-card>
 
           <a-card title="添加题目" size="small" style="margin-top: 16px">
             <a-form :label-col="{ span: 6 }" size="small">
@@ -71,12 +83,15 @@
                 <a-list-item>
                   <a-list-item-meta>
                     <template #title>
-                      <span style="font-weight: bold">{{ index + 1 }}. [{{ getTypeText(item.type) }}] {{ item.content }}</span>
+                      <span style="font-weight: bold">{{ index + 1 }}. [{{ getTypeText(item.type) }}]</span>
+                      <LatexText :content="item.content" style="font-weight: bold" />
                       <span style="margin-left: 8px; color: #999">（{{ item.score }}分）</span>
                     </template>
                     <template #description>
-                      <div v-if="item.options">
-                        选项：<span v-for="(opt, i) in item.options" :key="i">{{ opt }}；</span>
+                      <div v-if="item.options" style="display: flex; flex-wrap: wrap; gap: 8px">
+                        <span v-for="(opt, i) in item.options" :key="i">
+                          <span>{{ String.fromCharCode(65 + i) }}.</span><LatexText :content="opt" />
+                        </span>
                       </div>
                     </template>
                   </a-list-item-meta>
@@ -89,7 +104,7 @@
             <a-table :columns="submissionColumns" :data-source="submissions" row-key="id" size="small">
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'status'">
-                  <a-tag :color="record.status === 'graded' ? 'green' : 'blue'">{{ record.status === 'graded' ? '已批改' : '待批改' }}</a-tag>
+                  <a-tag :color="getStatusTagColor(record.status)">{{ getStatusTagText(record.status) }}</a-tag>
                 </template>
                 <template v-else-if="column.key === 'score'">
                   {{ record.score ?? '-' }} / {{ exam?.total_score }}
@@ -148,16 +163,23 @@
 
           <div v-for="ans in gradeDetail.answers" :key="ans.answer_id" style="margin-bottom: 16px; padding: 12px; background: #fafafa; border-radius: 8px">
             <div style="font-weight: bold; margin-bottom: 8px">
-              [{{ getTypeText(ans.question_type) }}] {{ ans.question_content }}
+              [{{ getTypeText(ans.question_type) }}] <LatexText :content="ans.question_content" />
             </div>
             <div v-if="ans.options" style="margin-bottom: 8px">
-              选项：<span v-for="(opt, i) in ans.options" :key="i">{{ String.fromCharCode(65 + i) }}.{{ opt }}；</span>
+              选项：<span v-for="(opt, i) in ans.options" :key="i">{{ String.fromCharCode(65 + i) }}.<LatexText :content="opt" />；</span>
             </div>
             <div style="margin-bottom: 8px">
-              <span style="color: #1890ff">学生答案：</span>{{ ans.student_answer || '（未作答）' }}
-            </div>
+	              <span style="color: #1890ff">学生答案：</span>{{ formatAnswer(ans.student_answer, ans.question_type) }}
+	            </div>
+	            <!-- 学生上传的图片答案 -->
+	            <div v-if="ans.image_urls && ans.image_urls.length" style="margin-bottom: 8px">
+	              <span style="color: #999; font-size: 12px">图片答案：</span>
+	              <a-image-preview-group>
+	                <a-image v-for="(url, idx) in ans.image_urls" :key="idx" :src="url" :width="100" :height="75" style="border-radius: 4px; object-fit: cover; margin-right: 4px; vertical-align: top" />
+	              </a-image-preview-group>
+	            </div>
             <div v-if="ans.correct_answer != null" style="margin-bottom: 8px">
-              <span style="color: #52c41a">正确答案：</span>{{ ans.correct_answer }}
+              <span style="color: #52c41a">正确答案：</span>{{ formatAnswer(ans.correct_answer, ans.question_type) }}
             </div>
 
             <div v-if="ans.question_type === 'essay'" style="margin-top: 8px; padding: 8px; background: #fff; border: 1px solid #d9d9d9; border-radius: 4px">
@@ -191,8 +213,11 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { RobotOutlined } from '@ant-design/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getExam, getExamStats, getExamSubmission, listExamSubmissions, addExamQuestion, gradeExamAnswers, publishExam, closeExam, exportExam } from '@/api/exam'
+import { getExam, getExamStats, getExamSubmission, listExamSubmissions, addExamQuestion, gradeExamAnswers, closeExam, exportExam, exportExamPaper } from '@/api/exam'
+import { publishExam as publishExamWithPayload } from '@/api/examTemplate'
+import LatexText from '@/components/LatexText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -254,6 +279,39 @@ const hasEssayQuestions = computed(() => {
   if (!gradeDetail.value) return false
   return gradeDetail.value.answers.some(a => a.question_type === 'essay')
 })
+
+// 是否含主观题（用于显示 AI 审核入口）
+const hasSubjectiveQuestions = computed(() => {
+  if (!exam.value || !exam.value.questions) return false
+  return exam.value.questions.some(q => q.type === 'essay' || q.type === 'fill')
+})
+
+function goToReview() {
+  router.push(`/exams/${examId}/review`)
+}
+
+// 学生提交列表状态显示
+function getStatusTagColor(status) {
+  return {
+    in_progress: 'default',
+    submitted: 'blue',
+    ai_grading: 'orange',
+    ai_graded: 'cyan',
+    graded: 'green',
+    timeout: 'red',
+  }[status] || 'default'
+}
+
+function getStatusTagText(status) {
+  return {
+    in_progress: '考试中',
+    submitted: '已提交',
+    ai_grading: 'AI 批改中',
+    ai_graded: '待审核',
+    graded: '已批改',
+    timeout: '已超时',
+  }[status] || status
+}
 
 async function openGradeDetail(record) {
   gradeDetailVisible.value = true
@@ -372,16 +430,30 @@ async function addQuestion() {
 
 async function handlePublishExam() {
   try {
-    await publishExam(examId)
-    message.success('考试已发布')
+    const res = await publishExamWithPayload(examId, {})
+    message.success(`考试发布成功！${res.data.question_count} 题 / ${res.data.total_score} 分`)
     fetchExam()
   } catch (e) {
-    message.error('发布失败')
+    const msg = e?.response?.data?.detail || '发布失败'
+    message.error(msg)
   }
 }
 
-function exportPaper() {
-  window.open(`/api/exams/${examId}/paper-export`, '_blank')
+async function exportPaper() {
+  try {
+    const res = await exportExamPaper(examId)
+    const blob = new Blob([res.data], { type: 'text/html' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `试卷_${examId}.html`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    message.error('导出试卷失败')
+  }
 }
 
 async function handleCloseExam() {
@@ -420,6 +492,41 @@ function getStatusText(status) {
 
 function getTypeText(type) {
   return { single: '单选', multi: '多选', judge: '判断', fill: '填空', essay: '简答' }[type] || type
+}
+
+/**
+ * 格式化答案显示：将索引格式（"0","1"）统一转为字母格式（"A","B"）
+ * 兼容后端可能存储的字母格式和索引格式
+ */
+function formatAnswer(answer, questionType) {
+  if (!answer && answer !== 0) return '（未作答）'
+  const str = String(answer).trim()
+  if (!str) return '（未作答）'
+
+  if (questionType === 'single') {
+    // 单选：可能是 "0"/"1"/"2" 或 "A"/"B"/"C"
+    if (/^\d+$/.test(str)) {
+      return String.fromCharCode(65 + parseInt(str))
+    }
+    return str
+  }
+
+  if (questionType === 'multi') {
+    // 多选：可能是 "0,2,3" 或 "A,C,D"
+    return str.split(',').map(s => {
+      const trimmed = s.trim()
+      if (/^\d+$/.test(trimmed)) {
+        return String.fromCharCode(65 + parseInt(trimmed))
+      }
+      return trimmed
+    }).join(',')
+  }
+
+  if (questionType === 'judge') {
+    return str.toLowerCase() === 'true' ? '正确' : '错误'
+  }
+
+  return str
 }
 
 onMounted(fetchExam)

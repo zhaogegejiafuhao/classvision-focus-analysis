@@ -23,8 +23,13 @@
       <a-table :columns="columns" :data-source="exams" row-key="id" :pagination="{ pageSize: 10 }">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <a @click="goDetail(record.id)">{{ record.title }}</a>
-          </template>
+	            <a @click="goDetail(record.id)">{{ record.title }}</a>
+	          </template>
+	          <template v-else-if="column.key === 'exam_type'">
+	            <a-tag :color="record.exam_type === 'paper' ? '#722ed1' : '#1890ff'">
+	              {{ record.exam_type === 'paper' ? '📝 笔试' : '💻 机试' }}
+	            </a-tag>
+	          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="getStatusColor(record.status)">{{ getStatusText(record.status) }}</a-tag>
           </template>
@@ -61,8 +66,14 @@
           <a-input-number v-model:value="form.duration" :min="10" :max="180" addon-after="分钟" />
         </a-form-item>
         <a-form-item label="总分">
-          <a-input-number v-model:value="form.total_score" :min="10" :max="500" />
-        </a-form-item>
+	          <a-input-number v-model:value="form.total_score" :min="10" :max="500" />
+	        </a-form-item>
+	        <a-form-item label="考试类型">
+	          <a-radio-group v-model:value="form.exam_type">
+	            <a-radio-button value="computer">💻 机试</a-radio-button>
+	            <a-radio-button value="paper">📝 笔试</a-radio-button>
+	          </a-radio-group>
+	        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -72,7 +83,8 @@
 import { ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import { listExams, createExam, publishExam, deleteExam } from '@/api/exam'
+import { listExams, createExam, deleteExam } from '@/api/exam'
+import { publishExam as publishExamWithPayload } from '@/api/examTemplate'
 import { listClassrooms } from '@/api/classroom'
 
 const router = useRouter()
@@ -89,11 +101,13 @@ const form = ref({
   classroom_id: null,
   duration: 60,
   total_score: 100,
+  exam_type: 'computer',
 })
 
 const columns = [
   { key: 'title', title: '标题', dataIndex: 'title' },
   { key: 'classroom', title: '课堂', dataIndex: 'classroom_name' },
+  { key: 'exam_type', title: '类型' },
   { key: 'duration', title: '时长', dataIndex: 'duration', suffix: '分钟' },
   { key: 'questions', title: '题目数', dataIndex: 'question_count' },
   { key: 'status', title: '状态', dataIndex: 'status' },
@@ -136,6 +150,7 @@ async function handleCreateExam() {
       classroom_id: form.value.classroom_id,
       duration: form.value.duration,
       total_score: form.value.total_score,
+      exam_type: form.value.exam_type,
       questions: [],
     })
     message.success('考试创建成功，请在详情页添加题目')
@@ -151,11 +166,12 @@ async function handleCreateExam() {
 
 async function handlePublishExam(id) {
   try {
-    await publishExam(id)
-    message.success('考试已发布')
+    const res = await publishExamWithPayload(id, {})
+    message.success(`考试发布成功！${res.data.question_count} 题 / ${res.data.total_score} 分`)
     fetchExams()
   } catch (e) {
-    message.error('发布失败')
+    const msg = e?.response?.data?.detail || '发布失败'
+    message.error(msg)
   }
 }
 
@@ -176,6 +192,7 @@ function resetForm() {
     classroom_id: null,
     duration: 60,
     total_score: 100,
+    exam_type: 'computer',
   }
 }
 

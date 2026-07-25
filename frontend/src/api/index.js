@@ -25,11 +25,35 @@ const errorMessages = {
   503: '服务维护中，请稍后再试',
 }
 
+/**
+ * 从 error response 中提取 detail 信息
+ * 支持 JSON 和 Blob 两种响应格式（blob 用于文件下载场景）
+ */
+async function extractErrorDetail(error) {
+  const data = error.response?.data
+  if (!data) return null
+
+  // 普通 JSON 响应
+  if (data.detail) return data.detail
+
+  // Blob 响应（responseType: 'blob' 时，错误响应也是 Blob）
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text()
+      const json = JSON.parse(text)
+      return json.detail || null
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status
-    const detail = error.response?.data?.detail
 
     if (status === 401) {
       localStorage.removeItem('token')
@@ -40,6 +64,7 @@ api.interceptors.response.use(
     } else if (status && status >= 400) {
       // 只对非页面主动处理的错误显示全局提示
       if (!error.config?._skipGlobalError) {
+        const detail = await extractErrorDetail(error)
         const msg = detail || errorMessages[status] || `请求失败(${status})`
         message.error(msg)
       }

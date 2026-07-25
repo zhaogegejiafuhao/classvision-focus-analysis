@@ -343,6 +343,20 @@ class ExamRiskOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CheatingRecordOut(BaseModel):
+    """违规记录输出模型"""
+    id: int
+    classroom_id: int
+    student_id: int
+    violation_type: str  # GAZE_DEVIATION / HEAD_DOWN_LONG
+    image_path: str
+    gaze_score: float = 0
+    pose_score: float = 0
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # --- 学生个人报告 ---
 class StudentClassroomAttention(BaseModel):
     """学生在某课堂的注意力数据"""

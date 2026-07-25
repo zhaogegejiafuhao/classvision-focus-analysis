@@ -63,6 +63,10 @@
           <template #icon><DatabaseOutlined /></template>
           <span>题库管理</span>
         </a-menu-item>
+        <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/exam-compose">
+          <template #icon><ThunderboltOutlined /></template>
+          <span>智能组卷</span>
+        </a-menu-item>
         <a-menu-item v-if="currentRole === 'teacher' || currentRole === 'admin'" key="/materials">
           <template #icon><FolderOutlined /></template>
           <span>课件管理</span>
@@ -432,6 +436,7 @@ const currentPageTitle = computed(() => {
     '/student/materials': '课程资料',
     '/student/grades': '我的成绩',
     '/question-bank': '题库管理',
+    '/exam-compose': '智能组卷',
     '/materials': '课件管理',
     '/grades': '综合成绩',
     '/teaching-plans': '教学计划',

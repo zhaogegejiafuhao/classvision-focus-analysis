@@ -20,9 +20,11 @@ export function getExam(examId) {
   return api.get(`/exams/${examId}`)
 }
 
-/** 发布考试（学生端可见） */
+/** 发布考试（已迁移到 examTemplate.js 的双参数版本，此函数仅作兼容保留） */
 export function publishExam(examId) {
-  return api.post(`/exams/${examId}/publish`)
+  // 注意：实际发布逻辑已迁移到 review_router（examTemplate.js 的 publishExam）
+  // 传入空 payload 调用新版发布接口
+  return api.post(`/exams/${examId}/publish`, {})
 }
 
 /** 删除考试 */
@@ -75,9 +77,14 @@ export function getExamSubmission(submissionId) {
   return api.get(`/exams/submissions/${submissionId}`)
 }
 
-/** 导出考试完整报告为文件（返回 Blob，供前端触发下载） */
+/** 导出考试成绩为 CSV */
 export function exportExam(examId) {
   return api.get(`/exams/${examId}/export`, { responseType: 'blob' })
+}
+
+/** 导出试卷为 HTML（可打印为 PDF） */
+export function exportExamPaper(examId) {
+  return api.get(`/exams/${examId}/paper-export`, { responseType: 'blob' })
 }
 
 /** 生成考试报告（班级维度：均分、及格率、每题正确率、AI 分析） */
@@ -88,4 +95,53 @@ export function generateExamReport(examId) {
 /** 学生个人考试报告（分数、错题、薄弱知识点、与班级对比） */
 export function getStudentExamReport(examId) {
   return api.get(`/exams/${examId}/student-report`)
+}
+
+// ============================================================
+// AI 批改相关 API
+// ============================================================
+
+/** 查询 AI 批改进度（教师/学生轮询） */
+export function getAiGradingProgress(submissionId) {
+  return api.get(`/exams/submissions/${submissionId}/ai-progress`)
+}
+
+/** 重新触发 AI 批改（教师对结果不满意时） */
+export function regradeSubmission(submissionId) {
+  return api.post(`/exams/submissions/${submissionId}/regrade`)
+}
+
+/** 教师确认单题（含覆盖分数/评语） */
+export function confirmAnswer(submissionId, answerId, data) {
+  return api.post(`/exams/submissions/${submissionId}/answers/${answerId}/confirm`, data)
+}
+
+/** 批量确认答案（一键采用 AI 分或批量指定分数） */
+export function confirmAnswersBatch(submissionId, payload) {
+  return api.post(`/exams/submissions/${submissionId}/confirm-batch`, payload)
+}
+
+/** 获取考试审核数据（按题目聚合所有学生答案，供横向对比） */
+export function getExamReviewData(examId) {
+  return api.get(`/exams/${examId}/review`)
+}
+
+/** 教师提交全部审核结果，锁定分数 */
+export function submitExamReview(examId, items) {
+  return api.post(`/exams/${examId}/review/submit`, { items })
+}
+
+/** 导出审核报告为 HTML（可打印为 PDF） */
+export function exportReviewReport(examId) {
+  return api.get(`/exams/${examId}/review/export`, { responseType: 'blob' })
+}
+
+/** 审核统计仪表盘数据 */
+export function getReviewStats(examId) {
+  return api.get(`/exams/${examId}/review/stats`)
+}
+
+/** 批量选择确认（增强版：按题目/提交/状态筛选） */
+export function batchConfirmReview(examId, payload) {
+  return api.post(`/exams/${examId}/review/batch-confirm`, payload)
 }

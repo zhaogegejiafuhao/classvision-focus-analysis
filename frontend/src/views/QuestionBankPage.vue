@@ -3,7 +3,7 @@
     <a-page-header title="题库管理" sub-title="管理和复用题目">
       <template #extra>
         <a-button type="primary" @click="showCreateModal = true">添加题目</a-button>
-        <a-button @click="showComposeModal = true" style="margin-left: 8px">组卷</a-button>
+        <a-button @click="router.push('/exam-compose')" style="margin-left: 8px">智能组卷</a-button>
       </template>
     </a-page-header>
 
@@ -29,6 +29,9 @@
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'type'">
             <a-tag>{{ getTypeText(record.type) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'content'">
+            <LatexText :content="record.content" class="q-content-cell" />
           </template>
           <template v-else-if="column.key === 'difficulty'">
             <span v-for="i in record.difficulty" :key="i" style="color: #faad14">★</span>
@@ -109,6 +112,7 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { listQuestionBank, createQuestionBankItem, deleteQuestionBankItem, getQuestionBankCategories, composeExamFromBank } from '@/api/questionBank'
 import { listClassrooms } from '@/api/classroom'
+import LatexText from '@/components/LatexText.vue'
 
 const router = useRouter()
 const questions = ref([])
@@ -133,7 +137,7 @@ const selectedQuestionIds = computed(() => Object.entries(selectedIds).filter(([
 const columns = [
   { key: 'selected', title: '组卷选题', width: 80 },
   { key: 'type', title: '题型', width: 80 },
-  { key: 'content', title: '内容', dataIndex: 'content', ellipsis: true },
+  { key: 'content', title: '内容', dataIndex: 'content', width: 300 },
   { key: 'category', title: '分类', dataIndex: 'category', width: 100 },
   { key: 'difficulty', title: '难度', width: 100 },
   { key: 'score', title: '分值', dataIndex: 'score', width: 60 },
@@ -215,3 +219,14 @@ function getTypeText(type) {
 
 onMounted(() => { fetchQuestions(); fetchCategories(); fetchClassrooms() })
 </script>
+
+<style scoped>
+.q-content-cell {
+  max-height: 80px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.5;
+}
+</style>

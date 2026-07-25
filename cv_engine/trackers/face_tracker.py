@@ -28,8 +28,16 @@ class FaceTracker:
         return self._model
 
     def track(self, frame):
+        # 💡 对齐 TUSEVEN cv-integration 原版（同学能正常运行的版本）：
+        # conf=0.65：确信度低于 65% 的疑似边缘一律抛弃
+        # classes=[0]：强制只追踪人类（Person），桌子、水杯、电脑等其余 79 种物体一律在矩阵计算阶段直接抹杀
         results = self.model.track(
-            frame, tracker="bytetrack.yaml", persist=True, verbose=False, conf=0.15
+            frame,
+            tracker="bytetrack.yaml",
+            persist=True,
+            conf=0.65,
+            classes=[0],
+            verbose=False,
         )
         persons = []
         objects = []

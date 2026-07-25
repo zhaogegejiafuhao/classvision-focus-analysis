@@ -105,6 +105,23 @@ class ExamRiskRecord(Base):
     classroom: Mapped["Classroom"] = relationship(back_populates="exam_risk_records")
 
 
+class CheatingRecord(Base):
+    """违规记录表：实时检测中触发违规时自动抓拍保存"""
+    __tablename__ = "cheating_record"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    classroom_id: Mapped[int] = mapped_column(Integer, ForeignKey("classroom.id"), index=True)
+    student_id: Mapped[int] = mapped_column(Integer, ForeignKey("student.id"), index=True)
+    violation_type: Mapped[str] = mapped_column(String(50))  # GAZE_DEVIATION / HEAD_DOWN_LONG
+    image_path: Mapped[str] = mapped_column(String(255))  # 抓拍图片路径
+    gaze_score: Mapped[float] = mapped_column(Float, default=0)
+    pose_score: Mapped[float] = mapped_column(Float, default=0)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    student_rel: Mapped["Student"] = relationship()
+    classroom_rel: Mapped["Classroom"] = relationship()
+
+
 class Report(Base):
     __tablename__ = "report"
 
@@ -433,6 +450,7 @@ class Exam(Base):
     duration: Mapped[int] = mapped_column(Integer, default=60)  # 考试时长（分钟）
     total_score: Mapped[float] = mapped_column(Float, default=100.0)
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft/published/closed
+    exam_type: Mapped[str] = mapped_column(String(20), default="computer")  # computer(机试)/paper(笔试)
     start_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
@@ -470,7 +488,10 @@ class ExamSubmission(Base):
     exam_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam.id"), index=True)
     student_id: Mapped[int] = mapped_column(Integer, ForeignKey("registered_person.id"), index=True)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="in_progress")  # in_progress/submitted/graded
+    status: Mapped[str] = mapped_column(String(20), default="in_progress")
+    # 状态机: in_progress → submitted → ai_grading → ai_graded → graded (含主观题)
+    #         in_progress → submitted → graded (纯客观题)
+    #         in_progress → timeout (超时)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -488,8 +509,33 @@ class Answer(Base):
     submission_id: Mapped[int] = mapped_column(Integer, ForeignKey("exam_submission.id"), index=True)
     question_id: Mapped[int] = mapped_column(Integer, ForeignKey("question.id"), index=True)
     content: Mapped[str] = mapped_column(Text, default="")
+    image_urls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON格式图片URL列表
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # === AI 批改结果字段 ===
+    ai_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # 取值: pending / processing / graded / failed / skipped
+    ai_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_grading_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_rubric_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_model_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ai_graded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ai_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # === OCR 结果字段 ===
+    ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ocr_engines: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # === 教师审核字段 ===
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    teacher_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    teacher_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    teacher_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     submission: Mapped["ExamSubmission"] = relationship(back_populates="answers")
     question: Mapped["Question"] = relationship(back_populates="answers")

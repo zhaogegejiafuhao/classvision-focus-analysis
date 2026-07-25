@@ -31,7 +31,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.core.database import Base
 from backend.models.tables import QuestionBank, RegisteredPerson
 
-DB_PATH = PROJECT_ROOT / "backend" / "classvision.db"
+DB_PATH = PROJECT_ROOT / "classvision.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 
@@ -63,16 +63,31 @@ def extract_tags(knowledge_routes: list[str]) -> str:
 
 
 def main():
+    import sys
+
     engine = create_engine(DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
     Session = sessionmaker(bind=engine)
     db = Session()
 
     # 查找 admin 用户作为题目的 teacher_id
     admin = db.query(RegisteredPerson).filter(RegisteredPerson.role == "admin").first()
-    teacher_id = admin.id if admin else 1
+    if not admin:
+        print("❌ 未找到 admin 用户，请先创建 admin 账号")
+        sys.exit(1)
+    teacher_id = admin.id
+    print(f"✅ 使用 admin 用户 (id={teacher_id}) 作为题目归属")
+
+    # ── 清空现有题库（用户确认：清空后重新导入）──
+    existing_count = db.query(QuestionBank).count()
+    if existing_count > 0:
+        print(f"⚠️  清空现有题库 {existing_count} 条...")
+        db.query(QuestionBank).delete()
+        db.commit()
+        print(f"✅ 已清空")
 
     imported = 0
     skipped = 0
+    seen_content_keys = set()  # 内存去重，替代逐条 LIKE 查询
 
     for split in ("train", "test"):
         filepath = PROJECT_ROOT / "data" / "question_banks" / "TAL-SCQ5K-CN" / f"{split}.jsonl"
@@ -132,14 +147,12 @@ def main():
                 # 分数：根据难度和题型
                 score = {1: 3, 2: 5, 3: 8, 4: 10, 5: 12}.get(difficulty, 5)
 
-                # 去重检查（基于题目内容前100字符）
+                # 内存去重检查（基于题目内容前100字符）
                 content_key = problem[:100]
-                exists = db.query(QuestionBank).filter(
-                    QuestionBank.content.contains(content_key)
-                ).first()
-                if exists:
+                if content_key in seen_content_keys:
                     skipped += 1
                     continue
+                seen_content_keys.add(content_key)
 
                 q = QuestionBank(
                     teacher_id=teacher_id,
@@ -167,6 +180,7 @@ def main():
 
     print(f"\n✅ 导入完成！新增 {imported} 条，跳过 {skipped} 条")
     print(f"   数据来源: TAL-SCQ5K-CN (好未来数学竞赛题库, 5000题)")
+    print(f"   归属: admin (id={teacher_id})")
 
 
 if __name__ == "__main__":

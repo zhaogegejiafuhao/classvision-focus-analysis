@@ -1,7 +1,10 @@
 from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import sessionmaker, declarative_base
+import logging
 
 from backend.core.config import settings
+
+_logger = logging.getLogger("exam")
 
 engine = create_engine(settings.DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
 
@@ -43,6 +46,9 @@ def init_db():
     _migrate_question_knowledge_points()
     _migrate_attendance_checkin_session_id()
     _migrate_add_missing_indexes()
+    _migrate_exam_type_and_answer_images()
+    _migrate_answer_ai_grading_fields()
+    _migrate_recover_stuck_ai_grading()
 
 
 def _migrate_person_extra_fields():
@@ -339,3 +345,85 @@ def _migrate_add_missing_indexes():
                     conn.commit()
             except Exception:
                 pass  # 索引可能已存在（并发情况）
+
+
+def _migrate_exam_type_and_answer_images():
+    """为 exam 表添加 exam_type 字段，为 answer 表添加 image_urls 字段"""
+    insp = inspect(engine)
+    if "exam" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("exam")}
+        if "exam_type" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE exam ADD COLUMN exam_type VARCHAR(20) DEFAULT 'computer'"))
+                conn.commit()
+    if "answer" in insp.get_table_names():
+        columns = {col["name"] for col in insp.get_columns("answer")}
+        if "image_urls" not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE answer ADD COLUMN image_urls TEXT"))
+                conn.commit()
+
+
+def _migrate_answer_ai_grading_fields():
+    """为 answer 表添加 AI 批改 + OCR + 教师审核字段（17 个）"""
+    insp = inspect(engine)
+    if "answer" not in insp.get_table_names():
+        return
+    columns = {col["name"] for col in insp.get_columns("answer")}
+    new_cols = {
+        # AI 批改结果
+        "ai_status": "ALTER TABLE answer ADD COLUMN ai_status VARCHAR(20)",
+        "ai_score": "ALTER TABLE answer ADD COLUMN ai_score FLOAT",
+        "ai_comment": "ALTER TABLE answer ADD COLUMN ai_comment TEXT",
+        "ai_confidence": "ALTER TABLE answer ADD COLUMN ai_confidence FLOAT",
+        "ai_grading_json": "ALTER TABLE answer ADD COLUMN ai_grading_json TEXT",
+        "ai_rubric_json": "ALTER TABLE answer ADD COLUMN ai_rubric_json TEXT",
+        "ai_model_key": "ALTER TABLE answer ADD COLUMN ai_model_key VARCHAR(50)",
+        "ai_graded_at": "ALTER TABLE answer ADD COLUMN ai_graded_at DATETIME",
+        "ai_error": "ALTER TABLE answer ADD COLUMN ai_error TEXT",
+        # OCR 结果
+        "ocr_text": "ALTER TABLE answer ADD COLUMN ocr_text TEXT",
+        "ocr_confidence": "ALTER TABLE answer ADD COLUMN ocr_confidence FLOAT",
+        "ocr_engines": "ALTER TABLE answer ADD COLUMN ocr_engines VARCHAR(100)",
+        # 教师审核
+        "needs_review": "ALTER TABLE answer ADD COLUMN needs_review BOOLEAN DEFAULT 0",
+        "teacher_confirmed": "ALTER TABLE answer ADD COLUMN teacher_confirmed BOOLEAN DEFAULT 0",
+        "teacher_score": "ALTER TABLE answer ADD COLUMN teacher_score FLOAT",
+        "teacher_comment": "ALTER TABLE answer ADD COLUMN teacher_comment TEXT",
+        "confirmed_at": "ALTER TABLE answer ADD COLUMN confirmed_at DATETIME",
+    }
+    for col_name, sql in new_cols.items():
+        if col_name not in columns:
+            with engine.connect() as conn:
+                conn.execute(text(sql))
+                conn.commit()
+                _logger.info(f"[migration] answer.{col_name} added")
+
+
+def _migrate_recover_stuck_ai_grading():
+    """服务重启后恢复卡在 ai_grading 状态的提交
+
+    将 exam_submission.status='ai_grading' 重置为 'submitted'，
+    并将 answer.ai_status='processing' 重置为 'pending'，
+    使教师可在审核页手动触发重新批改。
+    """
+    insp = inspect(engine)
+    if "exam_submission" not in insp.get_table_names():
+        return
+    with engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT id FROM exam_submission WHERE status = 'ai_grading'"
+        ))
+        stuck_ids = [row[0] for row in result]
+        if stuck_ids:
+            conn.execute(text(
+                "UPDATE exam_submission SET status = 'submitted' WHERE status = 'ai_grading'"
+            ))
+            if "answer" in insp.get_table_names():
+                conn.execute(text(
+                    "UPDATE answer SET ai_status = 'pending' WHERE ai_status = 'processing'"
+                ))
+            conn.commit()
+            _logger.warning(
+                f"[startup] recovered {len(stuck_ids)} stuck ai_grading submissions: {stuck_ids}"
+            )
