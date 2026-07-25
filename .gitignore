@@ -27,6 +27,8 @@ Thumbs.db
 # Database
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # RAG index data (large binary files)
@@ -70,10 +72,20 @@ oj/judger/sandbox/
 tests/__pycache__/
 
 # Reference project (not part of ClassVision)
-ZhiReviewPi/
+ZhiReviewPi/*
+!ZhiReviewPi/README.md
 
 # Runtime error logs
 *.err
 
 # User uploads (runtime data)
 uploads/
+
+# Backend static runtime data (cheating proofs, generated reports)
+backend/static/
+
+# pytest cache
+.pytest_cache/
+
+# Data cache (huggingface, etc.)
+data/question_banks/.cache/

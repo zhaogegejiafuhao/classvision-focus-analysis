@@ -88,7 +88,7 @@
         <div v-if="!isRegister" class="login-hint">
           <p class="hint-title">测试账号（点击填充）：</p>
           <div class="hint-list">
-            <span class="hint-item" :class="{ active: currentRole === 'admin' }" @click="fillAccount('admin', 'admin123')">管理员</span>
+            <span class="hint-item" :class="{ active: currentRole === 'admin' }" @click="fillAccount('admin', '123456')">管理员</span>
             <span class="hint-item" :class="{ active: currentRole === 'teacher' }" @click="fillAccount('teacher', 'teacher123')">教师</span>
             <span class="hint-item" :class="{ active: currentRole === 'student' }" @click="fillAccount('student', 'student123')">学生</span>
           </div>

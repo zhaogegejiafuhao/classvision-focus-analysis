@@ -31,7 +31,7 @@ from sqlalchemy.orm import sessionmaker
 from backend.core.database import Base
 from backend.models.tables import QuestionBank, RegisteredPerson
 
-DB_PATH = PROJECT_ROOT / "classvision.db"
+DB_PATH = PROJECT_ROOT / "classvision.db"  # 根目录的 classvision.db（与 main.py 一致）
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 

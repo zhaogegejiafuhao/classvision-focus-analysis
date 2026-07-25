@@ -1,9 +1,15 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# 项目根目录（始终指向 ClassVision/）
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
     APP_NAME: str = "ClassVision"
-    DATABASE_URL: str = "sqlite:///./classvision.db"
+    # 数据库路径：使用绝对路径，避免因启动目录不同导致指向不同 db
+    DATABASE_URL: str = f"sqlite:///{PROJECT_ROOT / 'classvision.db'}"
     OLLAMA_HOST: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen3:4b"  # Ollama 深度模型
     OLLAMA_MODEL_FAST: str = "qwen2.5:3b"  # Ollama 快速模型
@@ -18,8 +24,8 @@ class Settings(BaseSettings):
 
     # RAG配置
     RAG_CACHE_DIR: str = "D:/models/sentence-transformers"  # 嵌入模型缓存目录
-    RAG_INDEX_DIR: str = "D:/ClassVision/data/rag_index"  # FAISS索引目录
-    RAG_KNOWLEDGE_DIR: str = "D:/ClassVision/data/knowledge"  # 知识库文档目录
+    RAG_INDEX_DIR: str = str(PROJECT_ROOT / "data" / "rag_index")  # FAISS索引目录
+    RAG_KNOWLEDGE_DIR: str = str(PROJECT_ROOT / "data" / "knowledge")  # 知识库文档目录
     RAG_EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"  # 嵌入模型
     # --- 分块配置（WeKnora 文档分块指南 + Vecta 基准） ---
     RAG_CHUNK_BY_TOKENS: bool = False  # False=按字符计数（与 WeKnora/Vecta 一致）

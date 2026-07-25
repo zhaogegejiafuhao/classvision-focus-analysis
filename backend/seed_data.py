@@ -19,9 +19,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 必须在 import backend 之前设置，否则 SQLite 路径会错
-os.chdir(str(PROJECT_ROOT / "backend"))
-
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 
@@ -46,7 +43,8 @@ from backend.models.tables import (
 from backend.core.security import hash_password
 
 # ─── 配置 ───────────────────────────────────────────────
-DB_PATH = PROJECT_ROOT / "backend" / "classvision.db"
+# 数据库路径：与 config.py 保持一致，使用根目录的 classvision.db
+DB_PATH = PROJECT_ROOT / "classvision.db"
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CLEAR_FIRST = True  # True = 先清空再插入；False = 追加
