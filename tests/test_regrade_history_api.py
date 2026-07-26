@@ -18,14 +18,10 @@ C. 建表验证（1 个）：
 """
 import asyncio
 import json
-import sys
 from datetime import datetime
 from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
-
-sys.path.insert(0, "d:/ClassVision")
-
 
 # ============ 工具函数（与 test_regrade_essay_api.py 同模式）============
 

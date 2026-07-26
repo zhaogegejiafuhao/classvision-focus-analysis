@@ -6,8 +6,6 @@ C. OCR 识别顺序稳定化（_sort_blocks_by_reading_order / _concat_blocks_to
 """
 import sys
 
-sys.path.insert(0, "d:/ClassVision")
-
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 

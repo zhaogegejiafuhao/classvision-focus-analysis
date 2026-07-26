@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     LLM_MODEL_STRONG: str = ""  # 强模型名（用于几何题/复杂证明题，为空时默认 Qwen2.5-32B-Instruct）
 
     # RAG配置
-    RAG_CACHE_DIR: str = "D:/models/sentence-transformers"  # 嵌入模型缓存目录
+    RAG_CACHE_DIR: str = str(PROJECT_ROOT / "models" / "sentence-transformers")  # 嵌入模型缓存目录
     RAG_INDEX_DIR: str = str(PROJECT_ROOT / "data" / "rag_index")  # FAISS索引目录
     RAG_KNOWLEDGE_DIR: str = str(PROJECT_ROOT / "data" / "knowledge")  # 知识库文档目录
     RAG_EMBEDDING_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"  # 嵌入模型

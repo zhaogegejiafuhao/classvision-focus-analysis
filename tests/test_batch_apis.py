@@ -19,9 +19,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 
 # 把项目根目录加入 sys.path
-sys.path.insert(0, "d:/ClassVision")
-
-
 # ============ 工具函数 ============
 
 def _make_mock_user(role: str = "teacher", uid: int = 1):

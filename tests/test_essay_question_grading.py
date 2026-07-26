@@ -9,9 +9,6 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # 把项目根目录加入 sys.path
-sys.path.insert(0, "d:/ClassVision")
-
-
 def test_is_essay_question_keywords():
     """测试作文题关键词识别"""
     from backend.services.answer_sheet import _is_essay_question

@@ -16,8 +16,6 @@ import sys
 import os
 import io
 
-sys.path.insert(0, "d:/ClassVision")
-
 # Windows 控制台 UTF-8
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")

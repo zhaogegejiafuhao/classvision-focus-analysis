@@ -10,9 +10,6 @@ import sys
 import os
 
 # 把项目根目录加入 sys.path
-sys.path.insert(0, "d:/ClassVision")
-
-
 def test_normalize_fill_text():
     """测试文本规范化"""
     from backend.services.answer_sheet import _normalize_fill_text

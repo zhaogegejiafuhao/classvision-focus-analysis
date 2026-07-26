@@ -15,14 +15,10 @@
 
 测试策略：mock db + mock current_user，直接调用路由函数（不走 HTTP）
 """
-import sys
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-sys.path.insert(0, "d:/ClassVision")
-
 
 # ============ 工具函数 ============
 

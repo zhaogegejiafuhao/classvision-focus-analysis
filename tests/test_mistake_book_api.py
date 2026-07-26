@@ -6,11 +6,7 @@
 3. _parse_kp_list 辅助函数
 """
 import json
-import sys
 from unittest.mock import MagicMock, patch
-
-sys.path.insert(0, "d:/ClassVision")
-
 
 # ============ 辅助函数 ============
 

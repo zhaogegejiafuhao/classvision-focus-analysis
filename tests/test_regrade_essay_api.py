@@ -20,13 +20,9 @@
 测试策略：mock db + mock grading_service + mock writing_kg + mock UploadFile
 """
 import asyncio
-import sys
 from unittest.mock import MagicMock, AsyncMock, patch
 
 import pytest
-
-sys.path.insert(0, "d:/ClassVision")
-
 
 # ============ 工具函数 ============
 

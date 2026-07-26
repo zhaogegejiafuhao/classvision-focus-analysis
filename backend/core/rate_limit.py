@@ -114,8 +114,8 @@ def _get_client_id(request: Request) -> str:
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         try:
-            from backend.core.security import decode_token
-            payload = decode_token(auth[7:])
+            from backend.core.security import decode_access_token
+            payload = decode_access_token(auth[7:])
             if payload and "sub" in payload:
                 return f"user:{payload['sub']}"
         except Exception:

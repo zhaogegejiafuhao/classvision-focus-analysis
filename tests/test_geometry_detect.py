@@ -1,7 +1,5 @@
 """测试 Layer 3 LLM 兜底几何检测"""
 import asyncio, sys, time
-sys.path.insert(0, r"d:\ClassVision")
-
 from backend.services.geometry_analyzer import (
     is_geometry_question,
     has_geometry_ambiguous_hints,

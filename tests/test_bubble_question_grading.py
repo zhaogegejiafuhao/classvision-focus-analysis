@@ -12,8 +12,6 @@ import sys
 from unittest.mock import MagicMock, patch
 
 # 把项目根目录加入 sys.path
-sys.path.insert(0, "d:/ClassVision")
-
 from cv_engine.detectors.answer_card_detector import (
     AnswerCardResult, BubbleMark,
 )
