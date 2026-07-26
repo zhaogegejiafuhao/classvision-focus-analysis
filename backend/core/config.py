@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
 
+    # 速率限制配置（防止 LLM 路由被滥用）
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_GLOBAL: str = "120/minute"       # 全局每分钟请求数
+    RATE_LIMIT_LLM: str = "20/minute"           # LLM 相关路由（更严格）
+    RATE_LIMIT_AUTH: str = "10/minute"          # 登录/注册路由（防暴力破解）
+
     # CORS 配置
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"  # 逗号分隔的允许源
 

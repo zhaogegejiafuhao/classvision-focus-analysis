@@ -109,7 +109,7 @@ def test_mock_grade_fill_question():
     通过 mock OCR 返回值验证判分流程
     """
     from backend.services.answer_sheet import _normalize_fill_text, _levenshtein_similarity
-    from backend.api.exam_routes import auto_grade
+    from backend.services.exam_service import auto_grade
 
     # 模拟一个填空题
     class MockQuestion:

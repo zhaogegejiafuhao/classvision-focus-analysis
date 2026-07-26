@@ -172,7 +172,7 @@ def _extract_history(db) -> "AnswerRegradeHistory":
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_essay_writes_history(mock_writing_kg, mock_grading):
     """1. regrade_essay 后 db.add 调用包含 AnswerRegradeHistory 实例"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
     from backend.models.tables import AnswerRegradeHistory
 
     user = _make_user("teacher", 1)
@@ -209,7 +209,7 @@ def test_regrade_essay_writes_history(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_before_score_none_on_first(mock_writing_kg, mock_grading):
     """2. 首次批改（existing_answer=None）→ before_score=None, before_is_correct=None"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -243,7 +243,7 @@ def test_history_before_score_none_on_first(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_before_score_captured(mock_writing_kg, mock_grading):
     """3. 已有 Answer 时 → before_score=旧 score, before_is_correct=旧 is_correct"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=5.0, status="graded")
@@ -281,7 +281,7 @@ def test_history_before_score_captured(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_after_score_correct(mock_writing_kg, mock_grading):
     """4. history.after_score = suggested_score, after_is_correct = (ratio>=0.8)"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -315,7 +315,7 @@ def test_history_after_score_correct(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_total_scores(mock_writing_kg, mock_grading):
     """5. before_total_score = submission.score（旧），after_total_score = 重算后 total_score"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     # 旧总分 5.0
@@ -356,7 +356,7 @@ def test_history_max_score_snapshot(mock_writing_kg, mock_grading):
 
     场景：question.score=10，但 LLM 返回 max_score=15（防后续 question 改动后失去参照）
     """
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -389,7 +389,7 @@ def test_history_max_score_snapshot(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_input_mode_text(mock_writing_kg, mock_grading):
     """7. student_text 模式 → input_mode='text'"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -422,7 +422,7 @@ def test_history_input_mode_text(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_input_mode_image(mock_writing_kg, mock_grading, mock_ocr):
     """8. image_file 模式 → input_mode='image'"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -462,7 +462,7 @@ def test_history_force_essay_flag(mock_writing_kg, mock_grading):
 
     场景：content 不含"作文"关键词，但 force_essay=True → 走 grade_essay
     """
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -499,7 +499,7 @@ def test_history_force_essay_flag(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_writing_attribution_json(mock_writing_kg, mock_grading):
     """10. 作文 + 有错因 → writing_attribution_json 非空，含 dimension/fine_nodes/suggestion"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -546,7 +546,7 @@ def test_history_writing_attribution_json(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_history_writing_kg_failure(mock_writing_kg, mock_grading):
     """11. writing_kg 异常 → writing_attribution_json=None，接口不挂"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -585,7 +585,7 @@ def test_history_writing_kg_failure(mock_writing_kg, mock_grading):
 
 def test_manual_input_writes_history():
     """12. manual_input 后 db.add 包含 AnswerRegradeHistory，regrade_method='manual_input'"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
     from backend.models.tables import AnswerRegradeHistory
 
     user = _make_user("teacher", 1)
@@ -619,7 +619,7 @@ def test_manual_input_writes_history():
 
 def test_history_manual_input_no_llm_fields():
     """13. manual_input 的 history：所有 LLM 相关字段全为 None"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -757,7 +757,7 @@ def _make_history_record(rid: int = 1, submission_id: int = 10, question_id: int
 def test_list_history_permission_denied_student():
     """14. 学生 → 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("student", 100)
     db = _build_list_history_db()
@@ -774,7 +774,7 @@ def test_list_history_permission_denied_student():
 def test_list_history_permission_denied_other_teacher():
     """15. 非该考试教师 → 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 999)  # 不同 teacher_id
     submission = _make_submission(sid=10, exam_id=1)
@@ -793,7 +793,7 @@ def test_list_history_permission_denied_other_teacher():
 
 def test_list_history_admin_can_read_any():
     """16. admin → 200，可读任意考试的历史"""
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("admin", 999)  # admin，且不是该考试教师
     submission = _make_submission(sid=10, exam_id=1)
@@ -817,7 +817,7 @@ def test_list_history_admin_can_read_any():
 def test_list_history_submission_not_found():
     """17. submission 不存在 → 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     db = _build_list_history_db(submission=None)
@@ -835,7 +835,7 @@ def test_list_history_submission_not_found():
 def test_list_history_question_not_in_exam():
     """18. question 不属于该考试 → 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -856,7 +856,7 @@ def test_list_history_question_not_in_exam():
 
 def test_list_history_returns_desc_order():
     """19. 多条历史按 created_at DESC 排序（mock 直接返回有序列表，验证 order_by 被调用）"""
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -892,7 +892,7 @@ def test_list_history_isolated_per_question():
 
     验证：filter 链同时按 submission_id 和 question_id 过滤
     """
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -925,7 +925,7 @@ def test_list_history_isolated_per_question():
 
 def test_list_history_detail_false_omits_grading_json():
     """21. detail=False → 不含 grading_json/writing_attribution_json/完整 student_text"""
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -969,7 +969,7 @@ def test_list_history_detail_false_omits_grading_json():
 
 def test_list_history_detail_true_includes_grading_json():
     """22. detail=True → 含 grading_json/writing_attribution_json/完整 student_text/student_text_head"""
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -1009,7 +1009,7 @@ def test_list_history_detail_true_includes_grading_json():
 
 def test_list_history_pagination():
     """23. limit=10, offset=20 → safe_limit=10, safe_offset=20, total 正确"""
-    from backend.api.answer_sheet_routes import list_regrade_history
+    from backend.api.answer_sheet_grading_routes import list_regrade_history
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)

@@ -167,6 +167,7 @@ def test_get_mistake_detail_success(db_mock, auth_mock):
                                   error_type="计算粗心", error_cause="符号漏写")
     submission = _make_mock_submission(submission_id=207, student_id=1, homework_id=5)
     homework = _make_mock_homework(homework_id=5, title="周练卷第3题", description="标准答案内容")
+    homework.teacher_id = 1  # 匹配 teacher.uid，通过 IDOR 权限检查
 
     # CorrectionRecord
     cr = MagicMock()
@@ -183,14 +184,15 @@ def test_get_mistake_detail_success(db_mock, auth_mock):
     # 第二次 query: HomeworkSubmission
     q2 = MagicMock()
     q2.filter.return_value.first.return_value = submission
-    # 第三次 query: Homework
+    # 第三次 query: Homework（IDOR 权限检查）
     q3 = MagicMock()
     q3.filter.return_value.first.return_value = homework
-    # 第四次 query: CorrectionRecord
+    # 第四次 query: Homework（响应数据，复用 q3）
+    # 第五次 query: CorrectionRecord
     q4 = MagicMock()
     q4.filter.return_value.order_by.return_value.all.return_value = [cr]
 
-    db.query.side_effect = [q1, q2, q3, q4]
+    db.query.side_effect = [q1, q2, q3, q3, q4]
     db_mock.return_value = iter([db])
 
     result = get_mistake_detail(grading_id=18, db=db, current_user=teacher)

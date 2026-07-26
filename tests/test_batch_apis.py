@@ -51,7 +51,7 @@ def _make_mock_db():
 
 def test_preset_layouts_dict():
     """测试 _PRESET_LAYOUTS 字典完整性"""
-    from backend.api.answer_sheet_routes import _PRESET_LAYOUTS
+    from backend.api.answer_sheet_template_routes import _PRESET_LAYOUTS
 
     assert "standard_5col" in _PRESET_LAYOUTS
     assert "single_col" in _PRESET_LAYOUTS
@@ -65,7 +65,7 @@ def test_preset_layouts_dict():
 
 def test_qtype_to_region_type_mapping():
     """测试题型 → region_type 映射"""
-    from backend.api.answer_sheet_routes import _QTYPE_TO_REGION_TYPE
+    from backend.api.answer_sheet_template_routes import _QTYPE_TO_REGION_TYPE
 
     assert _QTYPE_TO_REGION_TYPE["single"] == "bubble"
     assert _QTYPE_TO_REGION_TYPE["multi"] == "bubble"
@@ -77,7 +77,7 @@ def test_qtype_to_region_type_mapping():
 
 def test_compute_auto_layout_bboxes_5col():
     """测试 5 列布局的 bbox 计算（10 题 → 2 行 × 5 列）"""
-    from backend.api.answer_sheet_routes import _compute_auto_layout_bboxes
+    from backend.api.answer_sheet_template_routes import _compute_auto_layout_bboxes
 
     # A4 300dpi: 2480×3508
     bboxes = _compute_auto_layout_bboxes(
@@ -110,7 +110,7 @@ def test_compute_auto_layout_bboxes_5col():
 
 def test_compute_auto_layout_bboxes_single_col():
     """测试单列布局（5 题竖排）"""
-    from backend.api.answer_sheet_routes import _compute_auto_layout_bboxes
+    from backend.api.answer_sheet_template_routes import _compute_auto_layout_bboxes
 
     bboxes = _compute_auto_layout_bboxes(
         img_w=1000, img_h=2000, n_questions=5, cols=1,
@@ -130,7 +130,7 @@ def test_compute_auto_layout_bboxes_single_col():
 
 def test_compute_auto_layout_bboxes_uneven():
     """测试不均匀分布：7 题 × 3 列 = 3 行（最后一行 1 题）"""
-    from backend.api.answer_sheet_routes import _compute_auto_layout_bboxes
+    from backend.api.answer_sheet_template_routes import _compute_auto_layout_bboxes
 
     bboxes = _compute_auto_layout_bboxes(
         img_w=1500, img_h=2000, n_questions=7, cols=3,
@@ -149,7 +149,7 @@ def test_compute_auto_layout_bboxes_uneven():
 def test_auto_generate_template_layout_invalid():
     """B 路由：无效布局应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import auto_generate_template
+    from backend.api.answer_sheet_template_routes import auto_generate_template
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -181,7 +181,7 @@ def test_auto_generate_template_layout_invalid():
 def test_auto_generate_template_permission_denied():
     """B 路由：学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import auto_generate_template
+    from backend.api.answer_sheet_template_routes import auto_generate_template
 
     user = _make_mock_user("student", 100)
     db = _make_mock_db()
@@ -202,7 +202,7 @@ def test_auto_generate_template_permission_denied():
 def test_auto_generate_template_margin_out_of_range():
     """B 路由：留白比例越界应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import auto_generate_template
+    from backend.api.answer_sheet_template_routes import auto_generate_template
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -230,7 +230,7 @@ def test_auto_generate_template_margin_out_of_range():
 
 def test_auto_generate_template_success():
     """B 路由：正常生成模板的完整流程"""
-    from backend.api.answer_sheet_routes import auto_generate_template
+    from backend.api.answer_sheet_template_routes import auto_generate_template
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -268,7 +268,7 @@ def test_auto_generate_template_success():
     file.read = AsyncMock(return_value=img_bytes.tobytes())
 
     # mock paper_template_service.create_template
-    with patch("backend.api.answer_sheet_routes.paper_template_service.create_template", return_value=42) as mock_create:
+    with patch("backend.api.answer_sheet_template_routes.paper_template_service.create_template", return_value=42) as mock_create:
         result = asyncio.run(auto_generate_template(
             exam_id=1,
             blank_file=file,
@@ -305,7 +305,7 @@ def test_auto_generate_template_success():
 def test_batch_update_regions_permission_denied():
     """C 路由：学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("student", 100)
     db = _make_mock_db()
@@ -324,7 +324,7 @@ def test_batch_update_regions_permission_denied():
 def test_batch_update_regions_template_not_found():
     """C 路由：模板不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -344,13 +344,14 @@ def test_batch_update_regions_template_not_found():
 def test_batch_update_regions_invalid_json():
     """C 路由：无效 JSON 应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
-    # 模板存在
+    # 模板存在（同时作为 Exam 查询返回值，需设 teacher_id 通过权限检查）
     template = MagicMock()
     template.id = 1
+    template.teacher_id = 1
     db.query().filter().first.return_value = template
 
     try:
@@ -368,12 +369,13 @@ def test_batch_update_regions_invalid_json():
 def test_batch_update_regions_missing_fields():
     """C 路由：缺字段应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
     template = MagicMock()
     template.id = 1
+    template.teacher_id = 1
     db.query().filter().first.return_value = template
 
     # 缺 bbox
@@ -393,12 +395,13 @@ def test_batch_update_regions_missing_fields():
 def test_batch_update_regions_invalid_region_type():
     """C 路由：无效 region_type 应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
     template = MagicMock()
     template.id = 1
+    template.teacher_id = 1
     db.query().filter().first.return_value = template
 
     bad_regions = json_str([{
@@ -420,12 +423,13 @@ def test_batch_update_regions_invalid_region_type():
 def test_batch_update_regions_insert_only():
     """C 路由：纯新增模式（无 region_id）"""
     import json as _json
-    from backend.api.answer_sheet_routes import batch_update_regions
+    from backend.api.answer_sheet_template_routes import batch_update_regions
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
     template = MagicMock()
     template.id = 1
+    template.teacher_id = 1
     db.query().filter().first.return_value = template
 
     regions = [
@@ -453,7 +457,7 @@ def test_batch_update_regions_insert_only():
 def test_scan_batch_permission_denied():
     """A 路由：学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import scan_batch
+    from backend.api.answer_sheet_scan_routes import scan_batch
 
     user = _make_mock_user("student", 100)
     db = _make_mock_db()
@@ -473,7 +477,7 @@ def test_scan_batch_permission_denied():
 def test_scan_batch_too_many_files():
     """A 路由：超过 50 个文件应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import scan_batch, _MAX_BATCH_FILES
+    from backend.api.answer_sheet_scan_routes import scan_batch, _MAX_BATCH_FILES
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -495,7 +499,7 @@ def test_scan_batch_too_many_files():
 def test_scan_batch_count_mismatch():
     """A 路由：文件数与学生数不一致应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import scan_batch
+    from backend.api.answer_sheet_scan_routes import scan_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -516,7 +520,7 @@ def test_scan_batch_count_mismatch():
 def test_scan_batch_invalid_student_ids():
     """A 路由：student_ids 非数字应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import scan_batch
+    from backend.api.answer_sheet_scan_routes import scan_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -537,7 +541,7 @@ def test_scan_batch_invalid_student_ids():
 def test_scan_batch_exam_not_found():
     """A 路由：考试不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import scan_batch
+    from backend.api.answer_sheet_scan_routes import scan_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -560,7 +564,7 @@ def test_scan_batch_partial_failure():
 
     场景：2 个学生，第 1 个 scan_and_grade 抛异常，第 2 个成功
     """
-    from backend.api.answer_sheet_routes import scan_batch
+    from backend.api.answer_sheet_scan_routes import scan_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -569,6 +573,7 @@ def test_scan_batch_partial_failure():
     exam = MagicMock()
     exam.id = 1
     exam.title = "测试考试"
+    exam.teacher_id = 1
     db.query().filter().first.return_value = exam
 
     # mock 学生列表（filter().all() 返回 2 个学生）
@@ -599,7 +604,7 @@ def test_scan_batch_partial_failure():
             raise ValueError("OCR 引擎不可用")
         return success_result
 
-    with patch("backend.api.answer_sheet_routes.answer_sheet_orchestrator.scan_and_grade", side_effect=mock_scan):
+    with patch("backend.api.answer_sheet_scan_routes.answer_sheet_orchestrator.scan_and_grade", side_effect=mock_scan):
         result = asyncio.run(scan_batch(
             exam_id=1,
             files=[file1, file2],
@@ -632,7 +637,7 @@ def test_scan_batch_partial_failure():
 def test_export_excel_batch_permission_denied():
     """D 路由：学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import export_excel_batch
+    from backend.api.answer_sheet_grading_routes import export_excel_batch
 
     user = _make_mock_user("student", 100)
     db = _make_mock_db()
@@ -651,7 +656,7 @@ def test_export_excel_batch_permission_denied():
 def test_export_excel_batch_invalid_ids():
     """D 路由：submission_ids 非数字应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import export_excel_batch
+    from backend.api.answer_sheet_grading_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -670,7 +675,7 @@ def test_export_excel_batch_invalid_ids():
 def test_export_excel_batch_too_many():
     """D 路由：超过 100 个 submission 应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import export_excel_batch
+    from backend.api.answer_sheet_grading_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -692,7 +697,7 @@ def test_export_excel_batch_too_many():
 def test_export_excel_batch_missing_submissions():
     """D 路由：submission 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import export_excel_batch
+    from backend.api.answer_sheet_grading_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()

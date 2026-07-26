@@ -13,6 +13,7 @@ from backend.core.database import get_db
 from backend.core.config import settings
 from backend.core.security import get_current_user
 from backend.core.access import assert_classroom_access, visible_doc_ids
+from backend.core.rate_limit import llm_rate_limit
 from backend.models.tables import Classroom, ChatMessage, Report, Student, AttentionRecord, ExamRiskRecord, RegisteredPerson
 from backend.models.schemas import ChatRequest, ChatMessageOut
 from backend.services.llm_client import get_llm, LLMError
@@ -117,6 +118,7 @@ def _llm_stream(system_prompt: str, messages: list[dict], mode: str = "fast"):
 def send_chat(
     classroom_id: int,
     data: ChatRequest,
+    _rl: None = Depends(llm_rate_limit),
     db: Session = Depends(get_db),
     current_user: RegisteredPerson = Depends(get_current_user),
 ):

@@ -147,7 +147,7 @@ def _make_upload_file(content: bytes = b"fake image bytes",
 def test_regrade_permission_denied_student():
     """学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("student", 100)
     db = _build_db_chain()
@@ -165,7 +165,7 @@ def test_regrade_permission_denied_student():
 def test_regrade_permission_denied_other_teacher():
     """非该考试教师应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 999)
     submission = _make_submission(sid=10, exam_id=1)
@@ -188,7 +188,7 @@ def test_regrade_permission_denied_other_teacher():
 def test_regrade_no_text_no_image():
     """student_text 和 image_file 都没传应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     db = _build_db_chain()
@@ -207,7 +207,7 @@ def test_regrade_no_text_no_image():
 def test_regrade_empty_text():
     """student_text 为空白应返回 400（视为未提供）"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -233,7 +233,7 @@ def test_regrade_empty_text():
 def test_regrade_submission_not_found():
     """submission 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     db = _build_db_chain(submission=None)
@@ -252,7 +252,7 @@ def test_regrade_submission_not_found():
 def test_regrade_question_not_found():
     """question 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -275,7 +275,7 @@ def test_regrade_question_not_found():
 def test_regrade_question_not_in_exam():
     """题目不属于该考试应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -297,7 +297,7 @@ def test_regrade_question_not_in_exam():
 def test_regrade_non_essay_question():
     """非大题（如单选题）应返回 400，提示用 manual-input"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -322,7 +322,7 @@ def test_regrade_non_essay_question():
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_math_success(mock_writing_kg, mock_grading):
     """数学大题 student_text 模式 → grade_math → 满分场景"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -380,7 +380,7 @@ def test_regrade_math_success(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_essay_auto_route_by_keyword(mock_writing_kg, mock_grading):
     """作文题 student_text 模式 → content 含"作文"关键词 → 自动路由 grade_essay"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -447,7 +447,7 @@ def test_regrade_essay_auto_route_by_keyword(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_force_essay_overrides_route(mock_writing_kg, mock_grading):
     """force_essay=True 时即使 content 不含作文关键词也走 grade_essay"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -489,7 +489,7 @@ def test_regrade_force_essay_overrides_route(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_update_existing_answer(mock_writing_kg, mock_grading):
     """已存在 Answer → 应更新而非新建（不调用 db.add）"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=5.0, status="graded")
@@ -540,7 +540,7 @@ def test_regrade_update_existing_answer(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_total_score_recalc(mock_writing_kg, mock_grading):
     """总分重算：多题场景下重批改后总分 = 所有 answer 分数之和"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=5.0, status="graded")
@@ -587,7 +587,7 @@ def test_regrade_total_score_recalc(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_submission_status_to_graded(mock_writing_kg, mock_grading):
     """submission.status 应更新为 'graded'"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -623,7 +623,7 @@ def test_regrade_submission_status_to_graded(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_admin_can_operate_any_exam(mock_writing_kg, mock_grading):
     """admin 角色可以操作任意考试"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("admin", 999)  # admin，且不是该考试教师
     submission = _make_submission(sid=10, exam_id=1)
@@ -660,7 +660,7 @@ def test_regrade_admin_can_operate_any_exam(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_return_complete_fields(mock_writing_kg, mock_grading):
     """返回值应包含所有承诺字段"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -723,7 +723,7 @@ def test_regrade_return_complete_fields(mock_writing_kg, mock_grading):
 def test_regrade_image_mode_ocr_failed(mock_writing_kg, mock_grading):
     """image_file 模式：OCR 失败（needs_manual_input=True）应返回 400 提示用 student_text"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     # 显式设置 AsyncMock，避免 MagicMock 不能 await 或缺少 assert_not_awaited
     mock_grading.grade_math = AsyncMock()
@@ -766,7 +766,7 @@ def test_regrade_image_mode_ocr_failed(mock_writing_kg, mock_grading):
 @patch("backend.services.writing_graph.writing_kg")
 def test_regrade_image_mode_success(mock_writing_kg, mock_grading):
     """image_file 模式：OCR 成功 → 走 LLM"""
-    from backend.api.answer_sheet_routes import regrade_essay
+    from backend.api.answer_sheet_grading_routes import regrade_essay
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")

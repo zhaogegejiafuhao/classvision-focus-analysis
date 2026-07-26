@@ -115,7 +115,7 @@ def _build_db_with_chain(submission=None, exam=None, question=None,
 def test_manual_input_permission_denied_student():
     """学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("student", 100)
     db = _build_db_with_chain()
@@ -134,7 +134,7 @@ def test_manual_input_permission_denied_student():
 def test_manual_input_permission_denied_other_teacher():
     """非该考试教师应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 999)  # 不同 teacher_id
     submission = _make_submission(sid=10, exam_id=1)
@@ -157,7 +157,7 @@ def test_manual_input_permission_denied_other_teacher():
 def test_manual_input_submission_not_found():
     """submission 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     db = _build_db_with_chain(submission=None)  # submission 不存在
@@ -176,7 +176,7 @@ def test_manual_input_submission_not_found():
 def test_manual_input_question_not_found():
     """question 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -200,7 +200,7 @@ def test_manual_input_question_not_found():
 def test_manual_input_question_not_in_exam():
     """题目不属于该考试应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -223,7 +223,7 @@ def test_manual_input_question_not_in_exam():
 def test_manual_input_essay_not_allowed():
     """大题不支持人工补录应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -245,7 +245,7 @@ def test_manual_input_essay_not_allowed():
 def test_manual_input_empty_answer():
     """学生答案为空应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1)
@@ -268,7 +268,7 @@ def test_manual_input_empty_answer():
 
 def test_manual_input_single_correct():
     """单选题正确答案 → 满分"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -313,7 +313,7 @@ def test_manual_input_single_correct():
 
 def test_manual_input_single_wrong():
     """单选题错误答案 → 0 分"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -345,7 +345,7 @@ def test_manual_input_fill_multi_blank_partial():
     标准答案 "0;1;2"（3 空，每空 2 分），学生答 "0;1;5"（前两空对，第三空错）
     期望：score=4.0（2/3 * 6 ≈ 4.0），is_correct=False
     """
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -381,7 +381,7 @@ def test_manual_input_fill_unit_equivalence():
 
     标准答案 "5kg"，学生答 "5千克" → 数值相同 + 单位等价 → 满分
     """
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -415,7 +415,7 @@ def test_manual_input_numeric_tolerance():
 
     标准答案 "3.14"，学生答 "3.140" → 数值等价 → 满分
     """
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -446,7 +446,7 @@ def test_manual_input_numeric_tolerance():
 
 def test_manual_input_update_existing_answer():
     """已存在 Answer → 应更新而非新建（不调用 db.add）"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -491,7 +491,7 @@ def test_manual_input_update_existing_answer():
 
 def test_manual_input_total_score_recalc():
     """总分重算：多题场景下人工补录后总分 = 所有 answer 分数之和"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=7.0, status="graded")
@@ -526,7 +526,7 @@ def test_manual_input_total_score_recalc():
 
 def test_manual_input_submission_status_to_graded():
     """submission.status 应更新为 'graded'（即使原来是 pending）"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -554,7 +554,7 @@ def test_manual_input_submission_status_to_graded():
 
 def test_manual_input_judge_question():
     """判断题人工补录"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("teacher", 1)
     submission = _make_submission(sid=10, exam_id=1, score=0.0, status="pending")
@@ -584,7 +584,7 @@ def test_manual_input_judge_question():
 
 def test_manual_input_admin_can_operate_any_exam():
     """admin 角色可以操作任意考试（即使不是该考试的教师）"""
-    from backend.api.answer_sheet_routes import manual_input_answer
+    from backend.api.answer_sheet_grading_routes import manual_input_answer
 
     user = _make_user("admin", 999)  # admin，且不是该考试教师
     submission = _make_submission(sid=10, exam_id=1)

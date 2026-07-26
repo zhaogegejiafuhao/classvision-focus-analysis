@@ -7,6 +7,10 @@ from contextlib import asynccontextmanager
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
+# 初始化结构化日志（必须在其他 import 之前，确保所有模块用统一配置）
+from backend.core.logging_config import setup_logging
+setup_logging()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +28,9 @@ from backend.api.notification_routes import router as notification_router
 from backend.api.homework_routes import router as homework_router
 from backend.api.checkin_routes import router as checkin_router
 from backend.api.exam_routes import router as exam_router
+from backend.api.exam_submission_routes import router as exam_submission_router
+from backend.api.exam_stats_report_routes import router as exam_stats_report_router
+from backend.api.exam_ai_grading_routes import router as exam_ai_grading_router
 from backend.api.question_bank_routes import router as question_bank_router
 from backend.api.material_routes import router as material_router
 from backend.api.grade_routes import router as grade_router
@@ -37,20 +44,22 @@ from backend.api.attribution_routes import router as attribution_router
 from backend.api.correction_routes import router as correction_router
 from backend.api.similar_question_routes import router as similar_question_router
 from backend.api.answer_sheet_routes import router as answer_sheet_router
+from backend.api.answer_sheet_scan_routes import router as answer_sheet_scan_router
+from backend.api.answer_sheet_template_routes import router as answer_sheet_template_router
+from backend.api.answer_sheet_grading_routes import router as answer_sheet_grading_router
+from backend.api.exam_review_routes import router as exam_review_router
 from backend.api.exam_compose_routes import template_router, compose_router, review_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
-from backend.core.config import settings
+from backend.core.config import settings, PROJECT_ROOT
 from backend.models import tables  # noqa: F401 — 确保 Base 能发现所有表
 from backend.models.tables import RegisteredPerson, OjProblem, OjTestCase, ExamTemplate
 
-# 配置 RAG 检索链路日志
+# RAG 日志：setup_logging() 已配置控制台输出，这里额外加文件输出用于审计
 os.makedirs("logs", exist_ok=True)
-_rag_logger = logging.getLogger("rag")
-_rag_logger.setLevel(logging.INFO)
-_rag_handler = logging.FileHandler("logs/rag_query.log", encoding="utf-8")
-_rag_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-_rag_logger.addHandler(_rag_handler)
+_rag_file_handler = logging.FileHandler("logs/rag_query.log", encoding="utf-8")
+_rag_file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logging.getLogger("rag").addHandler(_rag_file_handler)
 
 
 def _create_default_accounts():
@@ -339,6 +348,9 @@ app.include_router(notification_router)
 app.include_router(homework_router)
 app.include_router(checkin_router)
 app.include_router(exam_router)
+app.include_router(exam_submission_router)
+app.include_router(exam_stats_report_router)
+app.include_router(exam_ai_grading_router)
 app.include_router(question_bank_router)
 app.include_router(material_router)
 app.include_router(grade_router)
@@ -352,6 +364,10 @@ app.include_router(attribution_router)
 app.include_router(correction_router)
 app.include_router(similar_question_router)
 app.include_router(answer_sheet_router)
+app.include_router(answer_sheet_scan_router)
+app.include_router(answer_sheet_template_router)
+app.include_router(answer_sheet_grading_router)
+app.include_router(exam_review_router)
 app.include_router(template_router)
 app.include_router(compose_router)
 app.include_router(review_router)
@@ -371,4 +387,108 @@ app.mount("/static", StaticFiles(directory="backend/static"), name="static")
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "ClassVision"}
+    """完整健康检查：返回服务、数据库、磁盘、内存等关键指标状态。
+
+    用于运维监控和容器编排就绪探针。
+    """
+    import psutil
+    import time
+    from datetime import timedelta
+
+    checks = {}
+    overall = "ok"
+
+    # ─── 1. 数据库连通性 ──────────────────────────────
+    try:
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            checks["database"] = {"status": "ok"}
+        finally:
+            db.close()
+    except Exception as e:
+        checks["database"] = {"status": "error", "error": str(e)}
+        overall = "degraded"
+
+    # ─── 2. 磁盘空间 ─────────────────────────────────
+    try:
+        disk = psutil.disk_usage(str(PROJECT_ROOT))
+        disk_free_mb = disk.free / (1024 * 1024)
+        disk_status = "ok" if disk_free_mb > 500 else "warning"
+        if disk_status != "ok" and overall == "ok":
+            overall = "degraded"
+        checks["disk"] = {
+            "status": disk_status,
+            "free_mb": round(disk_free_mb, 1),
+            "total_mb": round(disk.total / (1024 * 1024), 1),
+            "percent_used": round(disk.used / disk.total * 100, 1),
+        }
+    except Exception as e:
+        checks["disk"] = {"status": "unknown", "error": str(e)}
+
+    # ─── 3. 内存使用 ─────────────────────────────────
+    try:
+        mem = psutil.virtual_memory()
+        mem_status = "ok" if mem.percent < 90 else "warning"
+        if mem_status != "ok" and overall == "ok":
+            overall = "degraded"
+        checks["memory"] = {
+            "status": mem_status,
+            "percent_used": mem.percent,
+            "available_mb": round(mem.available / (1024 * 1024), 1),
+        }
+    except Exception as e:
+        checks["memory"] = {"status": "unknown", "error": str(e)}
+
+    # ─── 4. 数据库文件大小 ────────────────────────────
+    try:
+        db_path = PROJECT_ROOT / "classvision.db"
+        if db_path.exists():
+            checks["database"]["size_mb"] = round(db_path.stat().st_size / (1024 * 1024), 2)
+    except Exception:
+        pass
+
+    # ─── 5. 进程运行时间 ──────────────────────────────
+    try:
+        process = psutil.Process()
+        checks["process"] = {
+            "status": "ok",
+            "uptime": str(timedelta(seconds=int(time.time() - process.create_time()))),
+            "pid": process.pid,
+        }
+    except Exception:
+        pass
+
+    return {
+        "status": overall,
+        "service": "ClassVision",
+        "version": "1.0.0",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "checks": checks,
+    }
+
+
+@app.get("/api/live")
+async def liveness():
+    """存活探针：进程能响应即认为活着（不检查依赖）。"""
+    return {"status": "alive"}
+
+
+@app.get("/api/ready")
+async def readiness():
+    """就绪探针：数据库可连通才认为就绪。"""
+    try:
+        from sqlalchemy import text
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+        finally:
+            db.close()
+        return {"status": "ready"}
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "error": str(e)},
+        )

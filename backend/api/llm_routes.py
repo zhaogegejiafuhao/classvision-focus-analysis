@@ -6,6 +6,7 @@ from typing import Optional
 
 from backend.core.config import settings, Settings
 from backend.core.security import get_current_user, assert_teacher_or_admin
+from backend.core.rate_limit import llm_rate_limit
 from backend.services.llm_client import get_llm, LLMError, PROVIDER_BASE_URLS
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])

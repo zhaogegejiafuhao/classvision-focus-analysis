@@ -366,7 +366,7 @@ def test_concat_blocks_unordered_input():
 
 def test_auto_grade_fill_single():
     """auto_grade fill 分支：单空场景"""
-    from backend.api.exam_routes import auto_grade
+    from backend.services.exam_service import auto_grade
     from unittest.mock import MagicMock
 
     q = MagicMock()
@@ -392,7 +392,7 @@ def test_auto_grade_fill_single():
 
 def test_auto_grade_fill_multi():
     """auto_grade fill 分支：多空场景，按比例给部分分"""
-    from backend.api.exam_routes import auto_grade
+    from backend.services.exam_service import auto_grade
     from unittest.mock import MagicMock
 
     q = MagicMock()

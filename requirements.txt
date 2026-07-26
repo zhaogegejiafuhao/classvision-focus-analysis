@@ -23,6 +23,7 @@ ollama==0.4.7                # Ollama Python SDK，调用本地大模型
 
 # --- 数据库 ---
 sqlalchemy==2.0.36           # ORM
+alembic>=1.13.0              # 数据库迁移
 
 # --- 配置与工具 ---
 pydantic==2.10.4
@@ -30,6 +31,7 @@ pydantic-settings==2.7.1
 python-dotenv==1.0.1
 python-jose[cryptography]==3.3.0  # JWT 鉴权
 bcrypt>=4.0.0                     # 密码哈希
+psutil>=5.9.0                     # 系统监控（健康检查端点使用）
 
 # --- RAG 模块 ---
 sentence-transformers>=2.2.0   # 文本嵌入模型
