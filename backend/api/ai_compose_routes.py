@@ -1,16 +1,13 @@
-"""AI 智能组卷 + 试卷模板管理 API
+"""AI 智能组卷路由（从 exam_compose_routes.py 拆分）
 
-提供以下接口：
-- POST /api/exam-templates                     创建试卷模板
-- GET  /api/exam-templates                     获取模板列表（含内置）
-- GET  /api/exam-templates/{id}                获取模板详情
-- DELETE /api/exam-templates/{id}              删除自定义模板
-- POST /api/question-bank/ai-compose           AI 智能组卷（自然语言→题库匹配+LLM补题）
+提供自然语言→题库匹配+LLM补题的智能组卷接口：
+- POST /api/question-bank/ai-compose   AI 智能组卷
+
+流程：自然语言描述 → LLM 解析生成组卷方案 → 从题库匹配题目 → 创建 draft 考试
 """
 import json
 import logging
 import random
-from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,123 +17,22 @@ from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core.security import get_current_user
 from backend.models.tables import (
-    QuestionBank, Exam, Question, RegisteredPerson, ExamTemplate, Student, Notification,
+    Exam,
+    ExamTemplate,
+    Question,
+    QuestionBank,
+    RegisteredPerson,
 )
 
 logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/question-bank", tags=["ai-compose"])
 
 _TYPE_MAP = {"single": "单选", "multi": "多选", "judge": "判断", "fill": "填空", "essay": "简答"}
 
 
 def getTypeText(t: str) -> str:
     return _TYPE_MAP.get(t, t)
-
-
-# ─── 试卷模板路由 ──────────────────────────────────────
-
-template_router = APIRouter(prefix="/api/exam-templates", tags=["exam-templates"])
-
-
-class ExamTemplateCreate(BaseModel):
-    name: str
-    description: str = ""
-    total_score: float = 100.0
-    duration: int = 90
-    # [{"type":"single","count":10,"score_per":5,"knowledge":["极限"],"difficulty":2}, ...]
-    structure: list[dict]
-
-
-class ExamTemplateOut(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    total_score: float
-    duration: int
-    structure: list[dict]
-    is_builtin: bool
-    created_by: int | None
-
-    class Config:
-        from_attributes = True
-
-
-@template_router.get("", response_model=list[ExamTemplateOut])
-def list_templates(
-    current_user: RegisteredPerson = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """获取试卷模板列表（内置 + 自己创建的）"""
-    query = db.query(ExamTemplate)
-    # 内置模板所有人可见，自定义模板只有创建者可见
-    if current_user.role != "admin":
-        query = query.filter(
-            (ExamTemplate.is_builtin == True) | (ExamTemplate.created_by == current_user.id)
-        )
-    templates = query.order_by(ExamTemplate.is_builtin.desc(), ExamTemplate.created_at.desc()).all()
-    result = []
-    for t in templates:
-        result.append(ExamTemplateOut(
-            id=t.id, name=t.name, description=t.description,
-            total_score=t.total_score, duration=t.duration,
-            structure=json.loads(t.structure) if t.structure else [],
-            is_builtin=t.is_builtin, created_by=t.created_by,
-        ))
-    return result
-
-
-@template_router.post("", response_model=ExamTemplateOut)
-def create_template(
-    data: ExamTemplateCreate,
-    current_user: RegisteredPerson = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """创建自定义试卷模板"""
-    if current_user.role not in ("teacher", "admin"):
-        raise HTTPException(403, "只有教师可以创建模板")
-
-    t = ExamTemplate(
-        name=data.name,
-        description=data.description,
-        total_score=data.total_score,
-        duration=data.duration,
-        structure=json.dumps(data.structure, ensure_ascii=False),
-        is_builtin=False,
-        created_by=current_user.id,
-    )
-    db.add(t)
-    db.commit()
-    db.refresh(t)
-
-    return ExamTemplateOut(
-        id=t.id, name=t.name, description=t.description,
-        total_score=t.total_score, duration=t.duration,
-        structure=data.structure,
-        is_builtin=t.is_builtin, created_by=t.created_by,
-    )
-
-
-@template_router.delete("/{template_id}")
-def delete_template(
-    template_id: int,
-    current_user: RegisteredPerson = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """删除自定义模板（内置模板不可删除）"""
-    t = db.query(ExamTemplate).filter(ExamTemplate.id == template_id).first()
-    if not t:
-        raise HTTPException(404, "模板不存在")
-    if t.is_builtin:
-        raise HTTPException(400, "内置模板不可删除")
-    if t.created_by != current_user.id and current_user.role != "admin":
-        raise HTTPException(403, "无权删除")
-    db.delete(t)
-    db.commit()
-    return {"success": True}
-
-
-# ─── AI 智能组卷路由 ────────────────────────────────────
-
-compose_router = APIRouter(prefix="/api/question-bank", tags=["ai-compose"])
 
 
 class AIComposeRequest(BaseModel):
@@ -244,7 +140,7 @@ def _parse_llm_json(text: str) -> dict | None:
     return None
 
 
-@compose_router.post("/ai-compose", response_model=AIComposeResult)
+@router.post("/ai-compose", response_model=AIComposeResult)
 async def ai_compose_exam(
     data: AIComposeRequest,
     current_user: RegisteredPerson = Depends(get_current_user),
@@ -442,170 +338,3 @@ async def ai_compose_exam(
         total_score=total_score,
         questions=questions_preview,
     )
-
-
-# ─── 考试审核与发布路由 ──────────────────────────────────
-
-review_router = APIRouter(prefix="/api/exams", tags=["exam-review"])
-
-
-class ExamPreviewResult(BaseModel):
-    """考试预览结果"""
-    exam_id: int
-    title: str
-    description: str
-    status: str
-    duration: int
-    total_score: float
-    classroom_id: int | None
-    questions: list[dict]
-
-
-@review_router.get("/{exam_id}/preview", response_model=ExamPreviewResult)
-def preview_exam(
-    exam_id: int,
-    current_user: RegisteredPerson = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """获取 draft 考试的完整预览（审核确认前查看详情）"""
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(404, "考试不存在")
-    if exam.teacher_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(403, "无权查看此考试")
-
-    questions = db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order).all()
-
-    questions_detail = []
-    for q in questions:
-        # 查找题库中的原始题目（用于换题参考）
-        bank_q = db.query(QuestionBank).filter(
-            QuestionBank.content == q.content,
-            QuestionBank.type == q.type,
-        ).first()
-
-        questions_detail.append({
-            "id": q.id,
-            "bank_id": bank_q.id if bank_q else None,
-            "order": q.order,
-            "type": q.type,
-            "content": q.content,
-            "options": json.loads(q.options) if q.options else None,
-            "answer": q.answer,
-            "score": q.score,
-            "suggested_score": q.score,
-            "knowledge_points": json.loads(q.knowledge_points) if q.knowledge_points else [],
-            "source": bank_q.source if bank_q else "题库",
-            "category": bank_q.category if bank_q else None,
-            "tags": bank_q.tags if bank_q else None,
-            "difficulty": bank_q.difficulty if bank_q else None,
-            "analysis": bank_q.analysis if bank_q else None,
-        })
-
-    return ExamPreviewResult(
-        exam_id=exam.id,
-        title=exam.title,
-        description=exam.description or "",
-        status=exam.status,
-        duration=exam.duration,
-        total_score=exam.total_score,
-        classroom_id=exam.classroom_id,
-        questions=questions_detail,
-    )
-
-
-class PublishExamRequest(BaseModel):
-    """发布考试请求"""
-    score_overrides: dict[int, float] | None = None  # 分值覆盖 {question_id: new_score}（Question表的ID）
-    remove_question_ids: list[int] | None = None  # 要删除的题目 ID（Question表的ID）
-    swap_questions: list[dict] | None = None  # 要替换的题目 [{"old_id": 1, "new_bank_id": 5}]
-    title: str | None = None  # 更新标题
-    duration: int | None = None  # 更新时长
-
-
-@review_router.post("/{exam_id}/publish")
-def publish_exam(
-    exam_id: int,
-    data: PublishExamRequest,
-    current_user: RegisteredPerson = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """将 draft 考试发布（教师审核确认后调用）"""
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(404, "考试不存在")
-    if exam.teacher_id != current_user.id and current_user.role != "admin":
-        raise HTTPException(403, "无权发布此考试")
-    if exam.status != "draft":
-        raise HTTPException(400, f"考试当前状态为 {exam.status}，无法重复发布")
-
-    # ── 1. 处理分值覆盖 ──
-    if data.score_overrides:
-        for q_id, new_score in data.score_overrides.items():
-            q = db.query(Question).filter(Question.id == q_id, Question.exam_id == exam_id).first()
-            if q:
-                q.score = new_score
-
-    # ── 2. 处理题目删除 ──
-    if data.remove_question_ids:
-        for q_id in data.remove_question_ids:
-            q = db.query(Question).filter(Question.id == q_id, Question.exam_id == exam_id).first()
-            if q:
-                db.delete(q)
-
-    # ── 3. 处理题目替换 ──
-    if data.swap_questions:
-        for swap in data.swap_questions:
-            old_id = swap.get("old_id")
-            new_bank_id = swap.get("new_bank_id")
-            if old_id and new_bank_id:
-                old_q = db.query(Question).filter(Question.id == old_id, Question.exam_id == exam_id).first()
-                new_bank_q = db.query(QuestionBank).filter(QuestionBank.id == new_bank_id).first()
-                if old_q and new_bank_q:
-                    old_q.type = new_bank_q.type
-                    old_q.content = new_bank_q.content
-                    old_q.options = new_bank_q.options
-                    old_q.answer = new_bank_q.answer
-                    # 保留原题分值（教师可在 score_overrides 中单独调整）
-                    old_q.knowledge_points = json.dumps(
-                        [new_bank_q.category] if new_bank_q.category else [], ensure_ascii=False
-                    )
-
-    # ── 4. 更新标题/时长 ──
-    if data.title:
-        exam.title = data.title
-    if data.duration:
-        exam.duration = data.duration
-
-    # ── 5. 重新计算总分和重排顺序 ──
-    remaining_questions = db.query(Question).filter(Question.exam_id == exam_id).order_by(Question.order).all()
-    for i, q in enumerate(remaining_questions):
-        q.order = i + 1
-    exam.total_score = sum(q.score for q in remaining_questions)
-    exam.status = "published"
-
-    # 发送通知给学生
-    if exam.classroom_id:
-        students = db.query(Student).filter(Student.classroom_id == exam.classroom_id).all()
-        for student in students:
-            if student.person:
-                notification = Notification(
-                    title=f"考试通知：{exam.title}",
-                    content=f"您有一个考试需要参加，时长 {exam.duration} 分钟。",
-                    type="exam",
-                    sender_id=current_user.id,
-                    receiver_id=student.person_id,
-                    classroom_id=exam.classroom_id,
-                )
-                db.add(notification)
-
-    db.commit()
-
-    return {
-        "success": True,
-        "exam_id": exam.id,
-        "title": exam.title,
-        "status": "published",
-        "question_count": len(remaining_questions),
-        "total_score": exam.total_score,
-    }

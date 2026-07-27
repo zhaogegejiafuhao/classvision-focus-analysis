@@ -55,7 +55,9 @@ from backend.api.answer_sheet_grading_routes import router as answer_sheet_gradi
 from backend.api.answer_sheet_export_routes import router as answer_sheet_export_router
 from backend.api.exam_review_routes import router as exam_review_router
 from backend.api.exam_review_export_routes import router as exam_review_export_router
-from backend.api.exam_compose_routes import template_router, compose_router, review_router
+from backend.api.exam_template_routes import router as exam_template_router
+from backend.api.ai_compose_routes import router as ai_compose_router
+from backend.api.exam_publish_routes import router as exam_publish_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
 from backend.core.config import settings, PROJECT_ROOT
@@ -382,9 +384,9 @@ app.include_router(answer_sheet_grading_router)
 app.include_router(answer_sheet_export_router)
 app.include_router(exam_review_router)
 app.include_router(exam_review_export_router)
-app.include_router(template_router)
-app.include_router(compose_router)
-app.include_router(review_router)
+app.include_router(exam_template_router)
+app.include_router(ai_compose_router)
+app.include_router(exam_publish_router)
 
 # 挂载上传目录
 os.makedirs("uploads/materials", exist_ok=True)
