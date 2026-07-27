@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # OJ 判题机配置
     OJ_JUDGER_URL: str = "http://127.0.0.1:12345"  # judger 容器映射地址
 
+    # ===== 模型预热配置 =====
+    # 默认关闭：模型在首次请求时懒加载，避免启动时占用 ~1-2GB 内存
+    # 设为 true 时恢复启动时全量预热行为（首次推理无延迟）
+    PRELOAD_CV_MODELS: bool = False  # YOLO + FaceLandmarker + InsightFace（课堂监控用）
+    PRELOAD_RERANKER: bool = False   # RAG 重排模型（仅 RAG_RERANKER_ENABLED=True 时有效）
+
     # ===== AI 智能批改配置（ZhiReviewPi迁移） =====
     # 百度手写OCR
     BAIDU_OCR_API_KEY: str = ""

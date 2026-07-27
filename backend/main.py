@@ -124,11 +124,18 @@ async def lifespan(app: FastAPI):
     _create_default_accounts()
     _seed_oj_problems()
     _seed_builtin_templates()
-    # 模型预热改为后台线程，不阻塞服务器启动
+    # 模型预热：默认关闭，按需懒加载以节省 ~1-2GB 内存
+    # 设 PRELOAD_CV_MODELS=true / PRELOAD_RERANKER=true 可恢复启动时全量预热
     import threading
-    threading.Thread(target=_warmup_models, daemon=True, name="model-warmup").start()
-    # RAG reranker 也改为后台线程
-    threading.Thread(target=_preload_reranker, daemon=True, name="reranker-preload").start()
+    from backend.core.config import settings
+    if settings.PRELOAD_CV_MODELS:
+        threading.Thread(target=_warmup_models, daemon=True, name="model-warmup").start()
+    else:
+        logging.getLogger("uvicorn").info("CV 模型懒加载已启用（PRELOAD_CV_MODELS=false）")
+    if settings.PRELOAD_RERANKER and settings.RAG_RERANKER_ENABLED:
+        threading.Thread(target=_preload_reranker, daemon=True, name="reranker-preload").start()
+    elif settings.RAG_RERANKER_ENABLED:
+        logging.getLogger("uvicorn").info("RAG 重排模型懒加载已启用（PRELOAD_RERANKER=false）")
     yield
 
 
