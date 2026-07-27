@@ -55,33 +55,33 @@ def _make_mock_homework(homework_id=5, title="周练卷第3题", description="�
 # ============ _parse_kp_list 测试 ============
 
 def test_parse_kp_list_normal():
-    from backend.api.correction_routes import _parse_kp_list
+    from backend.api.mistake_book_routes import _parse_kp_list
     assert _parse_kp_list('["一元二次方程", "因式分解"]') == ["一元二次方程", "因式分解"]
 
 
 def test_parse_kp_list_empty():
-    from backend.api.correction_routes import _parse_kp_list
+    from backend.api.mistake_book_routes import _parse_kp_list
     assert _parse_kp_list(None) == []
     assert _parse_kp_list("") == []
 
 
 def test_parse_kp_list_string():
-    from backend.api.correction_routes import _parse_kp_list
+    from backend.api.mistake_book_routes import _parse_kp_list
     assert _parse_kp_list('"单一知识点"') == ["单一知识点"]
 
 
 def test_parse_kp_list_invalid_json():
-    from backend.api.correction_routes import _parse_kp_list
+    from backend.api.mistake_book_routes import _parse_kp_list
     assert _parse_kp_list("not json") == []
 
 
 # ============ GET /list 测试 ============
 
-@patch("backend.api.correction_routes.get_current_user")
-@patch("backend.api.correction_routes.get_db")
+@patch("backend.api.mistake_book_routes.get_current_user")
+@patch("backend.api.mistake_book_routes.get_db")
 def test_list_mistakes_student_sees_own(db_mock, auth_mock):
     """学生角色：只能看自己的错题，忽略传入的 student_id"""
-    from backend.api.correction_routes import list_mistakes
+    from backend.api.mistake_book_routes import list_mistakes
 
     student = _make_mock_user(role="student", uid=42)
     auth_mock.return_value = student
@@ -115,11 +115,11 @@ def test_list_mistakes_student_sees_own(db_mock, auth_mock):
     assert result["items"][0]["grading_id"] == 1
 
 
-@patch("backend.api.correction_routes.get_current_user")
-@patch("backend.api.correction_routes.get_db")
+@patch("backend.api.mistake_book_routes.get_current_user")
+@patch("backend.api.mistake_book_routes.get_db")
 def test_list_mistakes_empty(db_mock, auth_mock):
     """没有错题时返回空列表"""
-    from backend.api.correction_routes import list_mistakes
+    from backend.api.mistake_book_routes import list_mistakes
 
     teacher = _make_mock_user(role="teacher", uid=1)
     auth_mock.return_value = teacher
@@ -149,11 +149,11 @@ def test_list_mistakes_empty(db_mock, auth_mock):
 
 # ============ GET /{grading_id} 测试 ============
 
-@patch("backend.api.correction_routes.get_current_user")
-@patch("backend.api.correction_routes.get_db")
+@patch("backend.api.mistake_book_routes.get_current_user")
+@patch("backend.api.mistake_book_routes.get_db")
 def test_get_mistake_detail_success(db_mock, auth_mock):
     """正常获取错题详情"""
-    from backend.api.correction_routes import get_mistake_detail
+    from backend.api.mistake_book_routes import get_mistake_detail
     from backend.models.tables import CorrectionRecord
 
     teacher = _make_mock_user(role="teacher", uid=1)
@@ -202,11 +202,11 @@ def test_get_mistake_detail_success(db_mock, auth_mock):
     assert result["correction_records"][0]["improved"] is True
 
 
-@patch("backend.api.correction_routes.get_current_user")
-@patch("backend.api.correction_routes.get_db")
+@patch("backend.api.mistake_book_routes.get_current_user")
+@patch("backend.api.mistake_book_routes.get_db")
 def test_get_mistake_detail_not_found(db_mock, auth_mock):
     """批改记录不存在返回 404"""
-    from backend.api.correction_routes import get_mistake_detail
+    from backend.api.mistake_book_routes import get_mistake_detail
     from fastapi import HTTPException
 
     teacher = _make_mock_user(role="teacher", uid=1)
@@ -225,11 +225,11 @@ def test_get_mistake_detail_not_found(db_mock, auth_mock):
         assert e.status_code == 404
 
 
-@patch("backend.api.correction_routes.get_current_user")
-@patch("backend.api.correction_routes.get_db")
+@patch("backend.api.mistake_book_routes.get_current_user")
+@patch("backend.api.mistake_book_routes.get_db")
 def test_get_mistake_detail_student_forbidden(db_mock, auth_mock):
     """学生不能看别人的错题"""
-    from backend.api.correction_routes import get_mistake_detail
+    from backend.api.mistake_book_routes import get_mistake_detail
     from fastapi import HTTPException
 
     student = _make_mock_user(role="student", uid=42)

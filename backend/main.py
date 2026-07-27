@@ -47,6 +47,7 @@ from backend.api.llm_routes import router as llm_router
 from backend.api.grading_routes import router as grading_router
 from backend.api.attribution_routes import router as attribution_router
 from backend.api.correction_routes import router as correction_router
+from backend.api.mistake_book_routes import router as mistake_book_router
 from backend.api.similar_question_routes import router as similar_question_router
 from backend.api.answer_sheet_routes import router as answer_sheet_router
 from backend.api.answer_sheet_scan_routes import router as answer_sheet_scan_router
@@ -376,6 +377,7 @@ app.include_router(llm_router)
 app.include_router(grading_router)
 app.include_router(attribution_router)
 app.include_router(correction_router)
+app.include_router(mistake_book_router)
 app.include_router(similar_question_router)
 app.include_router(answer_sheet_router)
 app.include_router(answer_sheet_scan_router)
