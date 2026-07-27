@@ -634,7 +634,7 @@ def test_scan_batch_partial_failure():
 def test_export_excel_batch_permission_denied():
     """D 路由：学生角色应返回 403"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_grading_routes import export_excel_batch
+    from backend.api.answer_sheet_export_routes import export_excel_batch
 
     user = _make_mock_user("student", 100)
     db = _make_mock_db()
@@ -653,7 +653,7 @@ def test_export_excel_batch_permission_denied():
 def test_export_excel_batch_invalid_ids():
     """D 路由：submission_ids 非数字应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_grading_routes import export_excel_batch
+    from backend.api.answer_sheet_export_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -672,7 +672,7 @@ def test_export_excel_batch_invalid_ids():
 def test_export_excel_batch_too_many():
     """D 路由：超过 100 个 submission 应返回 400"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_grading_routes import export_excel_batch
+    from backend.api.answer_sheet_export_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()
@@ -694,7 +694,7 @@ def test_export_excel_batch_too_many():
 def test_export_excel_batch_missing_submissions():
     """D 路由：submission 不存在应返回 404"""
     from fastapi import HTTPException
-    from backend.api.answer_sheet_grading_routes import export_excel_batch
+    from backend.api.answer_sheet_export_routes import export_excel_batch
 
     user = _make_mock_user("teacher", 1)
     db = _make_mock_db()

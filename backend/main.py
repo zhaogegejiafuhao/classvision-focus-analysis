@@ -18,14 +18,19 @@ from fastapi.staticfiles import StaticFiles
 from backend.api.routes import router as ws_router, _warmup_models
 from backend.api.classroom_routes import router as classroom_router
 from backend.api.stats_routes import router as stats_router
+from backend.api.student_stats_routes import router as student_stats_router
 from backend.api.chat_routes import router as chat_router
 from backend.api.person_routes import router as person_router
 from backend.api.rag_routes import router as rag_router
+from backend.api.rag_document_routes import router as rag_document_router
+from backend.api.rag_conversation_routes import router as rag_conversation_router
 from backend.api.oj_routes import router as oj_router
 from backend.api.auth_routes import router as auth_router
 from backend.api.import_routes import router as import_router
 from backend.api.notification_routes import router as notification_router
 from backend.api.homework_routes import router as homework_router
+from backend.api.homework_submission_routes import router as homework_submission_router
+from backend.api.homework_extension_routes import router as homework_extension_router
 from backend.api.checkin_routes import router as checkin_router
 from backend.api.exam_routes import router as exam_router
 from backend.api.exam_submission_routes import router as exam_submission_router
@@ -47,7 +52,9 @@ from backend.api.answer_sheet_routes import router as answer_sheet_router
 from backend.api.answer_sheet_scan_routes import router as answer_sheet_scan_router
 from backend.api.answer_sheet_template_routes import router as answer_sheet_template_router
 from backend.api.answer_sheet_grading_routes import router as answer_sheet_grading_router
+from backend.api.answer_sheet_export_routes import router as answer_sheet_export_router
 from backend.api.exam_review_routes import router as exam_review_router
+from backend.api.exam_review_export_routes import router as exam_review_export_router
 from backend.api.exam_compose_routes import template_router, compose_router, review_router
 from backend.core.database import init_db, SessionLocal
 from backend.core.security import hash_password
@@ -338,13 +345,18 @@ app.add_middleware(
 app.include_router(ws_router)
 app.include_router(classroom_router)
 app.include_router(stats_router)
+app.include_router(student_stats_router)
 app.include_router(chat_router)
 app.include_router(person_router)
 app.include_router(rag_router)
+app.include_router(rag_document_router)
+app.include_router(rag_conversation_router)
 app.include_router(oj_router)
 app.include_router(auth_router)
 app.include_router(import_router)
 app.include_router(notification_router)
+app.include_router(homework_extension_router)
+app.include_router(homework_submission_router)
 app.include_router(homework_router)
 app.include_router(checkin_router)
 app.include_router(exam_router)
@@ -367,7 +379,9 @@ app.include_router(answer_sheet_router)
 app.include_router(answer_sheet_scan_router)
 app.include_router(answer_sheet_template_router)
 app.include_router(answer_sheet_grading_router)
+app.include_router(answer_sheet_export_router)
 app.include_router(exam_review_router)
+app.include_router(exam_review_export_router)
 app.include_router(template_router)
 app.include_router(compose_router)
 app.include_router(review_router)

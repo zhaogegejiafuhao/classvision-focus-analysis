@@ -1,5 +1,6 @@
 """题库管理 API"""
 import json
+import logging
 import random
 from typing import Optional
 
@@ -10,6 +11,8 @@ from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core.security import get_current_user
 from backend.models.tables import QuestionBank, Exam, Question, RegisteredPerson
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/question-bank", tags=["question-bank"])
 

@@ -57,6 +57,7 @@ data/faces/
 
 # Model files (large)
 models/insightface/
+models/sentence-transformers/
 models/yolov8n.pt
 /yolov8n.pt
 
